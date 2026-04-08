@@ -8125,6 +8125,60 @@ PAGES['collab-entretien-ia'] = function(mc) {
 // RH — PAGES ADMIN
 // ============================================================
 
+
+function adminAddConge() {
+  var collabs = getCollabNames().filter(function(n){ return n !== 'Admin'; });
+  var opts = collabs.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('');
+  var html = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center">'
+    + '<div style="background:white;border-radius:12px;padding:24px;width:380px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+    + '<h3 style="margin:0 0 16px;font-size:1rem">➕ Ajouter un congé manuellement</h3>'
+    + '<div class="form-group"><label class="fl">Collaboratrice</label><select id="adm-collab" class="form-input">'+opts+'</select></div>'
+    + '<div class="form-group"><label class="fl">Type</label><select id="adm-type" class="form-input"><option>Congés payés</option><option>Récupération (½ journée)</option><option>Récupération (journée entière)</option><option>Congé sans solde</option><option>Congé exceptionnel</option><option>Arrêt maladie</option></select></div>'
+    + '<div class="form-group"><label class="fl">Date de début</label><input type="date" id="adm-debut" class="form-input"></div>'
+    + '<div class="form-group"><label class="fl">Date de fin</label><input type="date" id="adm-fin" class="form-input"></div>'
+    + '<div class="form-group"><label class="fl">Statut</label><select id="adm-statut" class="form-input"><option value="Approuvé">Approuvé</option><option value="En attente">En attente</option></select></div>'
+    + '<div class="form-group"><label class="fl">Commentaire (optionnel)</label><input type="text" id="adm-motif" class="form-input" placeholder="Ex : pris par anticipation N+1…"></div>'
+    + '<div style="display:flex;gap:10px;margin-top:16px">'
+    + '<button onclick="adminSaveConge()" style="flex:1;background:#16a34a;color:white;border:none;border-radius:7px;padding:10px;font-size:.9rem;font-weight:600;cursor:pointer">✅ Enregistrer</button>'
+    + '<button onclick="var m=document.getElementById(\'adm-conge-modal\');if(m)m.remove();" style="flex:1;background:#f3f4f6;color:#374151;border:none;border-radius:7px;padding:10px;font-size:.9rem;font-weight:600;cursor:pointer">Annuler</button>'
+    + '</div></div></div>';
+  var modal = document.createElement('div');
+  modal.id = 'adm-conge-modal';
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
+}
+
+function adminSaveConge() {
+  var collab = document.getElementById('adm-collab').value;
+  var type   = document.getElementById('adm-type').value;
+  var debut  = document.getElementById('adm-debut').value;
+  var fin    = document.getElementById('adm-fin').value;
+  var statut = document.getElementById('adm-statut').value;
+  var motif  = document.getElementById('adm-motif').value.trim();
+  if (!debut || !fin) { toast('Veuillez saisir les dates', 'error'); return; }
+  if (new Date(fin) < new Date(debut)) { toast('La date de fin doit être après la date de début', 'error'); return; }
+  if (!DB.conges) DB.conges = [];
+  DB.conges.push({
+    id: 'cg_adm_' + Date.now(),
+    collab: collab,
+    dateDebut: debut,
+    dateFin: fin,
+    type: type,
+    motif: motif,
+    statut: statut,
+    dateCreation: new Date().toISOString(),
+    commentaireAdmin: statut === 'Approuvé' ? 'Saisie manuelle admin' : '',
+    dateReponse: statut === 'Approuvé' ? new Date().toISOString() : '',
+    saisieAdmin: true
+  });
+  saveDB(DB);
+  try { updateCongeBadge(); } catch(e){}
+  var modal = document.getElementById('adm-conge-modal');
+  if (modal) modal.remove();
+  toast('✅ Congé de ' + collab + ' enregistré', 'success');
+  showPage('admin-rh-conges');
+}
+
 PAGES['admin-rh-conges'] = function(mc) {
   if (!DB.conges) DB.conges = [];
   var colorsMap = getCollabColors();
@@ -8323,6 +8377,7 @@ PAGES['admin-rh-conges'] = function(mc) {
     + fbStatus
     + '<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">📋 ' + totalConges + ' congé(s) en base · ' + pendingConges + ' en attente</span>'
     + '<button onclick="fbForceSync()" style="background:#3b82f6;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">🔄 Rafraîchir</button>'
+    + '<button onclick="adminAddConge()" style="background:#16a34a;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">➕ Ajouter un congé</button>'
     + '</div></div>'
     + countersHtml + planHtml + calHtml + jfHtml + attHtml + archiveHtml;
 };
