@@ -672,6 +672,7 @@ function _fbListen() {
         DB = _fbEnsure(remote);
         try { localStorage.setItem('allianz_db_v4', JSON.stringify(DB)); } catch(e){}
         console.log('⬇ DB Firebase chargée — ventes:', DB.ventes.length, '| devis:', (DB.devis||[]).length);
+      try { updateCongeBadge(); } catch(e){}
       } else {
         console.log('⬆ Firebase vide, push locale');
         _fbRef.set(DB).catch(function(e){ console.error('Push error:', e.code, e.message); });
@@ -700,6 +701,7 @@ function _fbListen() {
         typeof showPage === 'function') {
       showPage(currentPage);
     }
+    try { updateCongeBadge(); } catch(e){}
     try { toast('🔄 Données mises à jour par un autre utilisateur', 'info'); } catch(e){}
   }, function(err) {
     console.error('🔴 Firebase error:', err.code, err.message);
@@ -1063,10 +1065,21 @@ function renderSidebar(sections) {
   sb.innerHTML = sections.map(s => `
     <div class="sidebar-section">
       <div class="sidebar-label">${s.label}</div>
-      ${s.items.map(it => `<button class="nav-item" id="nav-${it.id}" onclick="showPage('${it.id}')">
-        <span class="nav-icon">${it.icon}</span>${it.label}
+      ${s.items.map(it => `<button class="nav-item" id="nav-${it.id}" onclick="showPage('${it.id}')" style="display:flex;align-items:center;justify-content:space-between">
+        <span><span class="nav-icon">${it.icon}</span>${it.label}</span>
+        ${it.id==='admin-rh-conges' ? '<span id="conge-badge" style="display:none;background:#dc2626;color:white;border-radius:10px;padding:1px 7px;font-size:.65rem;font-weight:700;min-width:18px;text-align:center"></span>' : ''}
       </button>`).join('')}
     </div>`).join('');
+  updateCongeBadge();
+}
+
+function updateCongeBadge() {
+  var count = (DB.conges||[]).filter(function(c){ return c.statut==='En attente'; }).length;
+  var badge = document.getElementById('conge-badge');
+  if (!badge) return;
+  if (count === 0) { badge.style.display='none'; return; }
+  badge.style.display='inline-block';
+  badge.textContent = count;
 }
 
 function showPage(id) {
@@ -7405,6 +7418,7 @@ function saveConge() {
     saisieRetroactive: isRetro || undefined
   });
   saveDB(DB);
+  try { updateCongeBadge(); } catch(e){}
   toast(isRetro ? 'Saisie rétroactive enregistrée ✅' : 'Demande de congés soumise ✅', 'success');
   showPage('collab-conges');
 }
@@ -7417,6 +7431,7 @@ function updateCongeStatut(id, statut) {
   cg.commentaireAdmin = commentaire;
   cg.dateReponse = new Date().toISOString();
   saveDB(DB);
+  try { updateCongeBadge(); } catch(e){}
   toast(statut === 'Approuvé' ? '✅ Congé approuvé' : '❌ Congé refusé', statut === 'Approuvé' ? 'success' : 'error');
   showPage('admin-rh-conges');
 }
@@ -8298,7 +8313,7 @@ PAGES['admin-rh-conges'] = function(mc) {
       : '<div style="overflow-x:auto"><table class="table"><thead><tr><th>Collaboratrice</th><th>Type</th><th>Du</th><th>Au</th><th>Jours ouvrés</th><th>Statut</th><th>Commentaire</th></tr></thead><tbody>'+archiveRows+'</tbody></table></div>')
     +'</div>';
 
-  mc.innerHTML = '<div class="page-header"><h1>🏖️ Congés équipe</h1><p>Compteurs, planning, jours fériés et approbations</p></div>'
+  mc.innerHTML = '<div class="page-header"><h1>🏖️ Congés équipe</h1><p>Compteurs, planning, jours fériés et approbations</p><button onclick="fbForceSync()" style="background:#3b82f6;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer;margin-top:8px">🔄 Rafraîchir</button></div>'
     + countersHtml + planHtml + calHtml + jfHtml + attHtml + archiveHtml;
 };
 
