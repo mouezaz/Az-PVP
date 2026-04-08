@@ -8234,6 +8234,7 @@ PAGES['admin-rh-conges'] = function(mc) {
       + '<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">📋 '+DB.conges.length+' congé(s) · '+enAttenteEarly.length+' en attente</span>'
       + '<button onclick="fbForceSync()" style="background:#3b82f6;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">🔄 Rafraîchir</button>'
       + '<button onclick="adminAddConge()" style="background:#16a34a;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">➕ Ajouter un congé</button>'
+      + '<button onclick="alert(\'DB.conges ('+DB.conges.length+' entrées):\\n\'+JSON.stringify(DB.conges).slice(0,800))" style="background:#6b7280;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">🔍 Debug DB</button>'
       + '</div></div>'
       + attEarly;
   } catch(err) {
