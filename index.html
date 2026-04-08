@@ -8313,7 +8313,17 @@ PAGES['admin-rh-conges'] = function(mc) {
       : '<div style="overflow-x:auto"><table class="table"><thead><tr><th>Collaboratrice</th><th>Type</th><th>Du</th><th>Au</th><th>Jours ouvrés</th><th>Statut</th><th>Commentaire</th></tr></thead><tbody>'+archiveRows+'</tbody></table></div>')
     +'</div>';
 
-  mc.innerHTML = '<div class="page-header"><h1>🏖️ Congés équipe</h1><p>Compteurs, planning, jours fériés et approbations</p><button onclick="fbForceSync()" style="background:#3b82f6;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer;margin-top:8px">🔄 Rafraîchir</button></div>'
+  var fbStatus = (typeof _fbEnabled !== 'undefined' && _fbEnabled && typeof _fbReady !== 'undefined' && _fbReady)
+    ? '<span style="background:#d1fae5;color:#065f46;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">🟢 Firebase connecté</span>'
+    : '<span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">🔴 Firebase déconnecté</span>';
+  var totalConges = (DB.conges||[]).length;
+  var pendingConges = (DB.conges||[]).filter(function(c){ return c.statut==='En attente'; }).length;
+  mc.innerHTML = '<div class="page-header"><h1>🏖️ Congés équipe</h1><p>Compteurs, planning, jours fériés et approbations</p>'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">'
+    + fbStatus
+    + '<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">📋 ' + totalConges + ' congé(s) en base · ' + pendingConges + ' en attente</span>'
+    + '<button onclick="fbForceSync()" style="background:#3b82f6;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">🔄 Rafraîchir</button>'
+    + '</div></div>'
     + countersHtml + planHtml + calHtml + jfHtml + attHtml + archiveHtml;
 };
 
