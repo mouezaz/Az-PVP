@@ -7703,6 +7703,24 @@ function saveCarryOver(collab) {
   toast('Report dérogatoire mis à jour pour '+collab+' ✅','success');
   showPage('admin-rh-conges');
 }
+
+function getAnticipationDette(collab) {
+  // Jours pris par anticipation sur N+1 (à déduire de la prochaine période)
+  if(!DB.settings) DB.settings={};
+  if(!DB.settings.anticipationDette) DB.settings.anticipationDette={};
+  return DB.settings.anticipationDette[collab]||0;
+}
+function saveAnticipationDette(collab) {
+  var el=document.getElementById('anti-'+collab);
+  var val=parseFloat((el?el.value:'0')||'0');
+  if(!DB.settings) DB.settings={};
+  if(!DB.settings.anticipationDette) DB.settings.anticipationDette={};
+  DB.settings.anticipationDette[collab]=val;
+  saveDB(DB);
+  toast('Dette anticipation mise à jour pour '+collab+' ✅','success');
+  showPage('admin-rh-conges');
+}
+
 function getRecupCredit(collab) {
   // In hours. 1 half-day = 3.5h, 1 full day = 7h
   if(!DB.settings) DB.settings={};
@@ -8205,8 +8223,9 @@ PAGES['admin-rh-conges'] = function(mc) {
     var droitsEC   = calcDroitsEnCours(name);
     var accordes   = getJoursAccordes(name);
     var carryOver  = getCarryOver(name);
+    var antiDette  = getAnticipationDette(name);
     var pris       = calcPrisConges(name);
-    var totalD     = Math.round((droitsTheo+accordes+carryOver)*10)/10;
+    var totalD     = Math.round((droitsTheo+accordes+carryOver-antiDette)*10)/10;
     var solde      = Math.round((totalD-pris)*10)/10;
     var col        = colorsMap[name]||'#6b7280';
     var rc=getRecupCredit(name), rp=getRecupPris(name), rs=Math.round((rc-rp)*10)/10;
@@ -8220,12 +8239,13 @@ PAGES['admin-rh-conges'] = function(mc) {
       + '<span style="background:#dbeafe;color:#1e40af;padding:2px 7px;border-radius:5px;font-size:.72rem;font-weight:600" title="Acquis en '+prevAcq2.label+'">'+droitsTheo+'j dispo</span>'
       + '<span style="background:#ede9fe;color:#5b21b6;padding:2px 7px;border-radius:5px;font-size:.72rem;font-weight:600">+'+accordes+'j anticipés</span>'
       + (carryOver>0?'<span style="background:#d1fae5;color:#065f46;padding:2px 7px;border-radius:5px;font-size:.72rem;font-weight:600">+'+carryOver+'j reportés</span>':'')
+      + (antiDette>0?'<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:5px;font-size:.72rem;font-weight:600" title="Jours pris par anticipation sur N+1">-'+antiDette+'j anticipation N+1</span>':'')
       + '<span style="background:#fee2e2;color:#991b1b;padding:2px 7px;border-radius:5px;font-size:.72rem;font-weight:600">'+pris+'j pris</span>'
       + '<span style="background:'+(solde>=0?'#d1fae5':'#fee2e2')+';color:'+(solde>=0?'#065f46':'#991b1b')+';padding:2px 7px;border-radius:5px;font-size:.72rem;font-weight:700">Solde: '+solde+'j</span>'
       + '<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:5px;font-size:.72rem;font-weight:600" title="En cours d\'acquisition pour '+currAcq2.label+'">🔄 +'+droitsEC+'j/an prochain</span>'
       + '<span style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:5px;font-size:.72rem;font-weight:600">⏱ Récup: '+rs+'h</span>'
       + '</div></div>'
-      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
+      + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">'
       + '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">'
       + '<label style="font-size:.75rem;color:#6b7280;white-space:nowrap">Anticipés :</label>'
       + '<input id="acc-'+name+'" type="number" min="0" step="0.5" value="'+accordes+'" style="width:55px;padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:.8rem">'
@@ -8235,6 +8255,11 @@ PAGES['admin-rh-conges'] = function(mc) {
       + '<label style="font-size:.75rem;color:#6b7280;white-space:nowrap;display:flex;align-items:center;gap:3px">Report dérogatoire :</label>'
       + '<input id="carry-'+name+'" type="number" min="0" step="0.5" value="'+carryOver+'" style="width:55px;padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:.8rem">'
       + '<button onclick="saveCarryOver(\''+name+'\')" style="background:#16a34a;color:white;border:none;border-radius:5px;padding:3px 8px;font-size:.72rem;cursor:pointer">✅</button>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">'
+      + '<label style="font-size:.75rem;color:#6b7280;white-space:nowrap" title="Jours pris par anticipation à déduire de la prochaine période">Dette antici. :</label>'
+      + '<input id="anti-'+name+'" type="number" min="0" step="0.5" value="'+antiDette+'" style="width:55px;padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:.8rem">'
+      + '<button onclick="saveAnticipationDette(\''+name+'\')" style="background:#f59e0b;color:white;border:none;border-radius:5px;padding:3px 8px;font-size:.72rem;cursor:pointer">✅</button>'
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">'
       + '<label style="font-size:.75rem;color:#6b7280;white-space:nowrap">Récup (h) :</label>'
@@ -8379,7 +8404,7 @@ PAGES['admin-rh-conges'] = function(mc) {
     + '<button onclick="fbForceSync()" style="background:#3b82f6;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">🔄 Rafraîchir</button>'
     + '<button onclick="adminAddConge()" style="background:#16a34a;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">➕ Ajouter un congé</button>'
     + '</div></div>'
-    + countersHtml + planHtml + calHtml + jfHtml + attHtml + archiveHtml;
+    + attHtml + countersHtml + planHtml + calHtml + jfHtml + archiveHtml;
 };
 
 PAGES['admin-rh-entretiens'] = function(mc) {
