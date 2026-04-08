@@ -8203,6 +8203,43 @@ PAGES['admin-rh-conges'] = function(mc) {
   var allCollabs = getCollabNames().filter(function(n){ return n !== 'Admin'; });
   var now = new Date(), calYear = now.getFullYear(), calMonth = now.getMonth();
 
+  // --- Render header + pending section FIRST (isolated) ---
+  try {
+    var fbStatus2 = (typeof _fbEnabled !== 'undefined' && _fbEnabled && typeof _fbReady !== 'undefined' && _fbReady)
+      ? '<span style="background:#d1fae5;color:#065f46;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">🟢 Firebase connecté</span>'
+      : '<span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">🔴 Firebase déconnecté</span>';
+    var enAttenteEarly = DB.conges.filter(function(c){ return c.statut==='En attente'; })
+      .sort(function(a,b){ return a.dateCreation.localeCompare(b.dateCreation); });
+    var attEarly = enAttenteEarly.length===0
+      ? '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:.85rem;color:#166534">✅ Aucune demande en attente.</div>'
+      : '<div class="card" style="border-left:4px solid #f59e0b"><div class="card-header"><div class="card-title">⏳ Demandes en attente ('+enAttenteEarly.length+')</div></div>'
+        + '<div style="display:flex;flex-direction:column;gap:10px">'
+        + enAttenteEarly.map(function(c){
+            var jours = countJoursConge(c);
+            var col = colorsMap[c.collab]||'#6b7280';
+            return '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+              + '<div style="width:32px;height:32px;border-radius:50%;background:'+col+';color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">'+c.collab.slice(0,2).toUpperCase()+'</div>'
+              + '<div style="flex:1;min-width:180px"><div style="font-weight:700">'+c.collab+' — '+c.type+'</div>'
+              + '<div style="font-size:.8rem;color:#6b7280">'+new Date(c.dateDebut+'T12:00:00').toLocaleDateString('fr-FR')+' → '+new Date(c.dateFin+'T12:00:00').toLocaleDateString('fr-FR')+' <strong>('+jours+'j ouvrables)</strong>'+(c.motif?' — '+c.motif:'')+'</div></div>'
+              + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+              + '<input type="text" id="rep-'+c.id+'" placeholder="Commentaire (optionnel)" style="padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.8rem;width:180px">'
+              + '<button onclick="updateCongeStatut(&quot;'+c.id+'&quot;,&quot;Approuvé&quot;)" class="btn btn-sm" style="background:#16a34a;color:white;border:none;cursor:pointer">✅ Approuver</button>'
+              + '<button onclick="updateCongeStatut(&quot;'+c.id+'&quot;,&quot;Refusé&quot;)" class="btn btn-sm" style="background:#dc2626;color:white;border:none;cursor:pointer">❌ Refuser</button>'
+              + '</div></div>';
+          }).join('')
+        + '</div></div>';
+    mc.innerHTML = '<div class="page-header"><h1>🏖️ Congés équipe</h1><p>Compteurs, planning, jours fériés et approbations</p>'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">'
+      + fbStatus2
+      + '<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">📋 '+DB.conges.length+' congé(s) · '+enAttenteEarly.length+' en attente</span>'
+      + '<button onclick="fbForceSync()" style="background:#3b82f6;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">🔄 Rafraîchir</button>'
+      + '<button onclick="adminAddConge()" style="background:#16a34a;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">➕ Ajouter un congé</button>'
+      + '</div></div>'
+      + attEarly;
+  } catch(err) {
+    mc.innerHTML += '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:12px;margin-bottom:12px;font-size:.8rem;color:#991b1b">⚠️ Erreur rendu en-tête : '+String(err)+'</div>';
+  }
+
   // --- Per-collab counters ---
   var utilP2   = getUtilPeriod();
   var prevAcq2 = getPrevAcqPeriod();
@@ -8392,19 +8429,12 @@ PAGES['admin-rh-conges'] = function(mc) {
       : '<div style="overflow-x:auto"><table class="table"><thead><tr><th>Collaboratrice</th><th>Type</th><th>Du</th><th>Au</th><th>Jours ouvrés</th><th>Statut</th><th>Commentaire</th></tr></thead><tbody>'+archiveRows+'</tbody></table></div>')
     +'</div>';
 
-  var fbStatus = (typeof _fbEnabled !== 'undefined' && _fbEnabled && typeof _fbReady !== 'undefined' && _fbReady)
-    ? '<span style="background:#d1fae5;color:#065f46;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">🟢 Firebase connecté</span>'
-    : '<span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">🔴 Firebase déconnecté</span>';
-  var totalConges = (DB.conges||[]).length;
-  var pendingConges = (DB.conges||[]).filter(function(c){ return c.statut==='En attente'; }).length;
-  mc.innerHTML = '<div class="page-header"><h1>🏖️ Congés équipe</h1><p>Compteurs, planning, jours fériés et approbations</p>'
-    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">'
-    + fbStatus
-    + '<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">📋 ' + totalConges + ' congé(s) en base · ' + pendingConges + ' en attente</span>'
-    + '<button onclick="fbForceSync()" style="background:#3b82f6;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">🔄 Rafraîchir</button>'
-    + '<button onclick="adminAddConge()" style="background:#16a34a;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">➕ Ajouter un congé</button>'
-    + '</div></div>'
-    + attHtml + countersHtml + planHtml + calHtml + jfHtml + archiveHtml;
+  // --- Append remaining sections with isolated error handling ---
+  try { mc.innerHTML += countersHtml; } catch(e) { mc.innerHTML += '<div style="background:#fee2e2;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.8rem;color:#991b1b">⚠️ Erreur compteurs: '+String(e)+'</div>'; }
+  try { mc.innerHTML += planHtml; } catch(e) { mc.innerHTML += '<div style="background:#fee2e2;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.8rem;color:#991b1b">⚠️ Erreur planning: '+String(e)+'</div>'; }
+  try { mc.innerHTML += calHtml; } catch(e) { mc.innerHTML += '<div style="background:#fee2e2;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.8rem;color:#991b1b">⚠️ Erreur calendrier: '+String(e)+'</div>'; }
+  try { mc.innerHTML += jfHtml; } catch(e) { mc.innerHTML += '<div style="background:#fee2e2;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.8rem;color:#991b1b">⚠️ Erreur jours fériés: '+String(e)+'</div>'; }
+  try { mc.innerHTML += archiveHtml; } catch(e) { mc.innerHTML += '<div style="background:#fee2e2;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.8rem;color:#991b1b">⚠️ Erreur historique: '+String(e)+'</div>'; }
 };
 
 PAGES['admin-rh-entretiens'] = function(mc) {
