@@ -8012,20 +8012,43 @@ PAGES['collab-conges'] = function(mc) {
     +'<span style="color:#6b7280">→ utilisables à partir du 1er juin '+currAcqP.end.slice(0,4)+'</span>'
     +'</div>'
     + expiryWarning
-    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">'
-    + '<div style="background:white;border:1.5px solid #e5e7eb;border-radius:10px;padding:12px;text-align:center">'
-    + '<div style="font-size:1.5rem;font-weight:800;color:#1e40af">'+droitsTheo+'j</div>'
-    + '<div style="font-size:.7rem;color:#6b7280;margin-top:2px">Droits acquis</div></div>'
-    + '<div style="background:white;border:1.5px solid #e5e7eb;border-radius:10px;padding:12px;text-align:center">'
-    + '<div style="font-size:1.5rem;font-weight:800;color:#7c3aed">'+(accordes+carryOver)+'j</div>'
-    + '<div style="font-size:.7rem;color:#6b7280;margin-top:2px">Anticipation + report</div></div>'
-    + '<div style="background:white;border:1.5px solid #e5e7eb;border-radius:10px;padding:12px;text-align:center">'
-    + '<div style="font-size:1.5rem;font-weight:800;color:#dc2626">'+pris+'j</div>'
-    + '<div style="font-size:.7rem;color:#6b7280;margin-top:2px">Pris (cette période)</div></div>'
-    + '<div style="background:'+(solde>=0?'#f0fdf4':'#fef2f2')+';border:1.5px solid '+(solde>=0?'#86efac':'#fca5a5')+';border-radius:10px;padding:12px;text-align:center">'
-    + '<div style="font-size:1.5rem;font-weight:800;color:'+(solde>=0?'#166534':'#991b1b')+'">'+solde+'j</div>'
-    + '<div style="font-size:.7rem;color:#6b7280;margin-top:2px">Solde CP</div></div>'
-    + '</div>'
+    // Balance block with progress bar
+    + (function(){
+        var antiDette2 = getAnticipationDette(collab);
+        var totalDispo = Math.round((droitsTheo + accordes + carryOver - antiDette2)*10)/10;
+        var pct = totalDispo > 0 ? Math.min(100, Math.round(pris/totalDispo*100)) : (pris>0?100:0);
+        var soldeColor = solde > 5 ? '#166534' : solde > 0 ? '#92400e' : '#991b1b';
+        var soldeBg    = solde > 5 ? '#f0fdf4'  : solde > 0 ? '#fef3c7'  : '#fef2f2';
+        var soldeBorder= solde > 5 ? '#86efac'  : solde > 0 ? '#fde68a'  : '#fca5a5';
+        var barColor   = solde > 5 ? '#22c55e'  : solde > 0 ? '#f59e0b'  : '#ef4444';
+        return '<div style="background:'+soldeBg+';border:2px solid '+soldeBorder+';border-radius:12px;padding:16px 20px;margin-bottom:12px">'
+          + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">'
+          + '<div style="font-size:2rem;font-weight:900;color:'+soldeColor+'">'+solde+'j</div>'
+          + '<div style="font-size:.85rem;color:'+soldeColor+';font-weight:700">Solde disponible</div>'
+          + '<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:.8rem">'
+          + '<span style="color:#1e40af"><strong>'+totalDispo+'j</strong> acquis</span>'
+          + '<span style="color:#dc2626">− <strong>'+pris+'j</strong> pris</span>'
+          + (antiDette2>0?'<span style="color:#f59e0b">− <strong>'+antiDette2+'j</strong> anticipés N+1</span>':'')
+          + '</div></div>'
+          + '<div style="background:#e5e7eb;border-radius:999px;height:12px;overflow:hidden;margin-bottom:8px">'
+          + '<div style="background:'+barColor+';height:100%;width:'+pct+'%;border-radius:999px;transition:width .5s ease"></div>'
+          + '</div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:.72rem;color:#6b7280">'
+          + '<span>'+pris+'j utilisés ('+pct+'%)</span>'
+          + '<span>'+totalDispo+'j au total</span>'
+          + '</div></div>'
+          + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">'
+          + '<div style="background:white;border:1.5px solid #e5e7eb;border-radius:10px;padding:10px;text-align:center">'
+          + '<div style="font-size:1.3rem;font-weight:800;color:#1e40af">'+droitsTheo+'j</div>'
+          + '<div style="font-size:.68rem;color:#6b7280;margin-top:2px">Droits acquis</div></div>'
+          + '<div style="background:white;border:1.5px solid #e5e7eb;border-radius:10px;padding:10px;text-align:center">'
+          + '<div style="font-size:1.3rem;font-weight:800;color:#7c3aed">'+(accordes+carryOver)+'j</div>'
+          + '<div style="font-size:.68rem;color:#6b7280;margin-top:2px">Anticipation + report</div></div>'
+          + '<div style="background:white;border:1.5px solid #e5e7eb;border-radius:10px;padding:10px;text-align:center">'
+          + '<div style="font-size:1.3rem;font-weight:800;color:#dc2626">'+pris+'j</div>'
+          + '<div style="font-size:.68rem;color:#6b7280;margin-top:2px">Pris (période en cours)</div></div>'
+          + '</div>';
+      })()
     + '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
     + '<span style="font-size:1rem">🔄</span>'
     + '<strong style="font-size:.85rem;color:#0369a1">Récupérations</strong>'
@@ -8034,7 +8057,7 @@ PAGES['collab-conges'] = function(mc) {
     + '<span style="font-size:.82rem;font-weight:700;color:'+(recupSolde>=0?'#065f46':'#991b1b')+'">Solde : '+(recupSolde>=0?'+':'')+recupSolde+'h</span>'
     + '</div>';
 
-  // Team calendar
+  // Team calendar — 12-month slider (3 visible)
   var calYear = now.getFullYear(), calMonth = now.getMonth();
   var colorsMap = getCollabColors();
   var legendHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb">';
@@ -8042,12 +8065,26 @@ PAGES['collab-conges'] = function(mc) {
     var col = colorsMap[name]||'#6b7280';
     legendHtml += '<div style="display:flex;align-items:center;gap:4px;font-size:.73rem"><div style="width:12px;height:12px;border-radius:3px;background:'+col+'"></div>'+name+'</div>';
   });
-  legendHtml += '<div style="display:flex;align-items:center;gap:4px;font-size:.73rem"><div style="width:12px;height:12px;border-radius:3px;background:#fef3c7;border:1px solid #f59e0b"></div>Jour férié chômé</div></div>';
-  var calHtml = '<div class="card"><div class="card-header"><div class="card-title">📅 Planning équipe</div></div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
-    + buildCongesCalendar(calYear, calMonth)
-    + buildCongesCalendar(calMonth===11?calYear+1:calYear, (calMonth+1)%12)
-    + '</div>' + legendHtml + '</div>';
+  legendHtml += '<div style="display:flex;align-items:center;gap:4px;font-size:.73rem"><div style="width:12px;height:12px;border-radius:3px;background:#fef3c7;border:1px solid #f59e0b"></div>Jour férié chômé</div>';
+  legendHtml += '<div style="display:flex;align-items:center;gap:4px;font-size:.73rem"><div style="width:12px;height:12px;border-radius:3px;background:repeating-linear-gradient(45deg,#6b7280,#6b7280 3px,white 3px,white 6px);border:1px solid #6b7280"></div>En attente</div></div>';
+  var cal12CollabSlides = '';
+  for (var mi2 = 0; mi2 < 12; mi2++) {
+    var cy2 = calYear + Math.floor((calMonth + mi2) / 12);
+    var cm2 = (calMonth + mi2) % 12;
+    cal12CollabSlides += '<div style="flex:0 0 calc(33.333% - 7px);min-width:0">' + buildCongesCalendar(cy2, cm2) + '</div>';
+  }
+  var calHtml = '<div class="card"><div class="card-header" style="display:flex;align-items:center;justify-content:space-between">'
+    + '<div class="card-title">📅 Planning équipe — 12 mois</div>'
+    + '<div style="display:flex;gap:6px;align-items:center">'
+    + '<button onclick="calSlide(\'cal-slider-collab\', -1)" style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;width:30px;height:30px;font-size:1rem;cursor:pointer">◀</button>'
+    + '<span id="cal-slider-collab-label" style="font-size:.8rem;color:#6b7280;min-width:100px;text-align:center"></span>'
+    + '<button onclick="calSlide(\'cal-slider-collab\', 1)" style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;width:30px;height:30px;font-size:1rem;cursor:pointer">▶</button>'
+    + '</div></div>'
+    + '<div style="overflow:hidden;padding:0 16px 8px">'
+    + '<div id="cal-slider-collab" style="display:flex;gap:10px;transition:transform .3s ease">'
+    + cal12CollabSlides
+    + '</div></div>'
+    + legendHtml + '</div>';
 
   // Request form
   var utilPStart = getUtilPeriod().start;
@@ -8111,6 +8148,7 @@ PAGES['collab-conges'] = function(mc) {
   mc.innerHTML = '<div class="page-header flex-between"><div><h1>🏖️ Mes congés payés</h1>'
     + '<p>Convention des agents généraux — 2,5 j/mois, 6j/semaine</p></div></div>'
     + veilleAlert + kpiHtml + calHtml + formHtml + listHtml;
+  setTimeout(function(){ calSliderInit('cal-slider-collab'); }, 50);
 };
 
 PAGES['collab-entretien-ia'] = function(mc) {
