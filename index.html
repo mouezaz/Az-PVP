@@ -808,7 +808,22 @@ function saveDB(db) {
     _lastSave = Date.now();
     if (_fbSave) clearTimeout(_fbSave);
     _fbSave = setTimeout(function() {
-      _fbRef.set(db).then(function() {
+      // Merge conges from Firebase before saving to avoid overwriting other users' entries
+      _fbRef.once('value').then(function(snap) {
+        var remote = snap.val() || {};
+        var merged = JSON.parse(JSON.stringify(db));
+        // Merge conges: keep remote entries not present locally (added by other users/admin)
+        var localIds = (merged.conges||[]).map(function(c){ return c.id; });
+        var remoteExtra = (remote.conges||[]).filter(function(c){ return localIds.indexOf(c.id) === -1; });
+        if (remoteExtra.length > 0) {
+          merged.conges = (merged.conges||[]).concat(remoteExtra);
+          // Also update local DB and localStorage with merged data
+          DB.conges = merged.conges;
+          try { localStorage.setItem('allianz_db_v4', JSON.stringify(DB)); } catch(e){}
+          console.log('🔀 Fusion congés Firebase:', remoteExtra.length, 'entrée(s) préservée(s)');
+        }
+        return _fbRef.set(merged);
+      }).then(function() {
         _fbSaveTimer = null;
       }).catch(function(err) {
         console.warn('Firebase sync error:', err);
@@ -8144,6 +8159,44 @@ PAGES['collab-entretien-ia'] = function(mc) {
 // ============================================================
 
 
+
+// ---- Calendrier congés slider ----
+var _calSliderPos = {};
+function calSlide(id, dir) {
+  if (_calSliderPos[id] === undefined) _calSliderPos[id] = 0;
+  var container = document.getElementById(id);
+  if (!container) return;
+  var items = container.children;
+  var total = items.length;
+  var maxPos = total - 3;
+  var newPos = _calSliderPos[id] + dir;
+  if (newPos < 0) newPos = 0;
+  if (newPos > maxPos) newPos = maxPos;
+  _calSliderPos[id] = newPos;
+  // Calculate offset: each item is ~33.333% of container + 10px gap
+  var itemW = (container.parentElement.offsetWidth - 20) / 3;
+  container.style.transform = 'translateX(-' + (newPos * (itemW + 10)) + 'px)';
+  // Update label
+  var label = document.getElementById(id + '-label');
+  if (label && items[newPos]) {
+    var title = items[newPos].querySelector('div > div');
+    var title2 = items[Math.min(newPos+2, total-1)].querySelector('div > div');
+    label.textContent = (title ? title.textContent : '') + (title2 && newPos+2 < total ? ' → ' + title2.textContent : '');
+  }
+}
+function calSliderInit(id) {
+  var container = document.getElementById(id);
+  if (!container) return;
+  _calSliderPos[id] = 0;
+  var label = document.getElementById(id + '-label');
+  if (label) {
+    var items = container.children;
+    var t0 = items[0] ? items[0].querySelector('div > div') : null;
+    var t2 = items[2] ? items[2].querySelector('div > div') : null;
+    label.textContent = (t0 ? t0.textContent : '') + (t2 ? ' → ' + t2.textContent : '');
+  }
+}
+
 function adminAddConge() {
   var collabs = getCollabNames().filter(function(n){ return n !== 'Admin'; });
   var opts = collabs.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('');
@@ -8349,16 +8402,30 @@ PAGES['admin-rh-conges'] = function(mc) {
   });
   legendHtml2 += '<div style="display:flex;align-items:center;gap:4px;font-size:.73rem"><div style="width:12px;height:12px;border-radius:3px;background:repeating-linear-gradient(45deg,#6b7280,#6b7280 3px,white 3px,white 6px);border:1px solid #6b7280"></div>En attente</div>';
   legendHtml2 += '</div>';
-  var cal12Html = '';
+  // Build all 12 months
+  var cal12Months = [];
   for (var mi = 0; mi < 12; mi++) {
     var cy = calYear + Math.floor((calMonth + mi) / 12);
     var cm = (calMonth + mi) % 12;
-    cal12Html += buildCongesCalendar(cy, cm);
+    cal12Months.push(buildCongesCalendar(cy, cm));
   }
-  var calHtml = '<div class="card"><div class="card-header"><div class="card-title">📅 Planning équipe — 12 mois glissants</div></div>'
-    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 16px 16px">'
-    + cal12Html
-    + '</div>' + legendHtml2 + '</div>';
+  // Slider: 3 visible at a time, navigable with arrows
+  var calSliderId = 'cal-slider-admin';
+  var calSlides = cal12Months.map(function(html, i) {
+    return '<div style="flex:0 0 calc(33.333% - 7px);min-width:0">' + html + '</div>';
+  }).join('');
+  var calHtml = '<div class="card"><div class="card-header" style="display:flex;align-items:center;justify-content:space-between">'
+    + '<div class="card-title">📅 Planning équipe — 12 mois glissants</div>'
+    + '<div style="display:flex;gap:6px;align-items:center">'
+    + '<button onclick="calSlide(\''+calSliderId+'\', -1)" style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;width:30px;height:30px;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">◀</button>'
+    + '<span id="'+calSliderId+'-label" style="font-size:.8rem;color:#6b7280;min-width:100px;text-align:center"></span>'
+    + '<button onclick="calSlide(\''+calSliderId+'\', 1)" style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;width:30px;height:30px;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>'
+    + '</div></div>'
+    + '<div style="overflow:hidden;padding:0 16px 8px">'
+    + '<div id="'+calSliderId+'" style="display:flex;gap:10px;transition:transform .3s ease;will-change:transform">'
+    + calSlides
+    + '</div></div>'
+    + legendHtml2 + '</div>';
 
   // --- Jours fériés toggles ---
   var jfHtml = '<div class="card"><div class="card-header"><div class="card-title">🎌 Jours fériés — Chômage</div>'
@@ -8433,7 +8500,7 @@ PAGES['admin-rh-conges'] = function(mc) {
   // --- Append remaining sections with isolated error handling ---
   try { mc.innerHTML += countersHtml; } catch(e) { mc.innerHTML += '<div style="background:#fee2e2;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.8rem;color:#991b1b">⚠️ Erreur compteurs: '+String(e)+'</div>'; }
   try { mc.innerHTML += planHtml; } catch(e) { mc.innerHTML += '<div style="background:#fee2e2;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.8rem;color:#991b1b">⚠️ Erreur planning: '+String(e)+'</div>'; }
-  try { mc.innerHTML += calHtml; } catch(e) { mc.innerHTML += '<div style="background:#fee2e2;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.8rem;color:#991b1b">⚠️ Erreur calendrier: '+String(e)+'</div>'; }
+  try { mc.innerHTML += calHtml; setTimeout(function(){ calSliderInit('cal-slider-admin'); }, 50); } catch(e) { mc.innerHTML += '<div style="background:#fee2e2;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.8rem;color:#991b1b">⚠️ Erreur calendrier: '+String(e)+'</div>'; }
   try { mc.innerHTML += jfHtml; } catch(e) { mc.innerHTML += '<div style="background:#fee2e2;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.8rem;color:#991b1b">⚠️ Erreur jours fériés: '+String(e)+'</div>'; }
   try { mc.innerHTML += archiveHtml; } catch(e) { mc.innerHTML += '<div style="background:#fee2e2;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.8rem;color:#991b1b">⚠️ Erreur historique: '+String(e)+'</div>'; }
 };
