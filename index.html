@@ -1235,8 +1235,8 @@ var COMM_RATES_COLLAB = {
   'Santé':             { type: 'pct',     val: 0.10 },
   'PJ Pro':            { type: 'pct',     val: 0.08 },
   'PJ Part':           { type: 'pct',     val: 0.08 },
-  'Allianz Immeuble':  { type: 'pct',     val: 0.12 },
-  'Assur Immeuble':    { type: 'pct',     val: 0.12 },
+  'Allianz Immeuble':  { type: 'pct',     val: 0.07 },
+  'Assur Immeuble':    { type: 'pct',     val: 0.07 },
 };
 function calcCommissionCollab(produit, prime) {
   var r = COMM_RATES_COLLAB[produit] || COMM_RATES[produit];
@@ -1507,11 +1507,11 @@ function updateCommPreview() {
   const prime = parseFloat(document.getElementById('v-prime')?.value)||0;
   const zone = document.getElementById('comm-preview');
   if (!zone || !produit) { if(zone) zone.innerHTML=''; return; }
-  const comm = calcCommission(produit, prime);
-  const r = COMM_RATES[produit];
+  const comm = calcCommissionCollab(produit, prime);
+  const r = COMM_RATES_COLLAB[produit] || COMM_RATES[produit];
   const desc = r ? (r.type==='forfait' ? `${r.val}€ forfaitaire` : `${(r.val*100).toFixed(0)}% de la prime`) : '';
   zone.innerHTML = `<div class="alert alert-success" style="display:flex;align-items:center;justify-content:space-between">
-    <span>Commission estimée <span class="muted">(${desc})</span></span>
+    <span>Ma commission <span class="muted">(${desc})</span></span>
     <strong style="font-size:16px">${fmtEuro(comm)}</strong>
   </div>`;
 }
@@ -1973,8 +1973,8 @@ function updateCVCommPreview() {
   const prime   = parseFloat(document.getElementById('cv-prime')?.value)||0;
   const prev    = document.getElementById('cv-comm-preview');
   if (!prev || !produit) return;
-  const comm = calcCommission(produit, prime);
-  prev.textContent = comm > 0 ? `💰 Commission estimée : ${fmtEuro(comm)}` : '';
+  const comm = calcCommissionCollab(produit, prime);
+  prev.textContent = comm > 0 ? `💰 Ma commission : ${fmtEuro(comm)}` : '';
 }
 
 function saveConvertDevis(devisId) {
@@ -2052,8 +2052,8 @@ function updateLVCommPreview() {
   const prime   = parseFloat(document.getElementById('lv-prime')?.value)||0;
   const prev    = document.getElementById('lv-comm-preview');
   if (!prev || !produit) return;
-  const comm = calcCommission(produit, prime);
-  prev.textContent = comm > 0 ? `💰 Commission estimée : ${fmtEuro(comm)}` : '';
+  const comm = calcCommissionCollab(produit, prime);
+  prev.textContent = comm > 0 ? `💰 Ma commission : ${fmtEuro(comm)}` : '';
 }
 
 function saveConvertLead(leadId) {
@@ -2457,13 +2457,20 @@ PAGES['collab-home'] = (mc) => {
   }).sort((a,b) => (a.rappel||'') > (b.rappel||'') ? 1 : -1);
 
   // --- Succès du mois ---
+  // Support both date-based entries (imported) and mois/annee-based (manually entered)
   const ventesM = (DB.ventes||[]).filter(v => {
+    if (v.collab !== collab) return false;
+    // Prefer mois/annee fields (manual entries use these)
+    if (v.mois !== undefined && v.annee !== undefined) {
+      return v.mois === mois && v.annee === annee;
+    }
+    // Fallback for entries with date field
     const d = new Date(v.date||'');
-    return v.collab===collab && d.getMonth()===mois && d.getFullYear()===annee;
+    return !isNaN(d) && d.getMonth() === mois - 1 && d.getFullYear() === annee;
   });
   const nbVentes = ventesM.length;
   const primeTotal = ventesM.reduce((s,v)=>s+(parseFloat(v.prime)||0),0);
-  const commTotal = ventesM.reduce((s,v)=>s+calcCommission(v.produit,v.prime),0);
+  const commTotal = ventesM.reduce((s,v)=>s+calcCommissionCollab(v.produit,v.prime),0);
 
   // Group by product for the wins grid
   const byProd = {};
@@ -2872,6 +2879,81 @@ PAGES['collab-home'] = (mc) => {
     </div>
 
   </div>
+
+  <!-- ===== ENCART RÉFÉRENTIEL COMMISSIONS ===== -->
+  <div style="margin-top:24px;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:16px;padding:24px 28px;color:#fff;position:relative;overflow:hidden;">
+    <!-- Background decoration -->
+    <div style="position:absolute;top:-30px;right:-30px;width:160px;height:160px;border-radius:50%;background:rgba(59,130,246,.15);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-20px;left:40px;width:100px;height:100px;border-radius:50%;background:rgba(16,185,129,.10);pointer-events:none;"></div>
+
+    <!-- Title -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <div style="width:42px;height:42px;border-radius:12px;background:rgba(59,130,246,.3);display:flex;align-items:center;justify-content:center;font-size:1.4rem;">💰</div>
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;letter-spacing:-.01em;">Référentiel des commissions</div>
+        <div style="font-size:.78rem;opacity:.65;margin-top:2px;">Vos taux applicables sur chaque produit</div>
+      </div>
+    </div>
+
+    <!-- FORFAITS section -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#93c5fd;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+        <span style="display:inline-block;width:20px;height:2px;background:#93c5fd;border-radius:2px;"></span>
+        Forfait fixe par contrat
+        <span style="display:inline-block;width:20px;height:2px;background:#93c5fd;border-radius:2px;"></span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;">
+        ${[
+          {prod:'Auto',      icon:'🚗', val:'8 €'},
+          {prod:'MRH',       icon:'🏠', val:'10 €'},
+          {prod:'Emprunteur',icon:'🔑', val:'20 €'},
+          {prod:'GAV',       icon:'🛡️', val:'20 €'},
+          {prod:'PER',       icon:'🏦', val:'10 €'},
+          {prod:'NOP',       icon:'🏢', val:'3 €'},
+        ].map(p=>`
+          <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 8px;text-align:center;transition:background .15s;"
+               onmouseover="this.style.background='rgba(59,130,246,.25)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">
+            <div style="font-size:1.3rem;">${p.icon}</div>
+            <div style="font-size:.78rem;font-weight:600;color:#e2e8f0;margin-top:4px;">${p.prod}</div>
+            <div style="font-size:1.1rem;font-weight:800;color:#34d399;margin-top:3px;">${p.val}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- POURCENTAGES section -->
+    <div>
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6ee7b7;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+        <span style="display:inline-block;width:20px;height:2px;background:#6ee7b7;border-radius:2px;"></span>
+        Pourcentage de la prime annuelle
+        <span style="display:inline-block;width:20px;height:2px;background:#6ee7b7;border-radius:2px;"></span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;">
+        ${[
+          {prod:'Santé',          icon:'💊', val:'10 %', color:'#34d399'},
+          {prod:'Allianz Immeuble',icon:'🏛️', val:'7 %',  color:'#93c5fd'},
+          {prod:'Actif',           icon:'🔧', val:'7 %',  color:'#93c5fd'},
+          {prod:'Profil Pro',      icon:'💼', val:'7 %',  color:'#93c5fd'},
+          {prod:'PJ Pro',          icon:'⚖️', val:'8 %',  color:'#fbbf24'},
+          {prod:'PJ Part',         icon:'⚖️', val:'8 %',  color:'#fbbf24'},
+        ].map(p=>`
+          <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 8px;display:flex;align-items:center;gap:8px;transition:background .15s;"
+               onmouseover="this.style.background='rgba(16,185,129,.2)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">
+            <div style="font-size:1.3rem;flex-shrink:0;">${p.icon}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:.78rem;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.prod}</div>
+              <div style="font-size:1.0rem;font-weight:800;color:${p.color};margin-top:1px;">${p.val}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Footer note -->
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);font-size:.75rem;opacity:.55;text-align:center;">
+      Les commissions % sont calculées sur la prime annuelle TTC • Mis à jour selon le référentiel produits Allianz
+    </div>
+  </div>
+  <!-- ===== FIN ENCART COMMISSIONS ===== -->
+
 </div>`;
 };
 
