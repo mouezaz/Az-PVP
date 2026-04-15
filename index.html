@@ -8171,11 +8171,13 @@ function buildChallengeWidget(collab) {
   // Seules Dorina et Rihem participent au challenge
   if (collab !== 'Dorina' && collab !== 'Rihem') return '';
 
+  // Parsing LOCAL pour éviter les décalages UTC (France = UTC+2)
   var today = new Date();
   today.setHours(0,0,0,0);
-  var dDebut = new Date(CHALLENGE_CONFIG.debut);
-  var dFin   = new Date(CHALLENGE_CONFIG.fin);
-  dFin.setHours(23,59,59,999);
+  var p1 = CHALLENGE_CONFIG.debut.split('-');
+  var p2 = CHALLENGE_CONFIG.fin.split('-');
+  var dDebut = new Date(parseInt(p1[0]), parseInt(p1[1])-1, parseInt(p1[2]), 0, 0, 0, 0);
+  var dFin   = new Date(parseInt(p2[0]), parseInt(p2[1])-1, parseInt(p2[2]), 23, 59, 59, 999);
   if (today < dDebut || today > dFin) return '';   // hors période
 
   var joursRestants = Math.ceil((dFin - today) / (1000*3600*24));
@@ -8184,8 +8186,19 @@ function buildChallengeWidget(collab) {
   // Comptage Santé dans la période pour cette collab
   var nbSante = (DB.ventes||[]).filter(function(v){
     if (v.collab !== collab || v.produit !== CHALLENGE_CONFIG.produit) return false;
-    var d = new Date(v.createdAt || (v.annee+'-'+String(v.mois).padStart(2,'0')+'-01'));
-    return d >= dDebut && d <= dFin;
+    // Ventes avec date précise
+    if (v.createdAt || v.date) {
+      var d = new Date(v.createdAt || v.date);
+      return !isNaN(d) && d >= dDebut && d <= dFin;
+    }
+    // Ventes saisies manuellement (mois/annee uniquement) : comparaison par mois
+    if (v.mois !== undefined && v.annee !== undefined) {
+      var vMs  = v.annee * 12 + (v.mois - 1);
+      var debMs = dDebut.getFullYear() * 12 + dDebut.getMonth();
+      var finMs = dFin.getFullYear() * 12 + dFin.getMonth();
+      return vMs >= debMs && vMs <= finMs;
+    }
+    return false;
   }).length;
   var atteint = nbSante >= CHALLENGE_CONFIG.objectif;
   var pct     = Math.min(Math.round((nbSante / CHALLENGE_CONFIG.objectif) * 100), 100);
@@ -8264,9 +8277,10 @@ function buildChallengeWidget(collab) {
 function buildChallengeAdminWidget() {
   var today = new Date();
   today.setHours(0,0,0,0);
-  var dDebut = new Date(CHALLENGE_CONFIG.debut);
-  var dFin   = new Date(CHALLENGE_CONFIG.fin);
-  dFin.setHours(23,59,59,999);
+  var p1 = CHALLENGE_CONFIG.debut.split('-');
+  var p2 = CHALLENGE_CONFIG.fin.split('-');
+  var dDebut = new Date(parseInt(p1[0]), parseInt(p1[1])-1, parseInt(p1[2]), 0, 0, 0, 0);
+  var dFin   = new Date(parseInt(p2[0]), parseInt(p2[1])-1, parseInt(p2[2]), 23, 59, 59, 999);
   if (today < dDebut || today > dFin) return '';
 
   var joursRestants = Math.ceil((dFin - today) / (1000*3600*24));
@@ -8276,8 +8290,17 @@ function buildChallengeAdminWidget() {
   var rows = collabs.map(function(c) {
     var nb = (DB.ventes||[]).filter(function(v){
       if (v.collab !== c || v.produit !== CHALLENGE_CONFIG.produit) return false;
-      var d = new Date(v.createdAt || (v.annee+'-'+String(v.mois).padStart(2,'0')+'-01'));
-      return d >= dDebut && d <= dFin;
+      if (v.createdAt || v.date) {
+        var d = new Date(v.createdAt || v.date);
+        return !isNaN(d) && d >= dDebut && d <= dFin;
+      }
+      if (v.mois !== undefined && v.annee !== undefined) {
+        var vMs  = v.annee * 12 + (v.mois - 1);
+        var debMs = dDebut.getFullYear() * 12 + dDebut.getMonth();
+        var finMs = dFin.getFullYear() * 12 + dFin.getMonth();
+        return vMs >= debMs && vMs <= finMs;
+      }
+      return false;
     }).length;
     var atteint = nb >= CHALLENGE_CONFIG.objectif;
     var pct = Math.min(Math.round((nb / CHALLENGE_CONFIG.objectif) * 100), 100);
@@ -8301,8 +8324,17 @@ function buildChallengeAdminWidget() {
   var allAtteint = collabs.every(function(c){
     var nb = (DB.ventes||[]).filter(function(v){
       if (v.collab !== c || v.produit !== CHALLENGE_CONFIG.produit) return false;
-      var d = new Date(v.createdAt || (v.annee+'-'+String(v.mois).padStart(2,'0')+'-01'));
-      return d >= dDebut && d <= dFin;
+      if (v.createdAt || v.date) {
+        var d = new Date(v.createdAt || v.date);
+        return !isNaN(d) && d >= dDebut && d <= dFin;
+      }
+      if (v.mois !== undefined && v.annee !== undefined) {
+        var vMs  = v.annee * 12 + (v.mois - 1);
+        var debMs = dDebut.getFullYear() * 12 + dDebut.getMonth();
+        var finMs = dFin.getFullYear() * 12 + dFin.getMonth();
+        return vMs >= debMs && vMs <= finMs;
+      }
+      return false;
     }).length;
     return nb >= CHALLENGE_CONFIG.objectif;
   });
@@ -8711,7 +8743,8 @@ function adminSaveConge() {
 PAGES['collab-primes'] = function(mc) {
   if (!DB.primes) DB.primes = [];
   var collab = currentUser.name;
-  var annee  = parseInt(document.getElementById('collab-primes-annee')?.value) || nowAnnee();
+  var _pannee = document.getElementById('collab-primes-annee');
+  var annee  = _pannee ? parseInt(_pannee.value) || nowAnnee() : nowAnnee();
   var col    = (getCollabColors()[collab] || '#3b82f6');
 
   // Data
@@ -8801,7 +8834,11 @@ PAGES['collab-primes'] = function(mc) {
     + '<div style="font-weight:700;font-size:.95rem;color:#0f172a;margin-bottom:14px;">🕐 Historique des versements</div>'
     + (timeline.length > 0
         ? '<div style="display:flex;flex-direction:column;gap:8px;">' + timeline + '</div>'
-        : '<div style="text-align:center;padding:30px;color:#9ca3af;"><div style="font-size:2rem;margin-bottom:8px;">💼</div><div>Aucune prime enregistrée pour ' + annee + '</div></div>')
+        : '<div style="text-align:center;padding:36px 20px;color:#9ca3af;">'
+        + '<div style="font-size:2.5rem;margin-bottom:10px;">🎁</div>'
+        + '<div style="font-weight:700;font-size:.95rem;color:#6b7280;margin-bottom:6px;">Aucune prime versée pour ' + annee + '</div>'
+        + '<div style="font-size:.82rem;color:#9ca3af;">Votre manager n\'a pas encore saisi de prime pour cette période.</div>'
+        + '</div>')
     + '</div>'
 
     + '</div>';
@@ -9121,7 +9158,8 @@ PAGES['admin-rh-primes'] = function(mc) {
   if (!DB.primes) DB.primes = [];
   var collabs   = getCollabNames();
   var colorsMap = getCollabColors();
-  var annee     = parseInt(document.getElementById('primes-filter-annee')?.value) || nowAnnee();
+  var _pfa = document.getElementById('primes-filter-annee');
+  var annee     = _pfa ? parseInt(_pfa.value) || nowAnnee() : nowAnnee();
 
   // ── helpers ──
   function getPrime(collab, mois, ann) {
@@ -9271,7 +9309,8 @@ function renderPrimesHistory(collabs, colorsMap, annee) {
     var col = colorsMap[collab] || '#6b7280';
     var vals = [];
     for (var m=1; m<=12; m++) {
-      vals.push((DB.primes||[]).find(function(p){ return p.collab===collab && p.mois===m && p.annee===annee; })?.montant || 0);
+      var found = (DB.primes||[]).find(function(p){ return p.collab===collab && p.mois===m && p.annee===annee; });
+      vals.push(found ? (found.montant || 0) : 0);
     }
     var totalC = vals.reduce(function(s,v){ return s+v; }, 0);
     var maxV = Math.max.apply(null, vals) || 1;
@@ -9317,7 +9356,8 @@ function savePrime(collab, mois, annee, valStr) {
   }
   saveDB(DB);
   // Refresh KPIs & history without full page reload
-  var anneeFilter = parseInt(document.getElementById('primes-filter-annee')?.value) || nowAnnee();
+  var _pfae = document.getElementById('primes-filter-annee');
+  var anneeFilter = _pfae ? parseInt(_pfae.value) || nowAnnee() : nowAnnee();
   renderPrimesHistory(getCollabNames(), getCollabColors(), anneeFilter);
   toast('Prime enregistrée ✓', 'success');
 }
