@@ -1311,7 +1311,21 @@ function renderCollabVentes() {
   const sc = (p) => p>=100?'var(--green)':p>=60?'var(--orange)':'var(--red)';
   const sb = (p) => p>=100?'var(--green-light)':p>=60?'var(--orange-light)':'var(--red-light)';
 
+  // Commission collab ce mois
+  const commCollabM = anVentes.reduce((s,v)=>s+calcCommissionCollab(v.produit,v.prime),0);
+
   document.getElementById('collab-kpis-zone').innerHTML = `
+    <!-- ENCART COMMISSION COLLAB -->
+    ${commCollabM > 0 ? `
+    <div style="background:linear-gradient(135deg,#1e3a5f,#1d4ed8);border-radius:var(--r);padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#fff;">
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.7;margin-bottom:4px;">💰 Mes commissions — ${MOIS_FULL[mois]} ${annee}</div>
+        <div style="font-size:32px;font-weight:800;line-height:1;">${fmtEuro(commCollabM)}</div>
+        <div style="font-size:11px;opacity:.7;margin-top:4px;">Sur ${anVentes.length} contrat${anVentes.length>1?'s':''} · taux référentiel interne</div>
+      </div>
+      <div style="font-size:2.5rem;opacity:.4;">💳</div>
+    </div>` : ''}
+
     <!-- BARRE OBJECTIF GLOBAL -->
     <div style="background:${sb(pctAN)};border:2px solid ${pctAN>=100?'#A7D9BC':pctAN>=60?'#F0C080':'#F5B0B0'};border-radius:var(--r);padding:14px 18px;margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -1367,6 +1381,7 @@ function renderCollabVentes() {
           <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;border-bottom:2px solid var(--gray-100)">Client</th>
           <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;border-bottom:2px solid var(--gray-100)">Contrat</th>
           <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;border-bottom:2px solid var(--gray-100)">Source</th>
+          <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;border-bottom:2px solid var(--gray-100)">💰 Commission</th>
           <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;border-bottom:2px solid var(--gray-100)">Priorité</th>
           <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;border-bottom:2px solid var(--gray-100)">Suivi dossier</th>
         </tr>
@@ -1375,6 +1390,9 @@ function renderCollabVentes() {
         ${anVentes.map((v,i)=>{
           const isPrio = PRIO_PRODS.includes(v.produit);
           const col = PROD_COLORS[v.produit]||'#6B7280';
+          const comm = calcCommissionCollab(v.produit, v.prime);
+          const rateInfo = COMM_RATES_COLLAB[v.produit];
+          const rateLabel = rateInfo ? (rateInfo.type==='forfait' ? rateInfo.val+'€ forfait' : (rateInfo.val*100)+'% prime') : '';
           const prioPill = isPrio
             ? `<span style="background:${col};color:white;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">⭐ Prioritaire</span>`
             : `<span style="color:var(--gray-400);font-size:11px">—</span>`;
@@ -1399,6 +1417,10 @@ function renderCollabVentes() {
               ${(()=>{const src=v.source||''; const srcIcons={'Prospect pur':'🎯','Lead entrant':'📥','Recommandation':'🤝','Client existant':'🔄'};
               return src?`<span style="font-size:11px;color:#374151;">${srcIcons[src]||''} ${src}</span>`:'<span style="color:var(--gray-300);font-size:11px">—</span>';})()}
             </td>
+            <td style="padding:10px 14px;text-align:right;">
+              <div style="font-weight:700;color:#1d4ed8;font-size:13px;">${comm>0?fmtEuro(comm):'—'}</div>
+              ${rateLabel?`<div style="font-size:10px;color:#9ca3af;margin-top:1px;">${rateLabel}</div>`:''}
+            </td>
             <td style="padding:10px 14px;text-align:center">${prioPill}</td>
             <td style="padding:10px 14px;text-align:center">${blocagePill}</td>
           </tr>`;
@@ -1407,9 +1429,11 @@ function renderCollabVentes() {
       <tfoot>
         <tr style="background:var(--blue-light);border-top:2px solid var(--blue)">
           <td colspan="2" style="padding:10px 14px;font-weight:700">${anVentes.length} AN au total</td>
-          <td colspan="3" style="padding:10px 14px;font-size:12px;color:var(--gray-600)">
+          <td colspan="2" style="padding:10px 14px;font-size:12px;color:var(--gray-600)">
             Prioritaires : ${anVentes.filter(v=>PRIO_PRODS.includes(v.produit)).length} · Auto : ${nbAuto} · MRH : ${nbMRH}
           </td>
+          <td style="padding:10px 14px;text-align:right;font-weight:800;color:#1d4ed8;font-size:14px;">${fmtEuro(commCollabM)}</td>
+          <td colspan="2"></td>
         </tr>
       </tfoot>
     </table>
@@ -8144,6 +8168,9 @@ var CHALLENGE_CONFIG = {
 };
 
 function buildChallengeWidget(collab) {
+  // Seules Dorina et Rihem participent au challenge
+  if (collab !== 'Dorina' && collab !== 'Rihem') return '';
+
   var today = new Date();
   today.setHours(0,0,0,0);
   var dDebut = new Date(CHALLENGE_CONFIG.debut);
