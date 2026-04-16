@@ -693,7 +693,7 @@ function _fbListen() {
       'collab-home','collab-ventes','collab-saisir','collab-resil',
       'collab-leads','collab-suivi','collab-prospection','collab-formation',
       'collab-decouverte','collab-conges',
-      'admin-dashboard','admin-ventes','admin-resil',
+      'admin-dashboard','admin-performance','admin-ventes','admin-resil',
       'admin-prospects','admin-commissions','admin-import','admin-export',
       'admin-tel','admin-entretien','admin-rh-conges'
     ];
@@ -1025,6 +1025,7 @@ function buildCollabSidebar() {
 function buildAdminSidebar() {
   const commercial = [
     { id: 'admin-dashboard',    icon: '📊', label: 'Tableau de bord' },
+    { id: 'admin-performance',  icon: '🏆', label: 'Performance Équipe' },
     { id: 'admin-commissions',  icon: '💰', label: 'Commissions détaillées' },
     { id: 'admin-ventes',       icon: '📋', label: 'Toutes les ventes' },
     { id: 'admin-resil',        icon: '🛡', label: 'Résiliations' },
@@ -6415,6 +6416,272 @@ function drawPie(canvasId, labels, values, colors) {
   ctx.fill();
 }
 
+
+// ── PAGE PERFORMANCE ÉQUIPE ──────────────────────────────────────────────────
+PAGES['admin-performance'] = function(mc) {
+  const mois = nowMois(), annee = nowAnnee();
+  const ANNEES = [annee-1, annee];
+  mc.innerHTML = `
+    <div class="page-header flex-between" style="flex-wrap:wrap;gap:10px;">
+      <div><h1>🏆 Performance Équipe</h1><p id="perf-subtitle" style="color:#6b7280;margin:0;font-size:.85rem;"></p></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="perf-mois" onchange="renderPerformanceEquipe()" style="font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid #e5e7eb;">
+          ${Array.from({length:12},(_,i)=>`<option value="${i+1}"${i+1===mois?' selected':''}>${MOIS_FULL[i+1]}</option>`).join('')}
+        </select>
+        <select id="perf-annee" onchange="renderPerformanceEquipe()" style="font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid #e5e7eb;">
+          ${ANNEES.map(a=>`<option value="${a}"${a===annee?' selected':''}>${a}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div id="perf-content" style="padding-bottom:40px;"></div>`;
+  renderPerformanceEquipe();
+};
+
+function renderPerformanceEquipe() {
+  var mois  = parseInt(document.getElementById('perf-mois')?.value)  || nowMois();
+  var annee = parseInt(document.getElementById('perf-annee')?.value) || nowAnnee();
+  var sub = document.getElementById('perf-subtitle');
+  if (sub) sub.textContent = MOIS_FULL[mois] + ' ' + annee + ' · Vue individuelle complète';
+
+  var COLLABS = getCollabNames();
+  var COLORS  = getCollabColors();
+  var today   = new Date(); today.setHours(0,0,0,0);
+
+  // ── Données par collaboratrice ──────────────────────────────────────────
+  var data = COLLABS.map(function(name) {
+    var color    = COLORS[name] || '#4f46e5';
+    var ventesM  = getVentesMoisCollab(name, mois, annee);
+    var obj      = getObjectifsStatus(name, mois, annee);
+    var commEarned   = calcCommissionCollabMensuel(name, mois, annee);
+    var commPotential = ventesM.reduce(function(s,v){ return s + calcCommissionCollab(v.produit, v.prime); }, 0);
+    var commBlocked  = commPotential - commEarned;
+
+    // Breakdown par produit
+    var byProduit = {};
+    ventesM.forEach(function(v){ byProduit[v.produit] = (byProduit[v.produit]||0)+1; });
+
+    // Prime (CA) totale
+    var caTotal = ventesM.reduce(function(s,v){ return s+(parseFloat(v.prime)||0); }, 0);
+
+    // Leads pipeline
+    var leadsAll    = (DB.leads||[]).filter(function(l){ return l.collab===name; });
+    var leadsActifs = leadsAll.filter(function(l){ return !['Gagné','Perdu'].includes(l.statut); });
+    var leadsRetard = leadsActifs.filter(function(l){
+      if (!l.rappel) return false;
+      var d = new Date(l.rappel); d.setHours(0,0,0,0); return d < today;
+    });
+    var leadsAujourd = leadsActifs.filter(function(l){
+      if (!l.rappel) return false;
+      var d = new Date(l.rappel); d.setHours(0,0,0,0); return d.getTime()===today.getTime();
+    });
+    var leadsAvenir = leadsActifs.filter(function(l){
+      if (!l.rappel) return false;
+      var d = new Date(l.rappel); d.setHours(0,0,0,0); return d > today;
+    });
+
+    // Prochaines relances triées
+    var prochaines = leadsActifs.filter(function(l){ return l.rappel; })
+      .sort(function(a,b){ return new Date(a.rappel)-new Date(b.rappel); })
+      .slice(0,4);
+
+    // Mois précédent (pour tendance)
+    var moisPrec = mois===1 ? 12 : mois-1;
+    var anneePrec = mois===1 ? annee-1 : annee;
+    var ventesPrec = getVentesMoisCollab(name, moisPrec, anneePrec);
+    var tendance = ventesM.length - ventesPrec.length;
+
+    return {
+      name, color, ventesM, byProduit, obj, commEarned, commPotential, commBlocked,
+      caTotal, leadsActifs:leadsActifs.length, leadsRetard:leadsRetard.length,
+      leadsAujourd:leadsAujourd.length, leadsAvenir:leadsAvenir.length,
+      prochaines, tendance, ventesPrec:ventesPrec.length
+    };
+  });
+
+  // Classement par ventes
+  var ranked = data.slice().sort(function(a,b){ return b.ventesM.length - a.ventesM.length; });
+
+  var html = '';
+
+  // ── PODIUM / CLASSEMENT RAPIDE ──────────────────────────────────────────
+  html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px;">`;
+  ranked.forEach(function(d, idx) {
+    var medal = ['🥇','🥈','🥉'][idx] || (idx+1)+'e';
+    var trend = d.tendance > 0 ? `<span style="color:#22c55e;font-size:.75rem;">▲ +${d.tendance}</span>`
+              : d.tendance < 0 ? `<span style="color:#ef4444;font-size:.75rem;">▼ ${d.tendance}</span>`
+              : `<span style="color:#9ca3af;font-size:.75rem;">= stable</span>`;
+    html += `<div style="background:white;border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);border-top:4px solid ${d.color};text-align:center;">
+      <div style="font-size:1.6rem;">${medal}</div>
+      <div style="font-weight:800;font-size:1.1rem;color:${d.color};margin:4px 0;">${d.name}</div>
+      <div style="font-size:2rem;font-weight:900;color:#111;">${d.ventesM.length}</div>
+      <div style="font-size:.72rem;color:#9ca3af;margin-bottom:4px;">vente(s) ce mois</div>
+      ${trend}
+      <div style="margin-top:8px;font-size:.9rem;font-weight:700;color:#1f2937;">${d.commEarned.toFixed(0)} €</div>
+      <div style="font-size:.68rem;color:#9ca3af;">commissions</div>
+      ${d.commBlocked>0 ? `<div style="font-size:.72rem;color:#ef4444;margin-top:3px;">🔒 ${d.commBlocked.toFixed(0)}€ bloqués</div>` : ''}
+    </div>`;
+  });
+  html += `</div>`;
+
+  // ── CARTES DÉTAILLÉES ────────────────────────────────────────────────────
+  html += `<div style="display:flex;flex-direction:column;gap:20px;">`;
+
+  data.forEach(function(d) {
+    var produits = Object.entries(d.byProduit);
+    var PRODUIT_COLORS = {
+      'Auto':'#3b82f6','MRH':'#10b981','Santé':'#f59e0b','NOP':'#8b5cf6',
+      'PJ Pro':'#06b6d4','PJ Part':'#14b8a6','GAV':'#f97316','PER':'#6366f1','Emprunteur':'#ec4899'
+    };
+
+    // Barre d'objectif
+    function objBar(label, val, target, ok, color) {
+      var pct = Math.min(100, Math.round((val/target)*100));
+      var statusIcon = ok ? '✅' : (pct>=80?'⚠️':'❌');
+      return `<div style="margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+          <span style="font-size:.72rem;font-weight:600;color:#374151;">${statusIcon} ${label}</span>
+          <span style="font-size:.72rem;font-weight:700;color:${ok?'#22c55e':'#ef4444'};">${val} / ${target}</span>
+        </div>
+        <div style="background:#f1f5f9;border-radius:99px;height:7px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${ok?'#22c55e':color};border-radius:99px;transition:width .4s;"></div>
+        </div>
+      </div>`;
+    }
+
+    // Badge produit
+    function prodBadge(prod, nb) {
+      var c = PRODUIT_COLORS[prod]||'#6b7280';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;background:${c}18;border-radius:6px;margin-bottom:4px;">
+        <span style="font-size:.75rem;color:${c};font-weight:600;">${prod}</span>
+        <span style="font-size:.8rem;font-weight:800;color:${c};">${nb}</span>
+      </div>`;
+    }
+
+    // Relance pill
+    function relancePill(l) {
+      var d2 = new Date(l.rappel); d2.setHours(0,0,0,0);
+      var diff = Math.round((d2-today)/86400000);
+      var label = diff<0 ? `J${diff}` : diff===0 ? 'Auj.' : `J+${diff}`;
+      var bcolor = diff<0 ? '#ef4444' : diff===0 ? '#f59e0b' : '#22c55e';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:#f8fafc;border-radius:6px;margin-bottom:4px;border-left:3px solid ${bcolor};">
+        <div>
+          <div style="font-size:.75rem;font-weight:600;color:#1f2937;">${l.nom||'—'}</div>
+          <div style="font-size:.68rem;color:#6b7280;">${l.produit||''} ${l.statut?'· '+l.statut:''}</div>
+        </div>
+        <span style="font-size:.72rem;font-weight:700;color:${bcolor};white-space:nowrap;">${label}</span>
+      </div>`;
+    }
+
+    var alertBanner = '';
+    if (d.commBlocked > 0) {
+      var reasons = [];
+      if (!d.obj.autoOK && d.obj.nbAuto > 0) reasons.push(`Auto: ${d.obj.nbAuto}/10`);
+      if (!d.obj.mrhOK  && d.obj.nbMRH  > 0) reasons.push(`MRH: ${d.obj.nbMRH}/8`);
+      if (!d.obj.nopOK) reasons.push(`NOP: ${d.obj.nbNOP}/4`);
+      alertBanner = `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-size:.85rem;">🔒</span>
+        <span style="font-size:.78rem;color:#b91c1c;font-weight:600;">${d.commBlocked.toFixed(0)} € bloqués — objectifs non atteints :</span>
+        <span style="font-size:.76rem;color:#dc2626;">${reasons.join(' · ')}</span>
+      </div>`;
+    }
+
+    html += `<div style="background:white;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-left:5px solid ${d.color};overflow:hidden;">
+      <!-- En-tête collab -->
+      <div style="padding:16px 20px;background:${d.color}0d;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:46px;height:46px;border-radius:50%;background:${d.color};display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:1.1rem;">${d.name[0]}</div>
+          <div>
+            <div style="font-weight:800;font-size:1.15rem;color:#111;">${d.name}</div>
+            <div style="font-size:.78rem;color:#6b7280;">${d.ventesM.length} vente(s) · CA ${d.caTotal.toFixed(0)} € de prime</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+          <div style="text-align:center;">
+            <div style="font-size:1.5rem;font-weight:900;color:${d.commEarned>0?d.color:'#9ca3af'};">${d.commEarned.toFixed(0)} €</div>
+            <div style="font-size:.68rem;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;">commissions</div>
+          </div>
+          ${d.leadsRetard>0?`<div style="background:#fef2f2;border-radius:8px;padding:6px 12px;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#ef4444;">${d.leadsRetard}</div><div style="font-size:.66rem;color:#ef4444;">retard</div></div>`:''}
+          <div style="background:#f0fdf4;border-radius:8px;padding:6px 12px;text-align:center;">
+            <div style="font-size:1.2rem;font-weight:800;color:#16a34a;">${d.leadsActifs}</div>
+            <div style="font-size:.66rem;color:#16a34a;">leads actifs</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Corps -->
+      <div style="padding:16px 20px;">
+        ${alertBanner}
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;">
+
+          <!-- Objectifs -->
+          <div style="background:#f8fafc;border-radius:10px;padding:12px;">
+            <div style="font-weight:700;font-size:.82rem;color:#374151;margin-bottom:10px;">🎯 Objectifs du mois</div>
+            ${objBar('Auto (min 10)', d.obj.nbAuto, 10, d.obj.autoOK, '#3b82f6')}
+            ${objBar('MRH (min 8)',   d.obj.nbMRH,  8,  d.obj.mrhOK,  '#10b981')}
+            ${objBar('NOP (min 4)',   d.obj.nbNOP,  4,  d.obj.nopOK,  '#8b5cf6')}
+          </div>
+
+          <!-- Ventes par produit -->
+          <div style="background:#f8fafc;border-radius:10px;padding:12px;">
+            <div style="font-weight:700;font-size:.82rem;color:#374151;margin-bottom:10px;">📋 Ventes par produit</div>
+            ${produits.length > 0
+              ? produits.map(function(e){ return prodBadge(e[0],e[1]); }).join('')
+              : '<div style="font-size:.78rem;color:#9ca3af;text-align:center;padding:16px 0;">Aucune vente ce mois</div>'
+            }
+          </div>
+
+          <!-- Pipeline leads -->
+          <div style="background:#f8fafc;border-radius:10px;padding:12px;">
+            <div style="font-weight:700;font-size:.82rem;color:#374151;margin-bottom:10px;">📞 Pipeline Leads</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
+              <div style="text-align:center;background:${d.leadsRetard>0?'#fef2f2':'#f1f5f9'};border-radius:8px;padding:8px 4px;">
+                <div style="font-size:1.3rem;font-weight:800;color:${d.leadsRetard>0?'#ef4444':'#9ca3af'};">${d.leadsRetard}</div>
+                <div style="font-size:.62rem;color:${d.leadsRetard>0?'#ef4444':'#9ca3af'};">Retard</div>
+              </div>
+              <div style="text-align:center;background:${d.leadsAujourd>0?'#fffbeb':'#f1f5f9'};border-radius:8px;padding:8px 4px;">
+                <div style="font-size:1.3rem;font-weight:800;color:${d.leadsAujourd>0?'#f59e0b':'#9ca3af'};">${d.leadsAujourd}</div>
+                <div style="font-size:.62rem;color:${d.leadsAujourd>0?'#f59e0b':'#9ca3af'};">Auj.</div>
+              </div>
+              <div style="text-align:center;background:#f0fdf4;border-radius:8px;padding:8px 4px;">
+                <div style="font-size:1.3rem;font-weight:800;color:#16a34a;">${d.leadsAvenir}</div>
+                <div style="font-size:.62rem;color:#16a34a;">À venir</div>
+              </div>
+            </div>
+            ${d.prochaines.length > 0
+              ? d.prochaines.map(relancePill).join('')
+              : '<div style="font-size:.75rem;color:#9ca3af;text-align:center;padding:8px 0;">Aucune relance planifiée</div>'
+            }
+          </div>
+
+          <!-- Dernières ventes -->
+          <div style="background:#f8fafc;border-radius:10px;padding:12px;">
+            <div style="font-weight:700;font-size:.82rem;color:#374151;margin-bottom:10px;">🗓 Dernières ventes</div>
+            ${d.ventesM.length > 0
+              ? d.ventesM.slice().reverse().slice(0,5).map(function(v){
+                  var c2 = PRODUIT_COLORS[v.produit]||'#6b7280';
+                  var dt = v.date ? v.date : (v.mois&&v.annee?String(v.mois).padStart(2,'0')+'/'+v.annee:'—');
+                  return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #e5e7eb;">
+                    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c2};flex-shrink:0;"></span>
+                    <span style="font-size:.75rem;color:#1f2937;flex:1;">${v.produit} ${v.client?'· '+v.client:''}</span>
+                    <span style="font-size:.72rem;color:#6b7280;">${dt}</span>
+                    <span style="font-size:.72rem;font-weight:700;color:${c2};">${parseFloat(v.prime||0).toFixed(0)}€</span>
+                  </div>`;
+                }).join('')
+              : '<div style="font-size:.78rem;color:#9ca3af;text-align:center;padding:16px 0;">Aucune vente ce mois</div>'
+            }
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  html += `</div>`;
+
+  var zone = document.getElementById('perf-content');
+  if (zone) zone.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 PAGES['admin-resil'] = (mc) => {
   const mois = nowMois(), annee = nowAnnee();
