@@ -4855,115 +4855,275 @@ function DC_renderRecentList(){
 // PAGES — PROSPECTS & RELANCES (COLLAB + ADMIN)
 // ============================================================
 PAGES['admin-prospects'] = (mc) => {
-  const collabs = getCollabNames();
-  const today = new Date().toISOString().slice(0,10);
-  const allProspects = DB.prospects;
-  const overdue = allProspects.filter(p=>p.rappel&&p.rappel<today&&p.statut!=='Signé'&&p.statut!=='Sans suite');
-  const dueToday = allProspects.filter(p=>p.rappel&&p.rappel===today);
-  const upcoming = allProspects.filter(p=>p.rappel&&p.rappel>today&&p.statut!=='Signé');
-
   mc.innerHTML = `
-<div class="page-header flex-between">
-  <div><h1>Prospects & Relances</h1><p>${allProspects.length} prospect(s) enregistré(s) — relances programmées</p></div>
-  <div class="flex-gap">
-    <select id="filter-collab-prosp" onchange="renderAdminProspects()" style="padding:8px 12px;border:1.5px solid var(--gray-200);border-radius:var(--rs);font-size:13px;background:white;font-family:inherit">
-      <option value="">Toute l'équipe</option>
-      ${collabs.map(c=>`<option value="${c}">${c}</option>`).join('')}
-    </select>
-    <select id="filter-statut-prosp" onchange="renderAdminProspects()" style="padding:8px 12px;border:1.5px solid var(--gray-200);border-radius:var(--rs);font-size:13px;background:white;font-family:inherit">
-      <option value="">Tous statuts</option>
-      <option value="À contacter">À contacter</option>
-      <option value="Contacté — en attente">Contacté</option>
-      <option value="Devis envoyé">Devis envoyé</option>
-      <option value="RDV planifié">RDV planifié</option>
-      <option value="Signé">Signé ✓</option>
-      <option value="Sans suite">Sans suite</option>
-    </select>
+<div style="max-width:960px;margin:0 auto;padding:20px;font-family:var(--font);">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+    <div>
+      <h1 style="margin:0;font-size:1.4rem;font-weight:800;color:#0f172a;">🎯 Activité & Relances équipe</h1>
+      <p style="margin:4px 0 0;color:#64748b;font-size:.85rem;">Leads en cours · Prochaines relances · Pipeline par collaboratrice</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <select id="filter-collab-prosp" onchange="renderAdminProspects()" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;background:#fff;font-family:inherit;">
+        <option value="">Toute l'équipe</option>
+        ${getCollabNames().map(c=>`<option value="${c}">${c}</option>`).join('')}
+      </select>
+      <select id="filter-statut-prosp" onchange="renderAdminProspects()" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;background:#fff;font-family:inherit;">
+        <option value="">Tous statuts</option>
+        <option value="À contacter">À contacter</option>
+        <option value="Contacté — en attente">Contacté</option>
+        <option value="Contrat signé">Signé ✓</option>
+      </select>
+    </div>
   </div>
-</div>
-
-<div class="kpi-grid kpi-grid-4" style="margin-bottom:20px">
-  <div class="kpi ${overdue.length?'danger':'good'}">
-    <div class="kpi-val">${overdue.length}</div>
-    <div class="kpi-lbl">Relances en retard</div>
-  </div>
-  <div class="kpi ${dueToday.length?'warn':''}">
-    <div class="kpi-val">${dueToday.length}</div>
-    <div class="kpi-lbl">À relancer aujourd'hui</div>
-  </div>
-  <div class="kpi">
-    <div class="kpi-val">${upcoming.length}</div>
-    <div class="kpi-lbl">Relances à venir</div>
-  </div>
-  <div class="kpi good">
-    <div class="kpi-val">${allProspects.filter(p=>p.statut==='Signé').length}</div>
-    <div class="kpi-lbl">Prospects convertis</div>
-  </div>
-</div>
-
-${overdue.length ? `<div class="alert alert-danger" style="margin-bottom:16px">⚠️ ${overdue.length} relance(s) en retard — action requise</div>` : ''}
-
-<div class="card">
-  <div class="card-header">
-    <div class="card-title"><div class="card-icon">📋</div>Liste des prospects</div>
-    <span class="muted" id="prosp-count">${allProspects.length} prospect(s)</span>
-  </div>
-  <div id="admin-prosp-table"></div>
+  <div id="admin-prosp-kpis" style="margin-bottom:20px;"></div>
+  <div id="admin-prosp-cards" style="margin-bottom:24px;"></div>
+  <div id="admin-prosp-table-wrap"></div>
 </div>`;
-
   renderAdminProspects();
 };
 
 function renderAdminProspects(){
-  const collabFilter = document.getElementById('filter-collab-prosp');
-  const statutFilter = document.getElementById('filter-statut-prosp');
-  const fc = collabFilter ? collabFilter.value : '';
-  const fs = statutFilter ? statutFilter.value : '';
-  const today = new Date().toISOString().slice(0,10);
+  const today    = new Date().toISOString().slice(0,10);
+  const collabs  = getCollabNames();
+  const colorsMap = getCollabColors();
+  const fc = (document.getElementById('filter-collab-prosp')||{}).value || '';
+  const fs = (document.getElementById('filter-statut-prosp')||{}).value || '';
 
-  let prospects = DB.prospects;
-  if (fc) prospects = prospects.filter(p=>p.collab===fc);
-  if (fs) prospects = prospects.filter(p=>p.statut===fs);
-  prospects = [...prospects].sort((a,b)=>{
-    // Sort: overdue first, then by rappel asc
-    const ra=a.rappel||'9999', rb=b.rappel||'9999';
-    return ra<rb?-1:ra>rb?1:0;
+  // ── Sources de données : leads + prospects CRM ──
+  const allLeads = (DB.leads||[]).filter(l => !['Contrat signé','Sans suite','Perdu','Abandonné'].includes(l.statut));
+  const allProspects = (DB.prospects||[]).filter(p => !['Signé','Sans suite'].includes(p.statut));
+
+  // ── KPIs globaux ──
+  const leadsRetard  = allLeads.filter(l => l.rappel && l.rappel < today);
+  const leadsAujourd = allLeads.filter(l => l.rappel && l.rappel === today);
+  const leadsAVenir  = allLeads.filter(l => l.rappel && l.rappel > today);
+  const leadsActifs  = allLeads.length;
+
+  const kpiZone = document.getElementById('admin-prosp-kpis');
+  if (kpiZone) {
+    kpiZone.innerHTML =
+      (leadsRetard.length ? `<div style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:.88rem;font-weight:600;color:#991b1b;">⚠️ ${leadsRetard.length} relance${leadsRetard.length>1?'s':''} en retard — action requise</div>` : '')
+      + `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;">
+        <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:12px;padding:14px;text-align:center;">
+          <div style="font-size:1.8rem;font-weight:800;color:#ea580c;">${leadsRetard.length}</div>
+          <div style="font-size:.72rem;font-weight:700;color:#9a3412;text-transform:uppercase;margin-top:3px;">En retard</div>
+        </div>
+        <div style="background:#fefce8;border:1.5px solid #fde047;border-radius:12px;padding:14px;text-align:center;">
+          <div style="font-size:1.8rem;font-weight:800;color:#ca8a04;">${leadsAujourd.length}</div>
+          <div style="font-size:.72rem;font-weight:700;color:#92400e;text-transform:uppercase;margin-top:3px;">Aujourd'hui</div>
+        </div>
+        <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:12px;padding:14px;text-align:center;">
+          <div style="font-size:1.8rem;font-weight:800;color:#1d4ed8;">${leadsAVenir.length}</div>
+          <div style="font-size:.72rem;font-weight:700;color:#1e40af;text-transform:uppercase;margin-top:3px;">À venir</div>
+        </div>
+        <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:14px;text-align:center;">
+          <div style="font-size:1.8rem;font-weight:800;color:#15803d;">${leadsActifs}</div>
+          <div style="font-size:.72rem;font-weight:700;color:#14532d;text-transform:uppercase;margin-top:3px;">Leads actifs</div>
+        </div>
+      </div>`;
+  }
+
+  // ── Cartes d'activité par collaboratrice ──
+  const cardsZone = document.getElementById('admin-prosp-cards');
+  if (cardsZone) {
+    const filteredCollabs = fc ? collabs.filter(c=>c===fc) : collabs;
+    cardsZone.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px;">` +
+    filteredCollabs.map(collab => {
+      const col  = colorsMap[collab] || '#6b7280';
+      const init = collab.slice(0,2).toUpperCase();
+
+      // Leads de cette collab
+      const cLeads = (DB.leads||[]).filter(l => l.collab === collab);
+      const cActifs= cLeads.filter(l => !['Contrat signé','Sans suite','Perdu','Abandonné'].includes(l.statut));
+      const nAContacter = cActifs.filter(l => l.statut === 'À contacter').length;
+      const nEnCours    = cActifs.filter(l => ['Contacté — en attente','Devis envoyé','RDV planifié'].includes(l.statut)).length;
+      const nSigne      = cLeads.filter(l => l.statut === 'Contrat signé').length;
+
+      // Devis actifs
+      const cDevis = (DB.devis||[]).filter(d => d.collab === collab && !['Gagné','Perdu','Abandonné'].includes(d.statut));
+
+      // Prochaine relance
+      const withRappel = cActifs.filter(l => l.rappel).sort((a,b) => a.rappel < b.rappel ? -1 : 1);
+      const nextRelance= withRappel[0] || null;
+      const relanceEnRetard = cActifs.filter(l => l.rappel && l.rappel < today);
+      const relanceAujourd  = cActifs.filter(l => l.rappel && l.rappel === today);
+
+      // Dernière activité
+      const lastUpdated = cLeads
+        .filter(l => l.updatedAt || l.createdAt)
+        .sort((a,b) => (b.updatedAt||b.createdAt||'') > (a.updatedAt||a.createdAt||'') ? 1 : -1);
+      const lastLead = lastUpdated[0] || null;
+
+      // Statut global collab
+      let globBg = '#fff', globBorder = '#e2e8f0';
+      if (relanceEnRetard.length) { globBg='#fff7ed'; globBorder='#fed7aa'; }
+      else if (relanceAujourd.length) { globBg='#fefce8'; globBorder='#fde047'; }
+
+      // Relances à venir (5 prochaines)
+      const prochaines = withRappel.slice(0,5);
+
+      // Barre pipeline
+      const totalPipeline = nAContacter + nEnCours + nSigne;
+      function pipeBar(n, color, label) {
+        const pct = totalPipeline > 0 ? Math.round((n/totalPipeline)*100) : 0;
+        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
+          <div style="width:80px;font-size:.72rem;color:#64748b;font-weight:600;flex-shrink:0;">${label}</div>
+          <div style="flex:1;background:#f1f5f9;border-radius:99px;height:8px;overflow:hidden;">
+            <div style="width:${pct}%;height:100%;background:${color};border-radius:99px;transition:width .4s;"></div>
+          </div>
+          <div style="width:24px;text-align:right;font-size:.78rem;font-weight:700;color:${n>0?color:'#cbd5e1'};">${n}</div>
+        </div>`;
+      }
+
+      return `<div style="background:${globBg};border:1.5px solid ${globBorder};border-radius:14px;overflow:hidden;">
+
+        <!-- En-tête collab -->
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:14px 18px;background:${col}0f;border-bottom:1px solid ${globBorder};">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:${col};color:#fff;font-size:.85rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${init}</div>
+            <div>
+              <div style="font-weight:800;font-size:1rem;color:#0f172a;">${collab}</div>
+              <div style="font-size:.75rem;color:#64748b;margin-top:1px;">${cActifs.length} lead${cActifs.length>1?'s':''} actif${cActifs.length>1?'s':''} · ${cDevis.length} devis en cours</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${relanceEnRetard.length ? `<span style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:20px;padding:3px 10px;font-size:.72rem;font-weight:700;">⚠️ ${relanceEnRetard.length} en retard</span>` : ''}
+            ${relanceAujourd.length  ? `<span style="background:#fefce8;color:#92400e;border:1px solid #fde047;border-radius:20px;padding:3px 10px;font-size:.72rem;font-weight:700;">📅 ${relanceAujourd.length} aujourd'hui</span>` : ''}
+            ${!relanceEnRetard.length && !relanceAujourd.length && cActifs.length === 0 ? `<span style="background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;border-radius:20px;padding:3px 10px;font-size:.72rem;font-weight:600;">Aucun lead actif</span>` : ''}
+          </div>
+        </div>
+
+        <!-- Corps : pipeline + relances -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;">
+
+          <!-- Pipeline -->
+          <div style="padding:14px 18px;border-right:1px solid ${globBorder};">
+            <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📊 Pipeline</div>
+            ${pipeBar(nAContacter, '#6366f1', 'À contacter')}
+            ${pipeBar(nEnCours,    '#0ea5e9', 'En cours')}
+            ${pipeBar(nSigne,      '#22c55e', 'Signé ✓')}
+            ${cDevis.length > 0 ? `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;font-size:.75rem;color:#0ea5e9;font-weight:600;">📋 ${cDevis.length} devis actif${cDevis.length>1?'s':''}</div>` : ''}
+          </div>
+
+          <!-- Prochaines relances -->
+          <div style="padding:14px 18px;">
+            <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">🔔 Prochaines relances</div>
+            ${prochaines.length === 0
+              ? `<div style="font-size:.8rem;color:#94a3b8;font-style:italic;">Aucune relance programmée</div>`
+              : prochaines.map(l => {
+                  const isLate  = l.rappel < today;
+                  const isToday = l.rappel === today;
+                  const diff    = Math.round((new Date(l.rappel)-new Date(today))/(1000*3600*24));
+                  const diffLbl = isLate  ? `⚠️ J+${Math.abs(diff)}`
+                                 : isToday ? `📅 Aujourd'hui`
+                                 : `Dans ${diff}j`;
+                  const diffCol = isLate ? '#dc2626' : isToday ? '#d97706' : '#0369a1';
+                  return `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;">
+                    <span style="font-size:.7rem;font-weight:700;color:${diffCol};background:${isLate?'#fee2e2':isToday?'#fefce8':'#eff6ff'};border-radius:6px;padding:2px 6px;white-space:nowrap;flex-shrink:0;">${diffLbl}</span>
+                    <div style="min-width:0;">
+                      <div style="font-size:.82rem;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l.client||'—'}</div>
+                      <div style="font-size:.72rem;color:#94a3b8;">${l.produit||''}</div>
+                    </div>
+                  </div>`;
+                }).join('')
+            }
+          </div>
+        </div>
+
+        ${lastLead ? `<div style="padding:8px 18px;border-top:1px solid ${globBorder};background:rgba(0,0,0,.02);font-size:.74rem;color:#94a3b8;">
+          🕐 Dernière activité : <strong style="color:#64748b;">${lastLead.client||'—'}</strong> — ${lastLead.statut||''} — ${(lastLead.updatedAt||lastLead.createdAt||'').slice(0,10)||'—'}
+        </div>` : ''}
+      </div>`;
+    }).join('') + `</div>`;
+  }
+
+  // ── Tableau détaillé leads (filtré) ──
+  const tableWrap = document.getElementById('admin-prosp-table-wrap');
+  if (!tableWrap) return;
+
+  let leads = (DB.leads||[]);
+  if (fc) leads = leads.filter(l => l.collab === fc);
+  if (fs) leads = leads.filter(l => l.statut === fs);
+  leads = [...leads].sort((a,b) => {
+    const ra = a.rappel||'9999', rb = b.rappel||'9999';
+    return ra < rb ? -1 : ra > rb ? 1 : 0;
   });
 
-  const cnt=document.getElementById('prosp-count'); if(cnt) cnt.textContent=prospects.length+' prospect(s)';
+  if (!leads.length) {
+    tableWrap.innerHTML = `<div style="background:#fff;border-radius:14px;border:1.5px solid #e2e8f0;padding:30px;text-align:center;color:#94a3b8;">
+      <div style="font-size:2rem;margin-bottom:8px;">📭</div>
+      <div style="font-weight:600;color:#64748b;">Aucun lead enregistré</div>
+      <div style="font-size:.82rem;margin-top:4px;">Les leads créés par les collaboratrices apparaîtront ici.</div>
+    </div>`;
+    return;
+  }
 
-  const zone = document.getElementById('admin-prosp-table'); if(!zone) return;
-  if(!prospects.length){zone.innerHTML='<p class="muted" style="padding:16px">Aucun prospect.</p>';return;}
+  const STAT_PILL = {
+    'À contacter':          'background:#e0e7ff;color:#3730a3',
+    'Contacté — en attente':'background:#dbeafe;color:#1d4ed8',
+    'Devis envoyé':         'background:#fef9c3;color:#92400e',
+    'RDV planifié':         'background:#ffedd5;color:#c2410c',
+    'Contrat signé':        'background:#dcfce7;color:#15803d',
+    'Sans suite':           'background:#f1f5f9;color:#64748b',
+  };
+  const PRIO_PILL = {
+    '🔴 Haute':   'background:#fee2e2;color:#991b1b',
+    '🟡 Moyenne': 'background:#fef9c3;color:#92400e',
+    '🟢 Basse':   'background:#dcfce7;color:#166534',
+  };
 
-  zone.innerHTML=`<table class="data-table">
-    <thead><tr>
-      <th>Prospect</th><th>Collaboratrice</th><th>Score</th><th>Statut</th>
-      <th>Rappel</th><th>Opportunités</th><th>Actions</th>
-    </tr></thead>
-    <tbody>${prospects.map(p=>{
-      const name=((p.prenom||'')+' '+(p.nom||'')).trim()||'—';
-      const isOverdue=p.rappel&&p.rappel<today&&p.statut!=='Signé'&&p.statut!=='Sans suite';
-      const isToday=p.rappel&&p.rappel===today;
-      const rapLabel=p.rappel?(isOverdue?`<span style="color:var(--red);font-weight:600">⚠ ${p.rappel}</span>`:isToday?`<span style="color:var(--orange);font-weight:600">📅 Aujourd'hui</span>`:`<span style="color:var(--green)">${p.rappel}</span>`):'—';
-      const scoreColor=p.score>=70?'green':p.score>=40?'blue':'warn';
-      const statPill={'À contacter':'pill-gray','Contacté — en attente':'pill-blue','Devis envoyé':'pill-gold','RDV planifié':'pill-orange','Signé':'pill-green','Sans suite':'pill-gray'}[p.statut]||'pill-gray';
-      return `<tr${isOverdue?' style="background:var(--red-light)"':isToday?' style="background:var(--orange-light)"':''}>
-        <td><div style="font-weight:600">${name}</div><div class="muted">${p.tel||'—'}</div></td>
-        <td>${p.collab||'—'}</td>
-        <td><span class="pill pill-${scoreColor}">${p.score||0}/100</span></td>
-        <td><span class="pill ${statPill}">${p.statut||'—'}</span></td>
-        <td>${rapLabel}</td>
-        <td><div style="font-size:11px;color:var(--gray-600);max-width:160px">${p.conclusion?p.conclusion.slice(0,60)+'…':p.notes?p.notes.slice(0,60)+'…':'—'}</div></td>
-        <td>
-          <button class="btn btn-ghost btn-sm" onclick="adminOpenProspect('${p.id}')">Voir</button>
-          ${!p.convertedToDevis
-            ? `<button class="btn btn-primary btn-sm" style="margin-left:4px;background:#059669;border-color:#059669;" onclick="convertProspectToDevis('${p.id}')">📋 Devis</button>`
-            : `<span style="font-size:11px;color:#059669;font-weight:600;margin-left:4px;">✅ Devis créé</span>`}
-          <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="adminDeleteProspect('${p.id}')">✕</button>
-        </td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table>`;
+  tableWrap.innerHTML = `<div style="background:#fff;border-radius:14px;border:1.5px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1.5px solid #f1f5f9;">
+      <div style="font-weight:700;font-size:.95rem;color:#0f172a;">📋 Détail des leads — ${leads.length} entrée${leads.length>1?'s':''}</div>
+    </div>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="padding:10px 14px;text-align:left;color:#64748b;font-weight:600;font-size:.72rem;text-transform:uppercase;border-bottom:1.5px solid #e2e8f0;">Client</th>
+          <th style="padding:10px 8px;text-align:left;color:#64748b;font-weight:600;font-size:.72rem;text-transform:uppercase;border-bottom:1.5px solid #e2e8f0;">Collab</th>
+          <th style="padding:10px 8px;text-align:left;color:#64748b;font-weight:600;font-size:.72rem;text-transform:uppercase;border-bottom:1.5px solid #e2e8f0;">Produit</th>
+          <th style="padding:10px 8px;text-align:center;color:#64748b;font-weight:600;font-size:.72rem;text-transform:uppercase;border-bottom:1.5px solid #e2e8f0;">Priorité</th>
+          <th style="padding:10px 8px;text-align:left;color:#64748b;font-weight:600;font-size:.72rem;text-transform:uppercase;border-bottom:1.5px solid #e2e8f0;">Statut</th>
+          <th style="padding:10px 8px;text-align:center;color:#1d4ed8;font-weight:700;font-size:.72rem;text-transform:uppercase;border-bottom:1.5px solid #e2e8f0;">🔔 Relance</th>
+          <th style="padding:10px 8px;text-align:left;color:#64748b;font-weight:600;font-size:.72rem;text-transform:uppercase;border-bottom:1.5px solid #e2e8f0;">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+      ${leads.map(l => {
+        const isLate  = l.rappel && l.rappel < today && !['Contrat signé','Sans suite'].includes(l.statut);
+        const isToday = l.rappel && l.rappel === today;
+        const col     = colorsMap[l.collab] || '#6b7280';
+        const diff    = l.rappel ? Math.round((new Date(l.rappel)-new Date(today))/(1000*3600*24)) : null;
+        const rappelLbl = !l.rappel ? '—'
+          : isLate  ? `<span style="color:#dc2626;font-weight:700;">⚠ J+${Math.abs(diff)}</span>`
+          : isToday ? `<span style="color:#d97706;font-weight:700;">📅 Auj.</span>`
+          : `<span style="color:#0369a1;font-weight:600;">J-${diff}</span>`;
+        const statSt  = STAT_PILL[l.statut] || 'background:#f1f5f9;color:#64748b';
+        const prioSt  = PRIO_PILL[l.priorite] || 'background:#f1f5f9;color:#64748b';
+        const rowBg   = isLate ? 'background:#fff7ed;' : isToday ? 'background:#fefce8;' : '';
+        return `<tr style="${rowBg}border-bottom:1px solid #f1f5f9;">
+          <td style="padding:10px 14px;">
+            <div style="font-weight:600;color:#1e293b;">${l.client||'—'}</div>
+            ${l.telephone ? `<div style="font-size:.72rem;color:#94a3b8;">${l.telephone}</div>` : ''}
+          </td>
+          <td style="padding:10px 8px;">
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:20px;height:20px;border-radius:6px;background:${col};color:#fff;font-size:.6rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${(l.collab||'?').slice(0,2).toUpperCase()}</div>
+              <span style="font-size:.78rem;font-weight:600;color:#374151;">${l.collab||'—'}</span>
+            </div>
+          </td>
+          <td style="padding:10px 8px;"><span style="font-size:.78rem;color:#374151;">${l.produit||'—'}</span></td>
+          <td style="padding:10px 8px;text-align:center;"><span style="font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:20px;${prioSt}">${l.priorite||'—'}</span></td>
+          <td style="padding:10px 8px;"><span style="font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:20px;${statSt}">${l.statut||'—'}</span></td>
+          <td style="padding:10px 8px;text-align:center;">${rappelLbl}${l.rappel?`<div style="font-size:.68rem;color:#94a3b8;">${l.rappel}</div>`:''}</td>
+          <td style="padding:10px 8px;max-width:180px;"><div style="font-size:.75rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(l.notes||'').replace(/"/g,'&quot;')}">${l.notes||'—'}</div></td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>
+    </div>
+  </div>`;
 }
 
 function adminOpenProspect(id){
