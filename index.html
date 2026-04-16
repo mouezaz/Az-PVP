@@ -1311,19 +1311,33 @@ function renderCollabVentes() {
   const sc = (p) => p>=100?'var(--green)':p>=60?'var(--orange)':'var(--red)';
   const sb = (p) => p>=100?'var(--green-light)':p>=60?'var(--orange-light)':'var(--red-light)';
 
-  // Commission collab ce mois
-  const commCollabM = anVentes.reduce((s,v)=>s+calcCommissionCollab(v.produit,v.prime),0);
+  // Commission collab ce mois — Auto/MRH conditionnés, reste toujours payé
+  const objSt       = getObjectifsStatus(currentUser.name, mois, annee);
+  const commCollabM = calcCommissionCollabMensuel(currentUser.name, mois, annee);
+  const autoBloque  = !objSt.autoOK;
+  const mrhBloque   = !objSt.mrhOK;
+  const hasLock     = autoBloque || mrhBloque;
+  // Construire les badges de conditions manquantes
+  const lockBadges  = [
+    autoBloque ? `Auto ${objSt.nbAuto}/${OBJECTIFS_COLLAB.autoMin}${!objSt.nopOK?' + NOP '+objSt.nbNOP+'/'+OBJECTIFS_COLLAB.nopMin:''}` : null,
+    mrhBloque  ? `MRH ${objSt.nbMRH}/${OBJECTIFS_COLLAB.mrhMin}${!objSt.nopOK && !autoBloque?' + NOP '+objSt.nbNOP+'/'+OBJECTIFS_COLLAB.nopMin:''}` : null,
+  ].filter(Boolean).join(' · ');
 
   document.getElementById('collab-kpis-zone').innerHTML = `
     <!-- ENCART COMMISSION COLLAB -->
-    ${commCollabM > 0 ? `
-    <div style="background:linear-gradient(135deg,#1e3a5f,#1d4ed8);border-radius:var(--r);padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#fff;">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.7;margin-bottom:4px;">💰 Mes commissions — ${MOIS_FULL[mois]} ${annee}</div>
-        <div style="font-size:32px;font-weight:800;line-height:1;">${fmtEuro(commCollabM)}</div>
-        <div style="font-size:11px;opacity:.7;margin-top:4px;">Sur ${anVentes.length} contrat${anVentes.length>1?'s':''} · taux référentiel interne</div>
+    ${commCollabM > 0 || hasLock ? `
+    <div style="background:linear-gradient(135deg,#1e3a5f,#1d4ed8);border-radius:var(--r);padding:14px 18px;margin-bottom:14px;color:#fff;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.7;margin-bottom:4px;">💰 Mes commissions — ${MOIS_FULL[mois]} ${annee}</div>
+          <div style="font-size:32px;font-weight:800;line-height:1;">${fmtEuro(commCollabM)}</div>
+          <div style="font-size:11px;opacity:.7;margin-top:4px;">Sur ${anVentes.length} contrat${anVentes.length>1?'s':''} · taux référentiel interne</div>
+        </div>
+        <div style="font-size:2.5rem;opacity:.4;">💳</div>
       </div>
-      <div style="font-size:2.5rem;opacity:.4;">💳</div>
+      ${hasLock ? `<div style="margin-top:10px;background:rgba(220,38,38,.25);border-radius:8px;padding:8px 12px;font-size:11px;font-weight:600;">
+        🔒 Commissions Auto/MRH non déclenchées · Manque : ${lockBadges}
+      </div>` : ''}
     </div>` : ''}
 
     <!-- BARRE OBJECTIF GLOBAL -->
@@ -1390,9 +1404,10 @@ function renderCollabVentes() {
         ${anVentes.map((v,i)=>{
           const isPrio = PRIO_PRODS.includes(v.produit);
           const col = PROD_COLORS[v.produit]||'#6B7280';
-          const comm = calcCommissionCollab(v.produit, v.prime);
+          const prodBloque = (v.produit==='Auto' && autoBloque) || (v.produit==='MRH' && mrhBloque);
+          const comm = prodBloque ? 0 : calcCommissionCollab(v.produit, v.prime);
           const rateInfo = COMM_RATES_COLLAB[v.produit];
-          const rateLabel = rateInfo ? (rateInfo.type==='forfait' ? rateInfo.val+'€ forfait' : (rateInfo.val*100)+'% prime') : '';
+          const rateLabel = prodBloque ? '🔒 objectif non atteint' : (rateInfo ? (rateInfo.type==='forfait' ? rateInfo.val+'€ forfait' : (rateInfo.val*100)+'% prime') : '');
           const prioPill = isPrio
             ? `<span style="background:${col};color:white;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">⭐ Prioritaire</span>`
             : `<span style="color:var(--gray-400);font-size:11px">—</span>`;
@@ -2496,13 +2511,9 @@ PAGES['collab-home'] = (mc) => {
   });
   const nbVentes = ventesM.length;
   const primeTotal = ventesM.reduce((s,v)=>s+(parseFloat(v.prime)||0),0);
-  // Commission effective : Auto et MRH conditionnés aux objectifs
+  // Commission effective : tout ou rien selon objectifs (Auto≥10, MRH≥8, NOP≥4)
   const objStatus = getObjectifsStatus(collab, mois, annee);
-  const commTotal = ventesM.reduce((s,v)=>{
-    if (v.produit==='Auto' && !objStatus.autoOK) return s;
-    if (v.produit==='MRH'  && !objStatus.mrhOK)  return s;
-    return s + calcCommissionCollab(v.produit, v.prime);
-  }, 0);
+  const commTotal = calcCommissionCollabMensuel(collab, mois, annee);
 
   // Group by product for the wins grid
   const byProd = {};
@@ -2767,7 +2778,8 @@ PAGES['collab-home'] = (mc) => {
     + objBar(objStatus.nbAuto, OBJECTIFS_COLLAB.autoMin, 'Auto',             '🚗', nopOK_)
     + objBar(objStatus.nbMRH,  OBJECTIFS_COLLAB.mrhMin,  'MRH',              '🏠', nopOK_)
     + '</div>'
-    + (!nopOK_ ? '<div style="margin-top:10px;font-size:.75rem;color:#dc2626;font-weight:600;">Atteignez ' + OBJECTIFS_COLLAB.nopMin + ' NOP pour débloquer les commissions Auto et MRH.</div>' : '')
+    + (!nopOK_ ? '<div style="margin-top:10px;font-size:.75rem;color:#dc2626;font-weight:600;">🔒 ' + OBJECTIFS_COLLAB.nopMin + ' NOP requis pour débloquer les commissions Auto et MRH.</div>'
+               : (!autoOK_ || !mrhOK_ ? '<div style="margin-top:10px;font-size:.75rem;color:#f97316;font-weight:600;">⚠️ Commissions ' + (!autoOK_&&!mrhOK_?'Auto et MRH':!autoOK_?'Auto':'MRH') + ' non déclenchées. Les autres produits (Santé, NOP, GAV…) sont payés normalement.</div>' : ''))
     + '</div>';
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -8816,14 +8828,17 @@ function getObjectifsStatus(collab, mois, annee) {
   };
 }
 
-// Commission collab mensuelle tenant compte des conditions d'objectifs
+// Commission collab mensuelle — règle par produit :
+// • Auto  : commission 8€/contrat SEULEMENT si ≥10 Auto ET ≥4 NOP dans le mois
+// • MRH   : commission 10€/contrat SEULEMENT si ≥8 MRH ET ≥4 NOP dans le mois
+// • Autres (NOP, Santé, GAV, PER, Emprunteur, PJ…) : toujours payés, sans condition
 function calcCommissionCollabMensuel(collab, mois, annee) {
   var obj     = getObjectifsStatus(collab, mois, annee);
   var ventesM = getVentesMoisCollab(collab, mois, annee);
   return ventesM.reduce(function(s, v) {
-    if (v.produit === 'Auto' && !obj.autoOK) return s;  // objectif non atteint
-    if (v.produit === 'MRH'  && !obj.mrhOK)  return s;  // objectif non atteint
-    return s + calcCommissionCollab(v.produit, v.prime);
+    if (v.produit === 'Auto' && !obj.autoOK) return s;  // ≥10 Auto + ≥4 NOP requis
+    if (v.produit === 'MRH'  && !obj.mrhOK)  return s;  // ≥8 MRH + ≥4 NOP requis
+    return s + calcCommissionCollab(v.produit, v.prime); // tous les autres : toujours
   }, 0);
 }
 // ─────────────────────────────────────────────────────────────────────────────
