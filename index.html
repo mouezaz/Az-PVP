@@ -8740,6 +8740,28 @@ function adminSaveConge() {
 // ============================================================
 // PAGE: MES PRIMES (collab)
 // ============================================================
+// ── Primes : commission auto ou override manuel ──────────────────────────────
+function getPrimeEffective(collab, mois, annee) {
+  // Override manuel prioritaire
+  var manual = (DB.primes||[]).find(function(p){ return p.collab===collab && p.mois===mois && p.annee===annee; });
+  if (manual !== undefined) return manual.montant || 0;
+  // Calcul automatique depuis les ventes (commissions collaboratrice)
+  return (DB.ventes||[]).filter(function(v){
+    return v.collab === collab && v.mois === mois && v.annee === annee;
+  }).reduce(function(s,v){ return s + calcCommissionCollab(v.produit, v.prime); }, 0);
+}
+function hasPrimeOverride(collab, mois, annee) {
+  return !!(DB.primes||[]).find(function(p){ return p.collab===collab && p.mois===mois && p.annee===annee; });
+}
+function resetPrimeOverride(collab, mois, annee) {
+  if (!DB.primes) return;
+  var idx = DB.primes.findIndex(function(p){ return p.collab===collab && p.mois===mois && p.annee===annee; });
+  if (idx >= 0) { DB.primes.splice(idx, 1); saveDB(DB); }
+  showPage('admin-rh-primes');
+  toast('Revenu au calcul automatique ✓', 'success');
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 PAGES['collab-primes'] = function(mc) {
   if (!DB.primes) DB.primes = [];
   var collab = currentUser.name;
@@ -8747,12 +8769,11 @@ PAGES['collab-primes'] = function(mc) {
   var annee  = _pannee ? parseInt(_pannee.value) || nowAnnee() : nowAnnee();
   var col    = (getCollabColors()[collab] || '#3b82f6');
 
-  // Data
+  // Data — commission calculée automatiquement (ou override manuel)
   var mesPrimes = [];
   var totalAn = 0, totalMoisCur = 0, totalMoisPrec = 0;
   for (var m=1; m<=12; m++) {
-    var entry = DB.primes.find(function(p){ return p.collab===collab && p.mois===m && p.annee===annee; });
-    var val = entry ? (entry.montant||0) : 0;
+    var val = getPrimeEffective(collab, m, annee);
     mesPrimes.push({ mois: m, val: val });
     totalAn += val;
     if (m === nowMois())   totalMoisCur  = val;
@@ -8803,7 +8824,7 @@ PAGES['collab-primes'] = function(mc) {
     + '<div style="display:flex;align-items:center;gap:16px;">'
     + '<div style="width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:1.8rem;">🎁</div>'
     + '<div><div style="font-size:1.3rem;font-weight:800;">Mes primes</div>'
-    + '<div style="opacity:.75;font-size:.88rem;margin-top:2px;">Versements de votre manager</div></div>'
+    + '<div style="opacity:.75;font-size:.88rem;margin-top:2px;">Calculées depuis vos commissions</div></div>'
     + '</div>'
     + '<select id="collab-primes-annee" onchange="showPage(\'collab-primes\')" style="padding:8px 12px;border:none;border-radius:8px;font-size:.88rem;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;">' + anneeOpts + '</select>'
     + '</div>'
@@ -9163,19 +9184,20 @@ PAGES['admin-rh-primes'] = function(mc) {
 
   // ── helpers ──
   function getPrime(collab, mois, ann) {
-    var e = DB.primes.find(function(p){ return p.collab===collab && p.mois===mois && p.annee===ann; });
-    return e ? e.montant : 0;
+    return getPrimeEffective(collab, mois, ann);
   }
   function totalCollab(collab, ann) {
-    return DB.primes.filter(function(p){ return p.collab===collab && p.annee===ann; })
-      .reduce(function(s,p){ return s + (p.montant||0); }, 0);
+    var t = 0;
+    for (var m=1; m<=12; m++) t += getPrimeEffective(collab, m, ann);
+    return t;
   }
   function totalMois(mois, ann) {
-    return collabs.reduce(function(s,c){ return s + getPrime(c, mois, ann); }, 0);
+    return collabs.reduce(function(s,c){ return s + getPrimeEffective(c, mois, ann); }, 0);
   }
   function totalAnnuel(ann) {
-    return DB.primes.filter(function(p){ return p.annee===ann; })
-      .reduce(function(s,p){ return s + (p.montant||0); }, 0);
+    var t = 0;
+    collabs.forEach(function(c){ for (var m=1; m<=12; m++) t += getPrimeEffective(c, m, ann); });
+    return t;
   }
 
   // ── yearly sparkline per collab (12 bars) ──
@@ -9211,17 +9233,29 @@ PAGES['admin-rh-primes'] = function(mc) {
     var init = collab.slice(0,2).toUpperCase();
     var totC = totalCollab(collab, annee);
     var cells = [1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
-      var val = getPrime(collab, m, annee);
-      var isCur = m===nowMois() && annee===nowAnnee();
-      return '<td style="padding:6px;text-align:center;border-bottom:1px solid #f1f5f9;' + (isCur?'background:#eff6ff;':'') + '">'
-        + '<input type="number" min="0" step="1"'
-        + ' value="' + (val||'') + '"'
-        + ' placeholder="0"'
+      var val      = getPrime(collab, m, annee);
+      var isManual = hasPrimeOverride(collab, m, annee);
+      var isCur    = m===nowMois() && annee===nowAnnee();
+      // Couleur : vert = override manuel, bleu = auto depuis commissions, gris = zéro
+      var borderCol = isManual ? '#86efac' : (val > 0 ? '#93c5fd' : '#e2e8f0');
+      var bgCol     = isManual ? '#f0fdf4' : (val > 0 ? '#eff6ff' : '#fff');
+      var titleTxt  = isManual ? 'Montant personnalisé — cliquez ↺ pour revenir au calcul auto' : (val > 0 ? 'Calculé automatiquement depuis les commissions' : 'Aucune vente ce mois');
+      return '<td style="padding:4px 3px;text-align:center;border-bottom:1px solid #f1f5f9;' + (isCur?'background:#eff6ff55;':'') + '">'
+        + '<div style="position:relative;display:inline-block;">'
+        + '<input type="number" min="0" step="0.01"'
+        + ' value="' + (val ? Math.round(val*100)/100 : '') + '"'
+        + ' placeholder="auto"'
+        + ' title="' + titleTxt + '"'
         + ' onchange="savePrime(\'' + collab + '\',' + m + ',' + annee + ',this.value)"'
-        + ' style="width:60px;text-align:center;border:1.5px solid ' + (val>0?'#bbf7d0':'#e2e8f0') + ';border-radius:6px;padding:4px 6px;font-size:.82rem;background:' + (val>0?'#f0fdf4':'#fff') + ';color:#1f2937;font-family:inherit;transition:border-color .15s,background .15s;"'
+        + ' style="width:62px;text-align:center;border:1.5px solid ' + borderCol + ';border-radius:6px;padding:4px 5px;font-size:.82rem;background:' + bgCol + ';color:#1f2937;font-family:inherit;transition:all .15s;"'
         + ' onfocus="this.style.borderColor=\'#3b82f6\';this.style.outline=\'none\'"'
-        + ' onblur="this.style.borderColor=this.value>0?\'#bbf7d0\':\'#e2e8f0\';this.style.background=this.value>0?\'#f0fdf4\':\'#fff\'"'
+        + ' onblur="this.style.borderColor=\''+borderCol+'\'"'
         + '>'
+        + (isManual
+            ? '<button onclick="resetPrimeOverride(\'' + collab + '\',' + m + ',' + annee + ')" title="Revenir au calcul automatique" '
+              + 'style="position:absolute;top:-5px;right:-5px;width:15px;height:15px;border-radius:50%;background:#f97316;border:none;color:#fff;font-size:.58rem;cursor:pointer;line-height:15px;text-align:center;padding:0;">↺</button>'
+            : '')
+        + '</div>'
         + '</td>';
     }).join('');
     return '<tr>'
@@ -9260,7 +9294,7 @@ PAGES['admin-rh-primes'] = function(mc) {
     // Header
     + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;">'
     + '<div><h1 style="margin:0;font-size:1.4rem;font-weight:800;color:#0f172a;">🎁 Primes mensuelles</h1>'
-    + '<p style="margin:4px 0 0;color:#64748b;font-size:.88rem;">Saisissez et suivez les primes versées à chaque collaboratrice</p></div>'
+    + '<p style="margin:4px 0 0;color:#64748b;font-size:.88rem;">Alimentées automatiquement depuis les commissions · <span style="color:#2563eb;font-weight:600;">🔵 auto</span> · <span style="color:#15803d;font-weight:600;">🟢 personnalisé</span> · <span style="color:#f97316;font-weight:600;">↺ réinitialiser</span></p></div>'
     + '<div style="display:flex;align-items:center;gap:10px;">'
     + '<select id="primes-filter-annee" onchange="showPage(\'admin-rh-primes\')" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.88rem;color:#1f2937;cursor:pointer;">' + anneeOpts + '</select>'
     + '<button onclick="adminAddPrimeBulk()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">➕ Saisie rapide</button>'
@@ -9309,8 +9343,7 @@ function renderPrimesHistory(collabs, colorsMap, annee) {
     var col = colorsMap[collab] || '#6b7280';
     var vals = [];
     for (var m=1; m<=12; m++) {
-      var found = (DB.primes||[]).find(function(p){ return p.collab===collab && p.mois===m && p.annee===annee; });
-      vals.push(found ? (found.montant || 0) : 0);
+      vals.push(getPrimeEffective(collab, m, annee));
     }
     var totalC = vals.reduce(function(s,v){ return s+v; }, 0);
     var maxV = Math.max.apply(null, vals) || 1;
@@ -9366,12 +9399,17 @@ function adminAddPrimeBulk() {
   var collabs = getCollabNames();
   var mois = nowMois(), annee = nowAnnee();
   var rows = collabs.map(function(c){
-    var cur = (DB.primes||[]).find(function(p){ return p.collab===c && p.mois===mois && p.annee===annee; });
+    var effVal   = getPrimeEffective(c, mois, annee);
+    var isManual = hasPrimeOverride(c, mois, annee);
+    var col      = getCollabColors()[c] || '#6b7280';
     return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9;">'
-      + '<div style="width:32px;height:32px;border-radius:50%;background:' + (getCollabColors()[c]||'#6b7280') + ';color:#fff;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + c.slice(0,2).toUpperCase() + '</div>'
-      + '<div style="flex:1;font-weight:600;font-size:.9rem;color:#1f2937;">' + c + '</div>'
-      + '<input id="bulk-prime-' + c + '" type="number" min="0" step="1" value="' + (cur ? cur.montant : '') + '" placeholder="0 €"'
-      + ' style="width:100px;text-align:right;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.9rem;font-family:inherit;">'
+      + '<div style="width:32px;height:32px;border-radius:50%;background:' + col + ';color:#fff;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + c.slice(0,2).toUpperCase() + '</div>'
+      + '<div style="flex:1;">'
+      + '<div style="font-weight:600;font-size:.9rem;color:#1f2937;">' + c + '</div>'
+      + '<div style="font-size:.72rem;color:' + (isManual?'#15803d':'#2563eb') + ';margin-top:1px;">' + (isManual ? '🟢 Montant personnalisé' : (effVal > 0 ? '🔵 Calculé auto : ' + fmtEuro(effVal) : '🔵 Aucune vente')) + '</div>'
+      + '</div>'
+      + '<input id="bulk-prime-' + c + '" type="number" min="0" step="0.01" value="' + (effVal ? Math.round(effVal*100)/100 : '') + '" placeholder="auto"'
+      + ' style="width:100px;text-align:right;border:1.5px solid ' + (isManual?'#86efac':'#93c5fd') + ';border-radius:8px;padding:7px 10px;font-size:.9rem;font-family:inherit;background:' + (isManual?'#f0fdf4':'#eff6ff') + ';">'
       + '</div>';
   }).join('');
 
