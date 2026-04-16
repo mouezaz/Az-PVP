@@ -8930,25 +8930,25 @@ PAGES['collab-primes'] = function(mc) {
     + '<select id="collab-primes-annee" onchange="showPage(\'collab-primes\')" style="padding:8px 12px;border:none;border-radius:8px;font-size:.88rem;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;">' + anneeOpts + '</select>'
     + '</div>'
 
-    // KPI row
-    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:24px;">'
-    + '<div style="background:#fff;border-radius:12px;border:1.5px solid #e2e8f0;padding:16px;text-align:center;">'
-    + '<div style="font-size:.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Ce mois</div>'
-    + '<div style="font-size:1.4rem;font-weight:800;color:' + (totalMoisCur>0?col:'#9ca3af') + ';margin-top:6px;">' + (totalMoisCur>0?fmtEuro(totalMoisCur):'—') + '</div>'
+    // KPI row — responsive (wrap si trop petits)
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px;">'
+    + '<div style="background:#fff;border-radius:12px;border:1.5px solid #e2e8f0;padding:14px;text-align:center;">'
+    + '<div style="font-size:.68rem;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Ce mois</div>'
+    + '<div style="font-size:1.3rem;font-weight:800;color:' + (totalMoisCur>0?col:'#9ca3af') + ';margin-top:5px;">' + (totalMoisCur>0?fmtEuro(totalMoisCur):'—') + '</div>'
     + '</div>'
-    + '<div style="background:#fff;border-radius:12px;border:1.5px solid #e2e8f0;padding:16px;text-align:center;">'
-    + '<div style="font-size:.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Mois précédent</div>'
-    + '<div style="font-size:1.4rem;font-weight:800;color:' + (totalMoisPrec>0?col:'#9ca3af') + ';margin-top:6px;">' + (totalMoisPrec>0?fmtEuro(totalMoisPrec):'—') + '</div>'
+    + '<div style="background:#fff;border-radius:12px;border:1.5px solid #e2e8f0;padding:14px;text-align:center;">'
+    + '<div style="font-size:.68rem;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Mois préc.</div>'
+    + '<div style="font-size:1.3rem;font-weight:800;color:' + (totalMoisPrec>0?col:'#9ca3af') + ';margin-top:5px;">' + (totalMoisPrec>0?fmtEuro(totalMoisPrec):'—') + '</div>'
     + '</div>'
-    + '<div style="background:' + col + '11;border-radius:12px;border:1.5px solid ' + col + '33;padding:16px;text-align:center;">'
-    + '<div style="font-size:.72rem;color:' + col + ';text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Total ' + annee + '</div>'
-    + '<div style="font-size:1.4rem;font-weight:800;color:' + (totalAn>0?col:'#9ca3af') + ';margin-top:6px;">' + (totalAn>0?fmtEuro(totalAn):'—') + '</div>'
+    + '<div style="background:' + col + '11;border-radius:12px;border:1.5px solid ' + col + '33;padding:14px;text-align:center;">'
+    + '<div style="font-size:.68rem;color:' + col + ';text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Total ' + annee + '</div>'
+    + '<div style="font-size:1.3rem;font-weight:800;color:' + (totalAn>0?col:'#9ca3af') + ';margin-top:5px;">' + (totalAn>0?fmtEuro(totalAn):'—') + '</div>'
     + '</div></div>'
 
-    // Bar chart
-    + '<div style="background:#fff;border-radius:14px;border:1.5px solid #e2e8f0;padding:20px;margin-bottom:20px;">'
-    + '<div style="font-weight:700;font-size:.95rem;color:#0f172a;margin-bottom:16px;">📊 Évolution des primes — ' + annee + '</div>'
-    + '<div style="display:flex;gap:6px;align-items:flex-end;padding:0 4px;">' + bars + '</div>'
+    // Bar chart — scrollable si écran étroit
+    + '<div style="background:#fff;border-radius:14px;border:1.5px solid #e2e8f0;padding:16px 14px;margin-bottom:20px;overflow-x:auto;">'
+    + '<div style="font-weight:700;font-size:.92rem;color:#0f172a;margin-bottom:14px;">📊 Évolution des primes — ' + annee + '</div>'
+    + '<div style="display:flex;gap:5px;align-items:flex-end;padding:0 2px;min-width:360px;">' + bars + '</div>'
     + '</div>'
 
     // Timeline
@@ -8958,8 +8958,8 @@ PAGES['collab-primes'] = function(mc) {
         ? '<div style="display:flex;flex-direction:column;gap:8px;">' + timeline + '</div>'
         : '<div style="text-align:center;padding:36px 20px;color:#9ca3af;">'
         + '<div style="font-size:2.5rem;margin-bottom:10px;">🎁</div>'
-        + '<div style="font-weight:700;font-size:.95rem;color:#6b7280;margin-bottom:6px;">Aucune prime versée pour ' + annee + '</div>'
-        + '<div style="font-size:.82rem;color:#9ca3af;">Votre manager n\'a pas encore saisi de prime pour cette période.</div>'
+        + '<div style="font-weight:700;font-size:.95rem;color:#6b7280;margin-bottom:6px;">Aucune commission déclenchée pour ' + annee + '</div>'
+        + '<div style="font-size:.82rem;color:#9ca3af;">Les objectifs mensuels (10 Auto + 8 MRH + 4 NOP) n\'ont pas encore été atteints ce mois-ci.</div>'
         + '</div>')
     + '</div>'
 
@@ -9319,102 +9319,109 @@ PAGES['admin-rh-primes'] = function(mc) {
     anneeOpts += '<option value="' + y + '"' + (y===annee?' selected':'') + '>' + y + '</option>';
   }
 
-  var tableHead = '<tr style="background:#f8fafc;">'
-    + '<th style="padding:10px 14px;text-align:left;font-size:.78rem;color:#64748b;font-weight:600;border-bottom:2px solid #e2e8f0;">Collaboratrice</th>'
-    + [1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
-        var isCur = m===nowMois() && annee===nowAnnee();
-        return '<th style="padding:8px 6px;text-align:center;font-size:.72rem;color:' + (isCur?'#1d4ed8':'#64748b') + ';font-weight:' + (isCur?'700':'600') + ';border-bottom:2px solid #e2e8f0;min-width:64px;">'
-          + MOIS_LABELS[m] + '</th>';
-      }).join('')
-    + '<th style="padding:8px 12px;text-align:right;font-size:.78rem;color:#64748b;font-weight:600;border-bottom:2px solid #e2e8f0;">Total</th>'
-    + '</tr>';
-
-  var tableBody = collabs.map(function(collab){
-    var col = colorsMap[collab] || '#6b7280';
-    var init = collab.slice(0,2).toUpperCase();
-    var totC = totalCollab(collab, annee);
-    var cells = [1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
-      var val      = getPrime(collab, m, annee);
-      var isManual = hasPrimeOverride(collab, m, annee);
-      var isCur    = m===nowMois() && annee===nowAnnee();
-      // Couleur : vert = override manuel, bleu = auto depuis commissions, gris = zéro
-      var borderCol = isManual ? '#86efac' : (val > 0 ? '#93c5fd' : '#e2e8f0');
-      var bgCol     = isManual ? '#f0fdf4' : (val > 0 ? '#eff6ff' : '#fff');
-      var titleTxt  = isManual ? 'Montant personnalisé — cliquez ↺ pour revenir au calcul auto' : (val > 0 ? 'Calculé automatiquement depuis les commissions' : 'Aucune vente ce mois');
-      return '<td style="padding:4px 3px;text-align:center;border-bottom:1px solid #f1f5f9;' + (isCur?'background:#eff6ff55;':'') + '">'
-        + '<div style="position:relative;display:inline-block;">'
-        + '<input type="number" min="0" step="0.01"'
-        + ' value="' + (val ? Math.round(val*100)/100 : '') + '"'
-        + ' placeholder="auto"'
-        + ' title="' + titleTxt + '"'
-        + ' onchange="savePrime(\'' + collab + '\',' + m + ',' + annee + ',this.value)"'
-        + ' style="width:62px;text-align:center;border:1.5px solid ' + borderCol + ';border-radius:6px;padding:4px 5px;font-size:.82rem;background:' + bgCol + ';color:#1f2937;font-family:inherit;transition:all .15s;"'
-        + ' onfocus="this.style.borderColor=\'#3b82f6\';this.style.outline=\'none\'"'
-        + ' onblur="this.style.borderColor=\''+borderCol+'\'"'
-        + '>'
-        + (isManual
-            ? '<button onclick="resetPrimeOverride(\'' + collab + '\',' + m + ',' + annee + ')" title="Revenir au calcul automatique" '
-              + 'style="position:absolute;top:-5px;right:-5px;width:15px;height:15px;border-radius:50%;background:#f97316;border:none;color:#fff;font-size:.58rem;cursor:pointer;line-height:15px;text-align:center;padding:0;">↺</button>'
-            : '')
-        + '</div>'
-        + '</td>';
-    }).join('');
-    return '<tr>'
-      + '<td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;">'
-      + '<div style="display:flex;align-items:center;gap:10px;">'
-      + '<div style="width:30px;height:30px;border-radius:50%;background:' + col + ';color:#fff;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + init + '</div>'
-      + '<div><div style="font-weight:600;font-size:.88rem;color:#1f2937;">' + collab + '</div>'
-      + '<div style="display:flex;align-items:flex-end;gap:2px;height:36px;margin-top:4px;">' + sparkline(collab, annee) + '</div></div>'
-      + '</div></td>'
-      + cells
-      + '<td style="padding:8px 12px;text-align:right;font-weight:700;font-size:.9rem;color:' + (totC>0?'#15803d':'#9ca3af') + ';border-bottom:1px solid #f1f5f9;background:#f8fafc;">'
-      + (totC > 0 ? fmtEuro(totC) : '—')
-      + '</td></tr>';
-  }).join('');
-
-  // Totaux ligne du bas
-  var totRow = '<tr style="background:#f0fdf4;">'
-    + '<td style="padding:10px 14px;font-weight:700;font-size:.82rem;color:#15803d;">TOTAL ÉQUIPE</td>'
-    + [1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
-        var t = totalMois(m, annee);
-        return '<td style="padding:8px 6px;text-align:center;font-weight:700;font-size:.82rem;color:' + (t>0?'#15803d':'#9ca3af') + ';">' + (t>0?fmtEuro(t):'—') + '</td>';
-      }).join('')
-    + '<td style="padding:8px 12px;text-align:right;font-weight:800;font-size:.95rem;color:#15803d;">' + fmtEuro(totalAnnuel(annee)) + '</td>'
-    + '</tr>';
-
-  // ── KPI cards ──
+  // ── KPI ──
   var kpiMois = totalMois(nowMois(), nowAnnee());
   var kpiAn   = totalAnnuel(annee);
   var kpiMax  = Math.max.apply(null, [1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){ return totalMois(m,annee); }));
-  var kpiMaxMois = MOIS_LABELS[[1,2,3,4,5,6,7,8,9,10,11,12].reduce(function(mi,m,i){
+  var kpiMaxMois = MOIS_LABELS[[1,2,3,4,5,6,7,8,9,10,11,12].reduce(function(mi,m){
     return totalMois(m,annee) > totalMois(mi,annee) ? m : mi;
   }, 1)];
 
-  mc.innerHTML = '<div style="max-width:1100px;margin:0 auto;padding:20px;font-family:var(--font);">'
+  // ── Total équipe par mois (barre récap) ──
+  var totEquipeCells = [1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
+    var t    = totalMois(m, annee);
+    var isCur = m === nowMois() && annee === nowAnnee();
+    return '<div style="flex:1;min-width:0;text-align:center;">'
+      + '<div style="font-size:.65rem;font-weight:700;color:#64748b;margin-bottom:3px;">' + MOIS_LABELS[m] + '</div>'
+      + '<div style="font-size:.8rem;font-weight:700;color:' + (t>0?'#15803d':'#cbd5e1') + ';padding:5px 2px;background:' + (isCur?'#f0fdf4':'transparent') + ';border-radius:6px;border:' + (isCur?'1.5px solid #86efac':'1.5px solid transparent') + ';">'
+      + (t > 0 ? fmtEuro(t).replace(' €','€') : '—')
+      + '</div></div>';
+  }).join('');
+
+  // ── Cartes par collaboratrice ──
+  var collabCards = collabs.map(function(collab){
+    var col  = colorsMap[collab] || '#6b7280';
+    var init = collab.slice(0,2).toUpperCase();
+    var totC = totalCollab(collab, annee);
+
+    var monthCells = [1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
+      var val      = getPrime(collab, m, annee);
+      var isManual = hasPrimeOverride(collab, m, annee);
+      var isCur    = m === nowMois() && annee === nowAnnee();
+      var borderCol = isManual ? '#86efac' : (val > 0 ? '#93c5fd' : '#e2e8f0');
+      var bgCol     = isManual ? '#f0fdf4' : (val > 0 ? '#eff6ff' : '#f8fafc');
+      var titleTxt  = isManual
+        ? 'Montant personnalisé — cliquez ↺ pour revenir au calcul auto'
+        : (val > 0 ? 'Calculé automatiquement depuis les commissions' : 'Aucune commission ce mois');
+      return '<div style="position:relative;background:' + bgCol + ';border:1.5px solid ' + (isCur?col:borderCol) + ';border-radius:10px;padding:8px 6px;text-align:center;' + (isCur?'box-shadow:0 0 0 3px '+col+'22;':'') + '">'
+        // Mois label
+        + '<div style="font-size:.68rem;font-weight:700;color:' + (isCur?col:'#94a3b8') + ';margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;">' + MOIS_LABELS[m] + '</div>'
+        // Input
+        + '<input type="number" min="0" step="0.01"'
+        + ' value="' + (val ? Math.round(val*100)/100 : '') + '"'
+        + ' placeholder="—"'
+        + ' title="' + titleTxt + '"'
+        + ' onchange="savePrime(\'' + collab + '\',' + m + ',' + annee + ',this.value)"'
+        + ' style="width:100%;text-align:center;border:none;border-radius:6px;padding:4px 2px;font-size:.88rem;font-weight:700;background:transparent;color:' + (val>0?(isManual?'#15803d':'#1d4ed8'):'#94a3b8') + ';font-family:inherit;outline:none;"'
+        + ' onfocus="this.style.background=\'#fff\';this.style.color=\'#0f172a\'"'
+        + ' onblur="this.style.background=\'transparent\'"'
+        + '>'
+        // Badge mode
+        + '<div style="font-size:.58rem;margin-top:3px;color:' + (isManual?'#15803d':'#3b82f6') + ';font-weight:600;">' + (isManual?'🟢':'🔵') + '</div>'
+        // Reset button (override seulement)
+        + (isManual
+            ? '<button onclick="resetPrimeOverride(\'' + collab + '\',' + m + ',' + annee + ')" title="Revenir au calcul auto" '
+              + 'style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#f97316;border:none;color:#fff;font-size:.6rem;cursor:pointer;line-height:16px;text-align:center;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.2);">↺</button>'
+            : '')
+        + '</div>';
+    }).join('');
+
+    return '<div style="background:#fff;border-radius:14px;border:1.5px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05);">'
+      // En-tête collab
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1.5px solid #f1f5f9;background:' + col + '0d;">'
+      + '<div style="display:flex;align-items:center;gap:12px;">'
+      + '<div style="width:38px;height:38px;border-radius:12px;background:' + col + ';color:#fff;font-size:.85rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + init + '</div>'
+      + '<div>'
+      + '<div style="font-weight:800;font-size:1rem;color:#0f172a;">' + collab + '</div>'
+      + '<div style="font-size:.75rem;color:#64748b;margin-top:1px;">Sparkline ' + annee + ' : <span style="display:inline-flex;align-items:flex-end;gap:1px;vertical-align:middle;height:14px;">' + sparkline(collab, annee) + '</span></div>'
+      + '</div></div>'
+      + '<div style="text-align:right;">'
+      + '<div style="font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:600;">Total ' + annee + '</div>'
+      + '<div style="font-size:1.2rem;font-weight:800;color:' + (totC>0?col:'#cbd5e1') + ';margin-top:2px;">' + (totC>0?fmtEuro(totC):'—') + '</div>'
+      + '</div></div>'
+      // Grille 12 mois (6 par ligne)
+      + '<div style="padding:14px 16px;">'
+      + '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;">'
+      + monthCells
+      + '</div></div></div>';
+  }).join('');
+
+  mc.innerHTML = '<div style="max-width:860px;margin:0 auto;padding:20px;font-family:var(--font);">'
 
     // Header
-    + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;">'
+    + '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">'
     + '<div><h1 style="margin:0;font-size:1.4rem;font-weight:800;color:#0f172a;">🎁 Primes mensuelles</h1>'
-    + '<p style="margin:4px 0 0;color:#64748b;font-size:.88rem;">Alimentées automatiquement depuis les commissions · <span style="color:#2563eb;font-weight:600;">🔵 auto</span> · <span style="color:#15803d;font-weight:600;">🟢 personnalisé</span> · <span style="color:#f97316;font-weight:600;">↺ réinitialiser</span></p></div>'
-    + '<div style="display:flex;align-items:center;gap:10px;">'
+    + '<p style="margin:6px 0 0;color:#64748b;font-size:.82rem;">Alimentées auto depuis les commissions &nbsp;·&nbsp; <span style="color:#2563eb;font-weight:600;">🔵 auto</span> &nbsp;·&nbsp; <span style="color:#15803d;font-weight:600;">🟢 personnalisé</span> &nbsp;·&nbsp; <span style="color:#f97316;font-weight:600;">↺ remettre en auto</span></p></div>'
+    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
     + '<select id="primes-filter-annee" onchange="showPage(\'admin-rh-primes\')" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.88rem;color:#1f2937;cursor:pointer;">' + anneeOpts + '</select>'
-    + '<button onclick="adminAddPrimeBulk()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">➕ Saisie rapide</button>'
+    + '<button onclick="adminAddPrimeBulk()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:.85rem;font-weight:600;cursor:pointer;">➕ Saisie rapide</button>'
     + '</div></div>'
 
     // KPI cards
-    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:24px;">'
-    + _kpiCard('🎁','Primes ce mois', kpiMois > 0 ? fmtEuro(kpiMois) : '—', '#eff6ff','#1d4ed8')
-    + _kpiCard('📅','Total ' + annee, kpiAn > 0 ? fmtEuro(kpiAn) : '—', '#f0fdf4','#15803d')
-    + _kpiCard('🏆','Mois record', kpiMax > 0 ? kpiMaxMois + ' — ' + fmtEuro(kpiMax) : '—', '#fefce8','#a16207')
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">'
+    + _kpiCard('🎁', 'Primes ce mois',  kpiMois > 0 ? fmtEuro(kpiMois) : '—', '#eff6ff', '#1d4ed8')
+    + _kpiCard('📅', 'Total ' + annee,  kpiAn   > 0 ? fmtEuro(kpiAn)   : '—', '#f0fdf4', '#15803d')
+    + _kpiCard('🏆', 'Mois record',     kpiMax  > 0 ? kpiMaxMois + ' · ' + fmtEuro(kpiMax) : '—', '#fefce8', '#a16207')
     + '</div>'
 
-    // Table
-    + '<div style="background:#fff;border-radius:14px;border:1.5px solid #e2e8f0;overflow-x:auto;box-shadow:0 1px 4px rgba(0,0,0,.06);">'
-    + '<table style="width:100%;border-collapse:collapse;">'
-    + '<thead>' + tableHead + '</thead>'
-    + '<tbody>' + tableBody + '</tbody>'
-    + '<tfoot>' + totRow + '</tfoot>'
-    + '</table></div>'
+    // Récap équipe (totaux mois)
+    + '<div style="background:#fff;border-radius:12px;border:1.5px solid #e2e8f0;padding:14px 16px;margin-bottom:20px;">'
+    + '<div style="font-size:.78rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📊 Total équipe par mois</div>'
+    + '<div style="display:flex;gap:4px;align-items:stretch;">' + totEquipeCells + '</div>'
+    + '</div>'
+
+    // Cartes par collab
+    + '<div style="display:flex;flex-direction:column;gap:16px;">' + collabCards + '</div>'
 
     // Historique par collab
     + '<div id="primes-history" style="margin-top:24px;"></div>'
