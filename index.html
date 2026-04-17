@@ -692,10 +692,10 @@ function _fbListen() {
     var safePages = [
       'collab-home','collab-ventes','collab-saisir','collab-resil',
       'collab-leads','collab-suivi','collab-prospection','collab-formation',
-      'collab-decouverte','collab-conges',
+      'collab-decouverte','collab-conges','collab-taches',
       'admin-dashboard','admin-performance','admin-ventes','admin-resil',
       'admin-prospects','admin-commissions','admin-import','admin-export',
-      'admin-tel','admin-entretien','admin-rh-conges'
+      'admin-tel','admin-entretien','admin-rh-conges','admin-taches'
     ];
     if (typeof currentPage !== 'undefined' && safePages.indexOf(currentPage) !== -1 &&
         typeof showPage === 'function') {
@@ -792,7 +792,7 @@ function loadDB() {
     const raw = localStorage.getItem('allianz_db_v4');
     if (raw) return JSON.parse(raw);
   } catch(e) {}
-  return { ventes: [], resiliations: [], tel: [], entretiens: [], leads: [], devis: [], formations: [], prospects: [], telStats: {}, conges: [], entretiensIA: [], primes: [], settings: { absences: {}, pins: {}, apiKey: '', collabs: [] } };
+  return { ventes: [], resiliations: [], tel: [], entretiens: [], leads: [], devis: [], formations: [], prospects: [], telStats: {}, conges: [], entretiensIA: [], primes: [], taches: [], settings: { absences: {}, pins: {}, apiKey: '', collabs: [] } };
 }
 function saveDB(db) {
   try {
@@ -1005,6 +1005,7 @@ function buildCollabSidebar() {
     { id: 'collab-decouverte',  icon: '🔍', label: 'Découverte client' },
     { id: 'collab-prospection', icon: '📋', label: 'Devis & Relances' },
     { id: 'collab-leads',       icon: '📞', label: 'Suivi leads' },
+    { id: 'collab-taches',      icon: '✅',  label: 'Mes tâches' },
     { id: 'collab-saisir',      icon: '✚',  label: 'Saisir une vente' },
     { id: 'collab-ventes',      icon: '📂', label: 'Mes affaires' },
     { id: 'collab-resil',       icon: '🛡',  label: 'Résiliations' },
@@ -1040,6 +1041,7 @@ function buildAdminSidebar() {
     { id: 'admin-rh-conges',      icon: '🏖️', label: 'Congés équipe' },
     { id: 'admin-rh-entretiens',  icon: '📄', label: 'Entretiens mensuels' },
     { id: 'admin-rh-primes',      icon: '🎁', label: 'Primes mensuelles' },
+    { id: 'admin-taches',         icon: '✅',  label: 'Tâches équipe' },
   ];
   renderSidebar([
     { label: '📈 Commercial & Gestion', items: commercial },
@@ -2900,6 +2902,35 @@ PAGES['collab-home'] = (mc) => {
     </div>
     ${tachesHTML}
   </div>
+
+  <!-- Mes tâches admin (mémos) -->
+  ${(function(){
+    if (!DB.taches) return '';
+    var mesTaches = DB.taches.filter(function(t){ return t.collab===collab && t.statut!=='Terminé'; });
+    var retardTaches = mesTaches.filter(function(t){
+      if (!t.echeance) return false;
+      var d=new Date(t.echeance); d.setHours(0,0,0,0); return d<new Date(new Date().setHours(0,0,0,0));
+    });
+    if (mesTaches.length===0) return '';
+    var items = mesTaches.sort(function(a,b){
+      var da=a.echeance?new Date(a.echeance):new Date('9999-12-31');
+      var db2=b.echeance?new Date(b.echeance):new Date('9999-12-31');
+      return da-db2;
+    }).slice(0,4).map(function(t){
+      var pc=tachePrioriteColor(t.priorite);
+      var today2=new Date(); today2.setHours(0,0,0,0);
+      var flag='';
+      if(t.echeance){var de=new Date(t.echeance);de.setHours(0,0,0,0);var diff=Math.round((de-today2)/86400000);flag=diff<0?'<span style="color:#ef4444;font-size:.7rem;font-weight:700;"> ⚠ J'+diff+'</span>':diff===0?'<span style="color:#f59e0b;font-size:.7rem;font-weight:700;"> ⏰ Auj.</span>':'<span style="color:#9ca3af;font-size:.7rem;"> J+'+diff+'</span>';}
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;">'
+        +'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+pc+';flex-shrink:0;"></span>'
+        +'<span style="font-size:.82rem;color:#1f2937;flex:1;">'+t.titre+'</span>'+flag+'</div>';
+    }).join('');
+    return '<div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:18px;margin-bottom:20px;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
+      +'<div style="font-weight:700;font-size:1rem;color:#1f2937;">✅ Mes tâches admin <span style="display:inline-block;background:#4f46e5;color:#fff;border-radius:20px;font-size:.72rem;padding:2px 8px;margin-left:6px;vertical-align:middle;">'+mesTaches.length+'</span>'+(retardTaches.length>0?'<span style="display:inline-block;background:#ef4444;color:#fff;border-radius:20px;font-size:.7rem;padding:2px 7px;margin-left:4px;vertical-align:middle;">'+retardTaches.length+' retard</span>':'')+'</div>'
+      +'<button onclick="showPage(\'collab-taches\')" style="font-size:.78rem;background:#eff6ff;color:#4f46e5;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:600;">Voir tout</button>'
+      +'</div>'+items+'</div>';
+  })()}
 
   <!-- Vue équipe -->
   <div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:18px;margin-bottom:20px;">
@@ -10107,5 +10138,426 @@ function resetAll() {
 })();
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// TÂCHES ADMINISTRATIVES — helpers, collab page, admin page
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function getTaches(collab) {
+  if (!DB.taches) DB.taches = [];
+  if (collab) return DB.taches.filter(function(t){ return t.collab === collab; });
+  return DB.taches;
+}
+
+function saveTache(tache) {
+  if (!DB.taches) DB.taches = [];
+  var idx = DB.taches.findIndex(function(t){ return t.id === tache.id; });
+  if (idx >= 0) DB.taches[idx] = tache;
+  else DB.taches.push(tache);
+  saveDB(DB);
+}
+
+function deleteTache(id) {
+  if (!DB.taches) DB.taches = [];
+  DB.taches = DB.taches.filter(function(t){ return t.id !== id; });
+  saveDB(DB);
+}
+
+function tachePrioriteColor(p) {
+  return p==='haute' ? '#ef4444' : p==='normale' ? '#f59e0b' : '#22c55e';
+}
+function tachePrioriteLabel(p) {
+  return p==='haute' ? '🔴 Haute' : p==='normale' ? '🟡 Normale' : '🟢 Basse';
+}
+function tacheStatutColor(s) {
+  return s==='Terminé' ? '#22c55e' : s==='En cours' ? '#3b82f6' : '#9ca3af';
+}
+
+// ── PAGE COLLAB : Mes tâches ──────────────────────────────────────────────────
+PAGES['collab-taches'] = function(mc) {
+  var COLLABS_OTHER = getCollabNames().filter(function(n){ return n !== currentUser.name; });
+  mc.innerHTML = `
+    <div class="page-header flex-between" style="flex-wrap:wrap;gap:10px;">
+      <div><h1>✅ Mes tâches</h1><p style="color:#6b7280;margin:0;font-size:.85rem;">Mémos et tâches administratives</p></div>
+      <button onclick="openTacheModal()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 18px;font-weight:600;font-size:.88rem;cursor:pointer;">+ Nouvelle tâche</button>
+    </div>
+
+    <!-- Filtres statut -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;" id="taches-filtres">
+      <button onclick="renderMesTaches('all')"     id="tf-all"     class="tf-btn tf-active" style="border-radius:99px;border:1.5px solid #e5e7eb;padding:5px 14px;font-size:.8rem;cursor:pointer;font-weight:600;background:white;">Toutes</button>
+      <button onclick="renderMesTaches('A faire')" id="tf-afaire"  class="tf-btn"           style="border-radius:99px;border:1.5px solid #e5e7eb;padding:5px 14px;font-size:.8rem;cursor:pointer;background:white;">À faire</button>
+      <button onclick="renderMesTaches('En cours')"id="tf-encours" class="tf-btn"           style="border-radius:99px;border:1.5px solid #e5e7eb;padding:5px 14px;font-size:.8rem;cursor:pointer;background:white;">En cours</button>
+      <button onclick="renderMesTaches('Terminé')" id="tf-termine" class="tf-btn"           style="border-radius:99px;border:1.5px solid #e5e7eb;padding:5px 14px;font-size:.8rem;cursor:pointer;background:white;">Terminées</button>
+    </div>
+
+    <div id="taches-list-zone"></div>
+
+    <!-- Modal création/édition -->
+    <div id="tache-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:none;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:white;border-radius:16px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+        <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;">
+          <h3 id="tache-modal-title" style="margin:0;font-size:1.05rem;font-weight:700;">Nouvelle tâche</h3>
+          <button onclick="closeTacheModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#9ca3af;">×</button>
+        </div>
+        <div style="padding:20px 24px;">
+          <input type="hidden" id="tm-id" value="">
+          <div style="margin-bottom:14px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Titre *</label>
+            <input id="tm-titre" type="text" placeholder="Ex: Envoyer justificatif à préfecture" maxlength="120"
+              style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.9rem;">
+          </div>
+          <div style="margin-bottom:14px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Description / mémo</label>
+            <textarea id="tm-desc" rows="3" placeholder="Détails, contexte, notes…"
+              style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;resize:vertical;"></textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+            <div>
+              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Échéance</label>
+              <input id="tm-echeance" type="date"
+                style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+            </div>
+            <div>
+              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Priorité</label>
+              <select id="tm-priorite" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+                <option value="normale">🟡 Normale</option>
+                <option value="haute">🔴 Haute</option>
+                <option value="basse">🟢 Basse</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-bottom:20px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Statut</label>
+            <select id="tm-statut" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+              <option value="À faire">À faire</option>
+              <option value="En cours">En cours</option>
+              <option value="Terminé">Terminé</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button onclick="closeTacheModal()" style="background:white;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 18px;font-size:.88rem;cursor:pointer;">Annuler</button>
+            <button onclick="submitTache()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:.88rem;cursor:pointer;">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal transfert -->
+    <div id="transfer-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9100;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:white;border-radius:16px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:24px;">
+        <h3 style="margin:0 0 6px;font-size:1rem;font-weight:700;">Transférer la tâche</h3>
+        <p id="transfer-titre" style="font-size:.82rem;color:#6b7280;margin:0 0 18px;"></p>
+        <input type="hidden" id="transfer-id">
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:6px;">Transférer à :</label>
+        <select id="transfer-dest" style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.9rem;margin-bottom:20px;">
+          ${COLLABS_OTHER.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('')}
+        </select>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button onclick="closeTransferModal()" style="background:white;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 18px;font-size:.88rem;cursor:pointer;">Annuler</button>
+          <button onclick="confirmTransfer()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:.88rem;cursor:pointer;">Transférer</button>
+        </div>
+      </div>
+    </div>
+  `;
+  renderMesTaches('all');
+};
+
+var _tachesFiltreActif = 'all';
+
+function renderMesTaches(filtre) {
+  _tachesFiltreActif = filtre || _tachesFiltreActif;
+  // Boutons actifs
+  ['all','A faire','En cours','Terminé'].forEach(function(f) {
+    var id = { 'all':'tf-all','A faire':'tf-afaire','En cours':'tf-encours','Terminé':'tf-termine' }[f];
+    var btn = document.getElementById(id);
+    if (!btn) return;
+    btn.style.background = (_tachesFiltreActif===f) ? '#4f46e5' : 'white';
+    btn.style.color       = (_tachesFiltreActif===f) ? 'white'   : '#374151';
+    btn.style.borderColor = (_tachesFiltreActif===f) ? '#4f46e5' : '#e5e7eb';
+  });
+
+  var taches = getTaches(currentUser.name);
+  if (_tachesFiltreActif !== 'all') taches = taches.filter(function(t){ return t.statut === _tachesFiltreActif; });
+
+  // Tri : retard d'abord, puis par échéance, puis sans date
+  var today = new Date(); today.setHours(0,0,0,0);
+  taches.sort(function(a,b){
+    var da = a.echeance ? new Date(a.echeance) : new Date('9999-12-31');
+    var db2= b.echeance ? new Date(b.echeance) : new Date('9999-12-31');
+    // Terminées en bas
+    if (a.statut==='Terminé' && b.statut!=='Terminé') return 1;
+    if (b.statut==='Terminé' && a.statut!=='Terminé') return -1;
+    // Priorité haute en haut dans mêmes groupes
+    var pOrder = { 'haute':0,'normale':1,'basse':2 };
+    if (da.getTime()===db2.getTime()) return (pOrder[a.priorite]||1)-(pOrder[b.priorite]||1);
+    return da-db2;
+  });
+
+  var zone = document.getElementById('taches-list-zone');
+  if (!zone) return;
+  if (taches.length === 0) {
+    zone.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#9ca3af;"><div style="font-size:2.5rem;margin-bottom:12px;">✅</div><div style="font-size:.9rem;">Aucune tâche ici<br><span style="font-size:.8rem;">Cliquez sur "+ Nouvelle tâche" pour commencer</span></div></div>';
+    return;
+  }
+
+  zone.innerHTML = taches.map(function(t) {
+    var today2 = new Date(); today2.setHours(0,0,0,0);
+    var retard = false, echeanceLabel = '';
+    if (t.echeance) {
+      var de = new Date(t.echeance); de.setHours(0,0,0,0);
+      var diff = Math.round((de-today2)/86400000);
+      if (t.statut !== 'Terminé') {
+        retard = diff < 0;
+        echeanceLabel = diff < 0  ? '<span style="color:#ef4444;font-weight:700;font-size:.75rem;">⚠ En retard de '+Math.abs(diff)+' j</span>'
+                      : diff === 0 ? '<span style="color:#f59e0b;font-weight:700;font-size:.75rem;">⏰ Aujourd\'hui</span>'
+                      : '<span style="color:#6b7280;font-size:.75rem;">📅 J+'+diff+'</span>';
+      } else {
+        echeanceLabel = '<span style="color:#9ca3af;font-size:.75rem;">Terminé</span>';
+      }
+    }
+    var pc = tachePrioriteColor(t.priorite);
+    var sc = tacheStatutColor(t.statut);
+    var termine = t.statut === 'Terminé';
+    var transferInfo = t.transferePar ? '<div style="font-size:.72rem;color:#6b7280;margin-top:4px;">↩ Transférée par <strong>'+t.transferePar+'</strong></div>' : '';
+
+    return `<div style="background:white;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:10px;border-left:4px solid ${retard?'#ef4444':pc};${termine?'opacity:.65':''}">
+      <div style="padding:14px 16px;">
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          <!-- Checkbox rapide -->
+          <button onclick="toggleTacheTermine('${t.id}')" title="Marquer terminé" style="flex-shrink:0;width:22px;height:22px;border-radius:50%;border:2px solid ${sc};background:${termine?sc:'white'};cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:2px;">
+            ${termine?'<span style="color:white;font-size:.7rem;line-height:1;">✓</span>':''}
+          </button>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:.95rem;color:${termine?'#9ca3af':'#111'};${termine?'text-decoration:line-through':''};">${t.titre}</div>
+            ${t.description ? '<div style="font-size:.78rem;color:#6b7280;margin-top:3px;white-space:pre-wrap;">'+t.description+'</div>' : ''}
+            ${transferInfo}
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+              <span style="font-size:.72rem;background:${pc}18;color:${pc};padding:2px 8px;border-radius:99px;font-weight:600;">${tachePrioriteLabel(t.priorite)}</span>
+              <span style="font-size:.72rem;background:${sc}18;color:${sc};padding:2px 8px;border-radius:99px;">${t.statut}</span>
+              ${echeanceLabel}
+            </div>
+          </div>
+          <!-- Actions -->
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button onclick="openTacheModal('${t.id}')" title="Modifier" style="background:#f1f5f9;border:none;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:.82rem;">✏️</button>
+            <button onclick="openTransferModal('${t.id}','${t.titre.replace(/'/g,"\\'")}','${currentUser.name}')" title="Transférer" style="background:#eff6ff;border:none;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:.82rem;">↪</button>
+            <button onclick="confirmDeleteTache('${t.id}')" title="Supprimer" style="background:#fef2f2;border:none;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:.82rem;">🗑</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openTacheModal(id) {
+  var modal = document.getElementById('tache-modal');
+  if (!modal) return;
+  if (id) {
+    var t = (DB.taches||[]).find(function(x){ return x.id===id; });
+    if (!t) return;
+    document.getElementById('tm-id').value       = t.id;
+    document.getElementById('tm-titre').value    = t.titre||'';
+    document.getElementById('tm-desc').value     = t.description||'';
+    document.getElementById('tm-echeance').value = t.echeance||'';
+    document.getElementById('tm-priorite').value = t.priorite||'normale';
+    document.getElementById('tm-statut').value   = t.statut||'À faire';
+    document.getElementById('tache-modal-title').textContent = 'Modifier la tâche';
+  } else {
+    document.getElementById('tm-id').value       = '';
+    document.getElementById('tm-titre').value    = '';
+    document.getElementById('tm-desc').value     = '';
+    document.getElementById('tm-echeance').value = '';
+    document.getElementById('tm-priorite').value = 'normale';
+    document.getElementById('tm-statut').value   = 'À faire';
+    document.getElementById('tache-modal-title').textContent = 'Nouvelle tâche';
+  }
+  modal.style.display = 'flex';
+}
+
+function closeTacheModal() {
+  var m = document.getElementById('tache-modal');
+  if (m) m.style.display = 'none';
+}
+
+function submitTache() {
+  var titre = (document.getElementById('tm-titre').value||'').trim();
+  if (!titre) { toast('Le titre est obligatoire', 'error'); return; }
+  var id = document.getElementById('tm-id').value || String(Date.now());
+  var tache = {
+    id:          id,
+    collab:      currentUser.name,
+    titre:       titre,
+    description: (document.getElementById('tm-desc').value||'').trim(),
+    echeance:    document.getElementById('tm-echeance').value || null,
+    priorite:    document.getElementById('tm-priorite').value || 'normale',
+    statut:      document.getElementById('tm-statut').value   || 'À faire',
+    createdAt:   document.getElementById('tm-id').value ? ((DB.taches||[]).find(function(t){return t.id===id;})||{}).createdAt || Date.now() : Date.now(),
+    createdBy:   currentUser.name,
+    transferePar: document.getElementById('tm-id').value ? ((DB.taches||[]).find(function(t){return t.id===id;})||{}).transferePar || null : null,
+  };
+  saveTache(tache);
+  closeTacheModal();
+  toast('Tâche enregistrée ✓', 'success');
+  renderMesTaches(_tachesFiltreActif);
+}
+
+function toggleTacheTermine(id) {
+  var t = (DB.taches||[]).find(function(x){ return x.id===id; });
+  if (!t) return;
+  t.statut = (t.statut==='Terminé') ? 'À faire' : 'Terminé';
+  if (t.statut==='Terminé') t.completedAt = Date.now();
+  saveTache(t);
+  renderMesTaches(_tachesFiltreActif);
+}
+
+function confirmDeleteTache(id) {
+  if (!confirm('Supprimer cette tâche ?')) return;
+  deleteTache(id);
+  toast('Tâche supprimée', 'info');
+  renderMesTaches(_tachesFiltreActif);
+}
+
+function openTransferModal(id, titre, from) {
+  var COLLABS_OTHER = getCollabNames().filter(function(n){ return n !== currentUser.name; });
+  if (COLLABS_OTHER.length === 0) { toast('Aucune autre collaboratrice disponible', 'info'); return; }
+  document.getElementById('transfer-id').value = id;
+  document.getElementById('transfer-titre').textContent = '"' + titre + '"';
+  var sel = document.getElementById('transfer-dest');
+  sel.innerHTML = COLLABS_OTHER.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('');
+  var m = document.getElementById('transfer-modal');
+  if (m) m.style.display = 'flex';
+}
+
+function closeTransferModal() {
+  var m = document.getElementById('transfer-modal');
+  if (m) m.style.display = 'none';
+}
+
+function confirmTransfer() {
+  var id   = document.getElementById('transfer-id').value;
+  var dest = document.getElementById('transfer-dest').value;
+  if (!id || !dest) return;
+  var t = (DB.taches||[]).find(function(x){ return x.id===id; });
+  if (!t) return;
+  var from = t.collab;
+  t.collab      = dest;
+  t.transferePar = from;
+  saveTache(t);
+  closeTransferModal();
+  toast('Tâche transférée à ' + dest + ' ✓', 'success');
+  renderMesTaches(_tachesFiltreActif);
+}
+
+// ── PAGE ADMIN : Tâches équipe ────────────────────────────────────────────────
+PAGES['admin-taches'] = function(mc) {
+  mc.innerHTML = `
+    <div class="page-header flex-between" style="flex-wrap:wrap;gap:10px;">
+      <div><h1>✅ Tâches équipe</h1><p style="color:#6b7280;margin:0;font-size:.85rem;">Vue consolidée des tâches de toutes les collaboratrices</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <select id="at-filtre-collab" onchange="renderAdminTaches()" style="font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid #e5e7eb;">
+          <option value="">Toutes</option>
+          ${getCollabNames().map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('')}
+        </select>
+        <select id="at-filtre-statut" onchange="renderAdminTaches()" style="font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid #e5e7eb;">
+          <option value="">Tous statuts</option>
+          <option value="À faire">À faire</option>
+          <option value="En cours">En cours</option>
+          <option value="Terminé">Terminé</option>
+        </select>
+      </div>
+    </div>
+    <div id="admin-taches-content"></div>
+  `;
+  renderAdminTaches();
+};
+
+function renderAdminTaches() {
+  var filtCollab = (document.getElementById('at-filtre-collab')||{}).value || '';
+  var filtStatut = (document.getElementById('at-filtre-statut')||{}).value || '';
+  var COLORS = getCollabColors();
+  var today  = new Date(); today.setHours(0,0,0,0);
+
+  var taches = (DB.taches||[]).slice();
+  if (filtCollab) taches = taches.filter(function(t){ return t.collab===filtCollab; });
+  if (filtStatut) taches = taches.filter(function(t){ return t.statut===filtStatut; });
+
+  // KPI rapides
+  var total    = taches.length;
+  var retard   = taches.filter(function(t){
+    if (!t.echeance || t.statut==='Terminé') return false;
+    var d=new Date(t.echeance); d.setHours(0,0,0,0); return d<today;
+  }).length;
+  var encours  = taches.filter(function(t){ return t.statut==='En cours'; }).length;
+  var termine  = taches.filter(function(t){ return t.statut==='Terminé'; }).length;
+
+  var zone = document.getElementById('admin-taches-content');
+  if (!zone) return;
+
+  var kpiHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;">
+    ${[['📋','Total',total,'#4f46e5'],['⚠️','En retard',retard,'#ef4444'],['🔄','En cours',encours,'#3b82f6'],['✅','Terminées',termine,'#22c55e']]
+      .map(function(x){return `<div style="background:white;border-radius:12px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.07);border-top:3px solid ${x[3]};">
+        <div style="font-size:1.5rem;">${x[0]}</div>
+        <div style="font-size:1.6rem;font-weight:900;color:${x[3]};">${x[2]}</div>
+        <div style="font-size:.72rem;color:#9ca3af;">${x[1]}</div>
+      </div>`;}).join('')}
+  </div>`;
+
+  // Trier : retard > aujourd'hui > reste ; terminé en bas
+  taches.sort(function(a,b){
+    if (a.statut==='Terminé' && b.statut!=='Terminé') return 1;
+    if (b.statut==='Terminé' && a.statut!=='Terminé') return -1;
+    var da = a.echeance ? new Date(a.echeance) : new Date('9999-12-31');
+    var db2= b.echeance ? new Date(b.echeance) : new Date('9999-12-31');
+    return da-db2;
+  });
+
+  var listHtml = '';
+  if (taches.length===0) {
+    listHtml = '<div style="text-align:center;padding:50px;color:#9ca3af;font-size:.9rem;">Aucune tâche trouvée</div>';
+  } else {
+    listHtml = '<div style="background:white;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;">';
+    taches.forEach(function(t, i) {
+      var color = COLORS[t.collab]||'#6b7280';
+      var pc    = tachePrioriteColor(t.priorite);
+      var sc    = tacheStatutColor(t.statut);
+      var echeanceStr = '—';
+      var retardFlag  = false;
+      if (t.echeance) {
+        var de = new Date(t.echeance); de.setHours(0,0,0,0);
+        var diff = Math.round((de-today)/86400000);
+        if (t.statut!=='Terminé') {
+          retardFlag  = diff < 0;
+          echeanceStr = diff < 0  ? '<span style="color:#ef4444;font-weight:700;">⚠ J'+diff+'</span>'
+                      : diff===0  ? '<span style="color:#f59e0b;font-weight:700;">Auj.</span>'
+                      :             'J+'+diff;
+        } else {
+          echeanceStr = t.echeance;
+        }
+      }
+      var transferInfo = t.transferePar ? ' <span style="font-size:.7rem;color:#9ca3af;">(↩ de '+t.transferePar+')</span>' : '';
+      listHtml += `<div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:12px;flex-wrap:wrap;${retardFlag?'background:#fff5f5':''};">
+        <!-- Collab badge -->
+        <div style="width:32px;height:32px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:.8rem;flex-shrink:0;">${t.collab[0]}</div>
+        <!-- Contenu -->
+        <div style="flex:1;min-width:140px;">
+          <div style="font-weight:600;font-size:.9rem;color:${t.statut==='Terminé'?'#9ca3af':'#111'};${t.statut==='Terminé'?'text-decoration:line-through':''};">${t.titre}${transferInfo}</div>
+          ${t.description?'<div style="font-size:.76rem;color:#6b7280;margin-top:2px;">'+t.description+'</div>':''}
+        </div>
+        <!-- Méta -->
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0;">
+          <span style="font-size:.72rem;color:${color};font-weight:700;">${t.collab}</span>
+          <span style="font-size:.72rem;background:${pc}18;color:${pc};padding:2px 8px;border-radius:99px;font-weight:600;">${tachePrioriteLabel(t.priorite)}</span>
+          <span style="font-size:.72rem;background:${sc}18;color:${sc};padding:2px 8px;border-radius:99px;">${t.statut}</span>
+          <span style="font-size:.76rem;">${echeanceStr}</span>
+        </div>
+      </div>`;
+    });
+    listHtml += '</div>';
+  }
+
+  zone.innerHTML = kpiHtml + listHtml;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 </script>
