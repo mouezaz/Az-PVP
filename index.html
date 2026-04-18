@@ -3555,8 +3555,8 @@ PAGES['collab-prospection'] = (mc) => {
   mc.innerHTML = `
     <div class="page-header flex-between">
       <div>
-        <h1>Mes devis & Prospection</h1>
-        <p>Vos devis et opportunités en cours</p>
+        <h1>Devis & Prospection — Équipe</h1>
+        <p>Tous les devis de l'équipe — visibles et réassignables</p>
       </div>
       <button class="btn btn-primary" onclick="openAddDevis()">✚ Nouveau devis</button>
     </div>
@@ -3739,6 +3739,7 @@ function buildClosedDevisActions(d) {
   html += d.statut === 'Gagné' ? '✅ Devis gagné' : '✕ ' + d.statut;
   html += '</span> ';
   html += '<button class="btn btn-ghost btn-sm" onclick="openEditDevis(&#39;' + d.id + '&#39;)">✏ Rouvrir / Modifier</button>';
+  html += ' <button class="btn btn-ghost btn-sm" style="color:#4f46e5" onclick="openReassignDevis(&#39;' + d.id + '&#39;)">↪ Réassigner</button>';
   if (d.statut === 'Gagné' && !d.convertedToAN) {
     html += ' <button class="btn btn-primary btn-sm" onclick="convertDevisToAN(&#39;' + d.id + '&#39;)" style="background:#059669;border-color:#059669;">✚ Créer l\'AN</button>';
   } else if (d.statut === 'Gagné' && d.convertedToAN) {
@@ -3845,6 +3846,7 @@ function buildDevisCard(d) {
         <button class="btn btn-success btn-sm" onclick="actionGagne('${d.id}')">✅ Devis accepté</button>
         <button class="btn btn-ghost btn-sm" onclick="actionNote('${d.id}')">📝 Ajouter une note</button>
         <button class="btn btn-ghost btn-sm" onclick="openEditDevis('${d.id}')">✏ Modifier</button>
+        <button class="btn btn-ghost btn-sm" style="color:#4f46e5" onclick="openReassignDevis('${d.id}')">↪ Réassigner</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="actionPerdu('${d.id}')">✕ Perdu / Abandonné</button>
         ` : buildClosedDevisActions(d)}
       </div>
@@ -3857,6 +3859,57 @@ function toggleDevisCard(id) {
   const card = document.getElementById('dc-'+id);
   if (body) body.classList.toggle('open');
   if (card) card.classList.toggle('open');
+}
+
+// ── Réassignation devis ───────────────────────────────────────────────────────
+function openReassignDevis(id) {
+  var d = (DB.devis||[]).find(function(x){ return x.id===id; });
+  if (!d) return;
+  var others = getCollabNames();
+  openModal(`
+    <div class="modal-header">
+      <div class="modal-title">↪ Réassigner le devis</div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div style="padding:4px 0 16px;">
+      <div style="font-size:.9rem;color:#374151;margin-bottom:16px;">
+        Devis de <strong>${d.client}</strong> (${d.produit||'—'}) — actuellement chez <strong>${d.collab||'—'}</strong>
+      </div>
+      <div class="form-group">
+        <label class="fl">Réassigner à</label>
+        <select id="rd-dest" style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.9rem;">
+          ${others.map(function(n){ return '<option value="'+n+'"'+(n===d.collab?' selected':'')+'>'+n+'</option>'; }).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="fl">Note (optionnel)</label>
+        <input id="rd-note" type="text" placeholder="Ex: Reprise pendant congé, expertise produit…" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+        <button class="btn btn-ghost" onclick="closeModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="confirmReassignDevis('${id}')">Réassigner</button>
+      </div>
+    </div>
+  `);
+}
+
+function confirmReassignDevis(id) {
+  var d = (DB.devis||[]).find(function(x){ return x.id===id; });
+  if (!d) return;
+  var dest = document.getElementById('rd-dest')?.value;
+  var note = (document.getElementById('rd-note')?.value||'').trim();
+  if (!dest) return;
+  var from = d.collab || '—';
+  if (dest === from) { closeModal(); return; }
+  d.reassignedFrom = from;
+  d.collab = dest;
+  if (!d.historique) d.historique = [];
+  d.historique.push({ date: new Date().toISOString(), type:'réassignation', texte: 'Réassigné de '+from+' vers '+dest+(note?' — '+note:'') });
+  saveDB(DB);
+  closeModal();
+  toast('Devis réassigné à ' + dest + ' ✓', 'success');
+  renderDevisList();
+  renderProspKpis();
 }
 
 // ---- ACTIONS ----
@@ -10175,17 +10228,24 @@ function tacheStatutColor(s) {
 
 // ── PAGE COLLAB : Mes tâches ──────────────────────────────────────────────────
 PAGES['collab-taches'] = function(mc) {
-  var COLLABS_OTHER = getCollabNames().filter(function(n){ return n !== currentUser.name; });
+  var ALL_COLLABS = getCollabNames();
   mc.innerHTML = `
     <div class="page-header flex-between" style="flex-wrap:wrap;gap:10px;">
-      <div><h1>✅ Mes tâches</h1><p style="color:#6b7280;margin:0;font-size:.85rem;">Mémos et tâches administratives</p></div>
+      <div><h1>✅ Tâches équipe</h1><p style="color:#6b7280;margin:0;font-size:.85rem;">Toutes les tâches — visibles et réassignables par toute l'équipe</p></div>
       <button onclick="openTacheModal()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 18px;font-weight:600;font-size:.88rem;cursor:pointer;">+ Nouvelle tâche</button>
     </div>
 
-    <!-- Filtres statut -->
-    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;" id="taches-filtres">
+    <!-- Filtres -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+      <!-- Filtre collab -->
+      <select id="tf-collab" onchange="renderMesTaches()" style="border-radius:99px;border:1.5px solid #e5e7eb;padding:5px 14px;font-size:.8rem;cursor:pointer;background:white;font-weight:600;">
+        <option value="">👥 Toute l'équipe</option>
+        <option value="${currentUser.name}" selected>👤 Mes tâches</option>
+        ${ALL_COLLABS.filter(function(n){return n!==currentUser.name;}).map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')}
+      </select>
+      <!-- Filtre statut -->
       <button onclick="renderMesTaches('all')"     id="tf-all"     class="tf-btn tf-active" style="border-radius:99px;border:1.5px solid #e5e7eb;padding:5px 14px;font-size:.8rem;cursor:pointer;font-weight:600;background:white;">Toutes</button>
-      <button onclick="renderMesTaches('A faire')" id="tf-afaire"  class="tf-btn"           style="border-radius:99px;border:1.5px solid #e5e7eb;padding:5px 14px;font-size:.8rem;cursor:pointer;background:white;">À faire</button>
+      <button onclick="renderMesTaches('À faire')" id="tf-afaire"  class="tf-btn"           style="border-radius:99px;border:1.5px solid #e5e7eb;padding:5px 14px;font-size:.8rem;cursor:pointer;background:white;">À faire</button>
       <button onclick="renderMesTaches('En cours')"id="tf-encours" class="tf-btn"           style="border-radius:99px;border:1.5px solid #e5e7eb;padding:5px 14px;font-size:.8rem;cursor:pointer;background:white;">En cours</button>
       <button onclick="renderMesTaches('Terminé')" id="tf-termine" class="tf-btn"           style="border-radius:99px;border:1.5px solid #e5e7eb;padding:5px 14px;font-size:.8rem;cursor:pointer;background:white;">Terminées</button>
     </div>
@@ -10193,7 +10253,7 @@ PAGES['collab-taches'] = function(mc) {
     <div id="taches-list-zone"></div>
 
     <!-- Modal création/édition -->
-    <div id="tache-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:none;align-items:center;justify-content:center;padding:16px;">
+    <div id="tache-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center;padding:16px;">
       <div style="background:white;border-radius:16px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.25);">
         <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;">
           <h3 id="tache-modal-title" style="margin:0;font-size:1.05rem;font-weight:700;">Nouvelle tâche</h3>
@@ -10213,9 +10273,10 @@ PAGES['collab-taches'] = function(mc) {
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
             <div>
-              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Échéance</label>
-              <input id="tm-echeance" type="date"
-                style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Assignée à</label>
+              <select id="tm-collab" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+                ${ALL_COLLABS.map(function(n){return '<option value="'+n+'"'+(n===currentUser.name?' selected':'')+'>'+n+'</option>';}).join('')}
+              </select>
             </div>
             <div>
               <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Priorité</label>
@@ -10226,13 +10287,20 @@ PAGES['collab-taches'] = function(mc) {
               </select>
             </div>
           </div>
-          <div style="margin-bottom:20px;">
-            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Statut</label>
-            <select id="tm-statut" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
-              <option value="À faire">À faire</option>
-              <option value="En cours">En cours</option>
-              <option value="Terminé">Terminé</option>
-            </select>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+            <div>
+              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Échéance</label>
+              <input id="tm-echeance" type="date"
+                style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+            </div>
+            <div>
+              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Statut</label>
+              <select id="tm-statut" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+                <option value="À faire">À faire</option>
+                <option value="En cours">En cours</option>
+                <option value="Terminé">Terminé</option>
+              </select>
+            </div>
           </div>
           <div style="display:flex;gap:10px;justify-content:flex-end;">
             <button onclick="closeTacheModal()" style="background:white;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 18px;font-size:.88rem;cursor:pointer;">Annuler</button>
@@ -10242,19 +10310,19 @@ PAGES['collab-taches'] = function(mc) {
       </div>
     </div>
 
-    <!-- Modal transfert -->
+    <!-- Modal réassignation tâche -->
     <div id="transfer-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9100;align-items:center;justify-content:center;padding:16px;">
-      <div style="background:white;border-radius:16px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:24px;">
-        <h3 style="margin:0 0 6px;font-size:1rem;font-weight:700;">Transférer la tâche</h3>
+      <div style="background:white;border-radius:16px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:24px;">
+        <h3 style="margin:0 0 6px;font-size:1rem;font-weight:700;">↪ Réassigner la tâche</h3>
         <p id="transfer-titre" style="font-size:.82rem;color:#6b7280;margin:0 0 18px;"></p>
         <input type="hidden" id="transfer-id">
-        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:6px;">Transférer à :</label>
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:6px;">Réassigner à :</label>
         <select id="transfer-dest" style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.9rem;margin-bottom:20px;">
-          ${COLLABS_OTHER.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('')}
+          ${ALL_COLLABS.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('')}
         </select>
         <div style="display:flex;gap:10px;justify-content:flex-end;">
           <button onclick="closeTransferModal()" style="background:white;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 18px;font-size:.88rem;cursor:pointer;">Annuler</button>
-          <button onclick="confirmTransfer()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:.88rem;cursor:pointer;">Transférer</button>
+          <button onclick="confirmTransfer()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:.88rem;cursor:pointer;">Réassigner</button>
         </div>
       </div>
     </div>
@@ -10265,29 +10333,28 @@ PAGES['collab-taches'] = function(mc) {
 var _tachesFiltreActif = 'all';
 
 function renderMesTaches(filtre) {
-  _tachesFiltreActif = filtre || _tachesFiltreActif;
+  if (filtre !== undefined) _tachesFiltreActif = filtre;
   // Boutons actifs
-  ['all','A faire','En cours','Terminé'].forEach(function(f) {
-    var id = { 'all':'tf-all','A faire':'tf-afaire','En cours':'tf-encours','Terminé':'tf-termine' }[f];
-    var btn = document.getElementById(id);
+  ['all','À faire','En cours','Terminé'].forEach(function(f) {
+    var btnId = { 'all':'tf-all','À faire':'tf-afaire','En cours':'tf-encours','Terminé':'tf-termine' }[f];
+    var btn = document.getElementById(btnId);
     if (!btn) return;
     btn.style.background = (_tachesFiltreActif===f) ? '#4f46e5' : 'white';
     btn.style.color       = (_tachesFiltreActif===f) ? 'white'   : '#374151';
     btn.style.borderColor = (_tachesFiltreActif===f) ? '#4f46e5' : '#e5e7eb';
   });
 
-  var taches = getTaches(currentUser.name);
+  var filtCollab = (document.getElementById('tf-collab')||{}).value || '';
+  var taches = filtCollab ? getTaches(filtCollab) : getTaches();
   if (_tachesFiltreActif !== 'all') taches = taches.filter(function(t){ return t.statut === _tachesFiltreActif; });
 
-  // Tri : retard d'abord, puis par échéance, puis sans date
+  var COLORS = getCollabColors();
   var today = new Date(); today.setHours(0,0,0,0);
   taches.sort(function(a,b){
-    var da = a.echeance ? new Date(a.echeance) : new Date('9999-12-31');
-    var db2= b.echeance ? new Date(b.echeance) : new Date('9999-12-31');
-    // Terminées en bas
     if (a.statut==='Terminé' && b.statut!=='Terminé') return 1;
     if (b.statut==='Terminé' && a.statut!=='Terminé') return -1;
-    // Priorité haute en haut dans mêmes groupes
+    var da = a.echeance ? new Date(a.echeance) : new Date('9999-12-31');
+    var db2= b.echeance ? new Date(b.echeance) : new Date('9999-12-31');
     var pOrder = { 'haute':0,'normale':1,'basse':2 };
     if (da.getTime()===db2.getTime()) return (pOrder[a.priorite]||1)-(pOrder[b.priorite]||1);
     return da-db2;
@@ -10301,6 +10368,7 @@ function renderMesTaches(filtre) {
   }
 
   zone.innerHTML = taches.map(function(t) {
+    var color  = COLORS[t.collab] || '#6b7280';
     var today2 = new Date(); today2.setHours(0,0,0,0);
     var retard = false, echeanceLabel = '';
     if (t.echeance) {
@@ -10318,34 +10386,31 @@ function renderMesTaches(filtre) {
     var pc = tachePrioriteColor(t.priorite);
     var sc = tacheStatutColor(t.statut);
     var termine = t.statut === 'Terminé';
-    var transferInfo = t.transferePar ? '<div style="font-size:.72rem;color:#6b7280;margin-top:4px;">↩ Transférée par <strong>'+t.transferePar+'</strong></div>' : '';
+    var assigneeInfo = '<span style="font-size:.72rem;background:'+color+'18;color:'+color+';padding:2px 8px;border-radius:99px;font-weight:700;">👤 '+t.collab+'</span>';
+    var transferInfo = t.transferePar ? '<span style="font-size:.7rem;color:#9ca3af;"> ↩ de '+t.transferePar+'</span>' : '';
 
-    return `<div style="background:white;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:10px;border-left:4px solid ${retard?'#ef4444':pc};${termine?'opacity:.65':''}">
-      <div style="padding:14px 16px;">
-        <div style="display:flex;align-items:flex-start;gap:12px;">
-          <!-- Checkbox rapide -->
-          <button onclick="toggleTacheTermine('${t.id}')" title="Marquer terminé" style="flex-shrink:0;width:22px;height:22px;border-radius:50%;border:2px solid ${sc};background:${termine?sc:'white'};cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:2px;">
-            ${termine?'<span style="color:white;font-size:.7rem;line-height:1;">✓</span>':''}
-          </button>
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:700;font-size:.95rem;color:${termine?'#9ca3af':'#111'};${termine?'text-decoration:line-through':''};">${t.titre}</div>
-            ${t.description ? '<div style="font-size:.78rem;color:#6b7280;margin-top:3px;white-space:pre-wrap;">'+t.description+'</div>' : ''}
-            ${transferInfo}
-            <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">
-              <span style="font-size:.72rem;background:${pc}18;color:${pc};padding:2px 8px;border-radius:99px;font-weight:600;">${tachePrioriteLabel(t.priorite)}</span>
-              <span style="font-size:.72rem;background:${sc}18;color:${sc};padding:2px 8px;border-radius:99px;">${t.statut}</span>
-              ${echeanceLabel}
-            </div>
-          </div>
-          <!-- Actions -->
-          <div style="display:flex;gap:6px;flex-shrink:0;">
-            <button onclick="openTacheModal('${t.id}')" title="Modifier" style="background:#f1f5f9;border:none;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:.82rem;">✏️</button>
-            <button onclick="openTransferModal('${t.id}','${t.titre.replace(/'/g,"\\'")}','${currentUser.name}')" title="Transférer" style="background:#eff6ff;border:none;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:.82rem;">↪</button>
-            <button onclick="confirmDeleteTache('${t.id}')" title="Supprimer" style="background:#fef2f2;border:none;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:.82rem;">🗑</button>
-          </div>
-        </div>
-      </div>
-    </div>`;
+    return '<div style="background:white;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:10px;border-left:4px solid '+(retard?'#ef4444':color)+';'+(termine?'opacity:.65':'')+';">'
+      +'<div style="padding:13px 16px;">'
+      +'<div style="display:flex;align-items:flex-start;gap:12px;">'
+      +'<button onclick="toggleTacheTermine(\''+t.id+'\')" title="Marquer terminé" style="flex-shrink:0;width:22px;height:22px;border-radius:50%;border:2px solid '+sc+';background:'+(termine?sc:'white')+';cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:2px;">'
+        +(termine?'<span style="color:white;font-size:.7rem;line-height:1;">✓</span>':'')
+      +'</button>'
+      +'<div style="flex:1;min-width:0;">'
+        +'<div style="font-weight:700;font-size:.93rem;color:'+(termine?'#9ca3af':'#111')+';'+(termine?'text-decoration:line-through':'')+';">'+t.titre+'</div>'
+        +(t.description?'<div style="font-size:.78rem;color:#6b7280;margin-top:3px;white-space:pre-wrap;">'+t.description+'</div>':'')
+        +'<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;">'
+          +assigneeInfo+transferInfo
+          +'<span style="font-size:.72rem;background:'+pc+'18;color:'+pc+';padding:2px 8px;border-radius:99px;font-weight:600;">'+tachePrioriteLabel(t.priorite)+'</span>'
+          +'<span style="font-size:.72rem;background:'+sc+'18;color:'+sc+';padding:2px 8px;border-radius:99px;">'+t.statut+'</span>'
+          +echeanceLabel
+        +'</div>'
+      +'</div>'
+      +'<div style="display:flex;gap:5px;flex-shrink:0;">'
+        +'<button onclick="openTacheModal(\''+t.id+'\')" title="Modifier" style="background:#f1f5f9;border:none;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:.82rem;">✏️</button>'
+        +'<button onclick="openTransferModal(\''+t.id+'\',\''+t.titre.replace(/'/g,"\\'").replace(/`/g,'\\`')+'\',\''+t.collab+'\')" title="Réassigner" style="background:#eff6ff;border:none;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:.82rem;">↪</button>'
+        +'<button onclick="confirmDeleteTache(\''+t.id+'\')" title="Supprimer" style="background:#fef2f2;border:none;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:.82rem;">🗑</button>'
+      +'</div>'
+      +'</div></div></div>';
   }).join('');
 }
 
@@ -10361,6 +10426,7 @@ function openTacheModal(id) {
     document.getElementById('tm-echeance').value = t.echeance||'';
     document.getElementById('tm-priorite').value = t.priorite||'normale';
     document.getElementById('tm-statut').value   = t.statut||'À faire';
+    if (document.getElementById('tm-collab')) document.getElementById('tm-collab').value = t.collab||currentUser.name;
     document.getElementById('tache-modal-title').textContent = 'Modifier la tâche';
   } else {
     document.getElementById('tm-id').value       = '';
@@ -10369,6 +10435,7 @@ function openTacheModal(id) {
     document.getElementById('tm-echeance').value = '';
     document.getElementById('tm-priorite').value = 'normale';
     document.getElementById('tm-statut').value   = 'À faire';
+    if (document.getElementById('tm-collab')) document.getElementById('tm-collab').value = currentUser.name;
     document.getElementById('tache-modal-title').textContent = 'Nouvelle tâche';
   }
   modal.style.display = 'flex';
@@ -10382,23 +10449,26 @@ function closeTacheModal() {
 function submitTache() {
   var titre = (document.getElementById('tm-titre').value||'').trim();
   if (!titre) { toast('Le titre est obligatoire', 'error'); return; }
-  var id = document.getElementById('tm-id').value || String(Date.now());
+  var existingId = document.getElementById('tm-id').value;
+  var id = existingId || String(Date.now());
+  var existing = existingId ? (DB.taches||[]).find(function(t){return t.id===id;}) : null;
+  var assignee = document.getElementById('tm-collab')?.value || currentUser.name;
   var tache = {
     id:          id,
-    collab:      currentUser.name,
+    collab:      assignee,
     titre:       titre,
     description: (document.getElementById('tm-desc').value||'').trim(),
     echeance:    document.getElementById('tm-echeance').value || null,
     priorite:    document.getElementById('tm-priorite').value || 'normale',
     statut:      document.getElementById('tm-statut').value   || 'À faire',
-    createdAt:   document.getElementById('tm-id').value ? ((DB.taches||[]).find(function(t){return t.id===id;})||{}).createdAt || Date.now() : Date.now(),
-    createdBy:   currentUser.name,
-    transferePar: document.getElementById('tm-id').value ? ((DB.taches||[]).find(function(t){return t.id===id;})||{}).transferePar || null : null,
+    createdAt:   existing ? existing.createdAt || Date.now() : Date.now(),
+    createdBy:   existing ? existing.createdBy || currentUser.name : currentUser.name,
+    transferePar: existing && existing.collab !== assignee ? currentUser.name : (existing ? existing.transferePar || null : null),
   };
   saveTache(tache);
   closeTacheModal();
   toast('Tâche enregistrée ✓', 'success');
-  renderMesTaches(_tachesFiltreActif);
+  renderMesTaches();
 }
 
 function toggleTacheTermine(id) {
@@ -10407,23 +10477,24 @@ function toggleTacheTermine(id) {
   t.statut = (t.statut==='Terminé') ? 'À faire' : 'Terminé';
   if (t.statut==='Terminé') t.completedAt = Date.now();
   saveTache(t);
-  renderMesTaches(_tachesFiltreActif);
+  renderMesTaches();
 }
 
 function confirmDeleteTache(id) {
   if (!confirm('Supprimer cette tâche ?')) return;
   deleteTache(id);
   toast('Tâche supprimée', 'info');
-  renderMesTaches(_tachesFiltreActif);
+  renderMesTaches();
 }
 
-function openTransferModal(id, titre, from) {
-  var COLLABS_OTHER = getCollabNames().filter(function(n){ return n !== currentUser.name; });
-  if (COLLABS_OTHER.length === 0) { toast('Aucune autre collaboratrice disponible', 'info'); return; }
+function openTransferModal(id, titre, currentCollab) {
+  var ALL = getCollabNames();
   document.getElementById('transfer-id').value = id;
   document.getElementById('transfer-titre').textContent = '"' + titre + '"';
   var sel = document.getElementById('transfer-dest');
-  sel.innerHTML = COLLABS_OTHER.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('');
+  if (sel) {
+    sel.innerHTML = ALL.map(function(n){ return '<option value="'+n+'"'+(n===currentCollab?' selected':'')+'>'+n+'</option>'; }).join('');
+  }
   var m = document.getElementById('transfer-modal');
   if (m) m.style.display = 'flex';
 }
@@ -10440,12 +10511,13 @@ function confirmTransfer() {
   var t = (DB.taches||[]).find(function(x){ return x.id===id; });
   if (!t) return;
   var from = t.collab;
-  t.collab      = dest;
-  t.transferePar = from;
+  if (dest === from) { closeTransferModal(); return; }
+  t.transferePar = currentUser.name;
+  t.collab = dest;
   saveTache(t);
   closeTransferModal();
-  toast('Tâche transférée à ' + dest + ' ✓', 'success');
-  renderMesTaches(_tachesFiltreActif);
+  toast('Tâche réassignée à ' + dest + ' ✓', 'success');
+  renderMesTaches();
 }
 
 // ── PAGE ADMIN : Tâches équipe ────────────────────────────────────────────────
