@@ -570,6 +570,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
         </div>
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
+      <a href="https://drive.google.com/file/d/1ejgKAurx-HBdRtMtElkr-2f_rF2KR0Xu/view" target="_blank" rel="noopener" title="Guide opérationnel" style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:5px 12px;font-size:.78rem;font-weight:600;color:#fff;text-decoration:none;margin-right:4px;" onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">📖 Guide</a>
       <button onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
@@ -1712,7 +1713,7 @@ function saveResil() {
   renderCollabResil();
 }
 
-function renderResilList(zoneId, mois, annee) {
+function renderResilList(zoneId, mois, annee, showFinances) {
   var zone = document.getElementById(zoneId);
   if (!zone) return;
   var allList = (DB.resiliations||[]).filter(function(r){ return r.mois===mois && r.annee===annee; })
@@ -1754,28 +1755,30 @@ function renderResilList(zoneId, mois, annee) {
 
   // ── FILTRES ──────────────────────────────────────────────────────────────
   html += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:12px 16px;background:#f8fafc;border-bottom:1px solid #e5e7eb;">';
+  var sfArg = showFinances ? ',true' : '';
   html += '<div><label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px;">Produit</label>'
-    +'<select id="rf-produit-'+zoneId+'" onchange="renderResilList(\''+zoneId+'\','+mois+','+annee+')" style="font-size:.82rem;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;">'
+    +'<select id="rf-produit-'+zoneId+'" onchange="renderResilList(\''+zoneId+'\','+mois+','+annee+sfArg+')" style="font-size:.82rem;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;">'
     +'<option value="">Tous</option>'
     +prodOpts.map(function(p){ return '<option value="'+p+'"'+(fProd===p?' selected':'')+'>'+p+'</option>'; }).join('')
     +'</select></div>';
   html += '<div><label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px;">Motif</label>'
-    +'<select id="rf-motif-'+zoneId+'" onchange="renderResilList(\''+zoneId+'\','+mois+','+annee+')" style="font-size:.82rem;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;">'
+    +'<select id="rf-motif-'+zoneId+'" onchange="renderResilList(\''+zoneId+'\','+mois+','+annee+sfArg+')" style="font-size:.82rem;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;">'
     +'<option value="">Tous</option>'
     +motifOpts.map(function(m){ return '<option value="'+m+'"'+(fMotif===m?' selected':'')+'>'+m+'</option>'; }).join('')
     +'</select></div>';
   if (collabOpts.length>0) {
     html += '<div><label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px;">Collaborateur</label>'
-      +'<select id="rf-collab-'+zoneId+'" onchange="renderResilList(\''+zoneId+'\','+mois+','+annee+')" style="font-size:.82rem;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;">'
+      +'<select id="rf-collab-'+zoneId+'" onchange="renderResilList(\''+zoneId+'\','+mois+','+annee+sfArg+')" style="font-size:.82rem;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;">'
       +'<option value="">Tous</option>'
       +collabOpts.map(function(c){ return '<option value="'+c+'"'+(fCollab===c?' selected':'')+'>'+c+'</option>'; }).join('')
       +'</select></div>';
   }
   html += '<div style="flex:1;min-width:160px;"><label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px;">Recherche client / contrat</label>'
-    +'<input id="rf-search-'+zoneId+'" type="text" value="'+fSearch+'" placeholder="Nom ou n° contrat…" oninput="renderResilList(\''+zoneId+'\','+mois+','+annee+')" style="width:100%;font-size:.82rem;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;"></div>';
+    +'<input id="rf-search-'+zoneId+'" type="text" value="'+fSearch+'" placeholder="Nom ou n° contrat…" oninput="renderResilList(\''+zoneId+'\','+mois+','+annee+sfArg+')" style="width:100%;font-size:.82rem;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;"></div>';
   html += '</div>';
 
-  // ── BANDEAU KPI FINANCIER ─────────────────────────────────────────────────
+  // ── BANDEAU KPI FINANCIER (admin seulement) ──────────────────────────────
+  if (showFinances) {
   html += '<div style="background:linear-gradient(135deg,#fff5f5,#fef2f2);border-bottom:2px solid #fca5a5;padding:14px 16px;">'
     +'<div style="font-size:.72rem;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📉 Impact financier — '+list.length+' résiliation'+(list.length!==1?'s':'')+' sélectionnée'+(list.length!==1?'s':'')+' / '+allList.length+' ce mois</div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:12px;">'
@@ -1802,6 +1805,7 @@ function renderResilList(zoneId, mois, annee) {
         +'<div style="font-size:.65rem;color:#9ca3af;">taux '+taux+'</div></div>';
     }).join('')
     +'</div></div>';
+  } // fin showFinances
 
   // Top motifs
   if (Object.keys(byMotifStat).length>0) {
@@ -1821,8 +1825,7 @@ function renderResilList(zoneId, mois, annee) {
   html += '<div style="overflow-x:auto;">'
     +'<table class="data-table"><thead><tr>'
     +'<th>Date</th><th>Produit</th><th>Client</th><th>Contrat</th><th>Motif</th>'
-    +'<th style="color:#dc2626;">💸 Prime</th>'
-    +'<th style="color:#ea580c;">🏦 Comm. agence</th>'
+    +(showFinances?'<th style="color:#dc2626;">💸 Prime</th><th style="color:#ea580c;">🏦 Comm. agence</th>':'')
     +(collabOpts.length>0?'<th>Saisi par</th>':'')
     +'<th></th>'
     +'</tr></thead><tbody>'
@@ -1839,20 +1842,24 @@ function renderResilList(zoneId, mois, annee) {
         +'<td class="fw600" style="font-size:.88rem;">'+r.client+'</td>'
         +'<td class="muted" style="font-size:.8rem;">'+(r.contrat||'—')+'</td>'
         +'<td style="font-size:.82rem;">'+(r.motif||'—')+'</td>'
-        +'<td style="text-align:right;font-weight:800;color:#dc2626;white-space:nowrap;">'+fmtEuro(prime)+'</td>'
-        +'<td style="text-align:right;white-space:nowrap;">'
-          +'<span style="font-weight:700;color:#ea580c;">'+fmtEuro(commAgence)+'</span>'
-          +(tauxLabel?'<span style="font-size:.68rem;color:#9ca3af;margin-left:4px;">'+tauxLabel+'</span>':'')
-        +'</td>'
+        +(showFinances
+          ? '<td style="text-align:right;font-weight:800;color:#dc2626;white-space:nowrap;">'+fmtEuro(prime)+'</td>'
+            +'<td style="text-align:right;white-space:nowrap;">'
+            +'<span style="font-weight:700;color:#ea580c;">'+fmtEuro(commAgence)+'</span>'
+            +(tauxLabel?'<span style="font-size:.68rem;color:#9ca3af;margin-left:4px;">'+tauxLabel+'</span>':'')
+            +'</td>'
+          : '')
         +(collabOpts.length>0?'<td style="font-size:.78rem;color:#6b7280;">'+(r.collab||'—')+'</td>':'')
         +'<td><button class="btn btn-ghost btn-sm" onclick="deleteResil(\''+r.id+'\',\''+zoneId+'\','+mois+','+annee+')">✕</button></td>'
         +'</tr>';
     }).join('')
     +'</tbody></table></div>'
-    +'<div style="display:flex;justify-content:flex-end;gap:24px;padding:10px 16px;font-size:.85rem;font-weight:700;background:#fef2f2;border-top:2px solid #fca5a5;">'
-    +'<span style="color:#dc2626;">💸 Total prime : '+fmtEuro(totalPrime)+'</span>'
-    +'<span style="color:#ea580c;">🏦 Comm. agence : '+fmtEuro(totalCommAgence)+'</span>'
-    +'</div>';
+    +(showFinances
+      ? '<div style="display:flex;justify-content:flex-end;gap:24px;padding:10px 16px;font-size:.85rem;font-weight:700;background:#fef2f2;border-top:2px solid #fca5a5;">'
+        +'<span style="color:#dc2626;">💸 Total prime : '+fmtEuro(totalPrime)+'</span>'
+        +'<span style="color:#ea580c;">🏦 Comm. agence : '+fmtEuro(totalCommAgence)+'</span>'
+        +'</div>'
+      : '');
 
   zone.innerHTML = html;
 }
@@ -1861,7 +1868,8 @@ function deleteResil(id, zoneId, mois, annee) {
   if(!confirm('Supprimer cette résiliation ?')) return;
   DB.resiliations = DB.resiliations.filter(r => r.id !== id);
   saveDB(DB);
-  renderResilList(zoneId, mois, annee);
+  var isAdmin = currentUser && currentUser.role === 'admin';
+  renderResilList(zoneId, mois, annee, isAdmin);
   toast('Résiliation supprimée');
 }
 
@@ -2851,6 +2859,16 @@ PAGES['collab-home'] = function(mc) {
           +'</div></div>';
       }).join('')
       +'</div></div>';
+
+    // GUIDE OPÉRATIONNEL
+    html += '<a href="https://drive.google.com/file/d/1ejgKAurx-HBdRtMtElkr-2f_rF2KR0Xu/view" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-top:14px;text-decoration:none;transition:box-shadow .15s;" onmouseover="this.style.boxShadow=\'0 4px 12px rgba(0,0,0,.1)\'" onmouseout="this.style.boxShadow=\'none\'">'
+      +'<div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#003DA5,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;">📖</div>'
+      +'<div style="flex:1;">'
+      +'<div style="font-weight:700;font-size:.9rem;color:#1f2937;">Guide opérationnel agence</div>'
+      +'<div style="font-size:.78rem;color:#6b7280;margin-top:2px;">Procédures, produits, conseils — v16</div>'
+      +'</div>'
+      +'<span style="font-size:.82rem;color:#1d4ed8;font-weight:600;white-space:nowrap;">Ouvrir →</span>'
+      +'</a>';
 
     html += '</div>'; // fin container
     mc.innerHTML = html;
@@ -5586,6 +5604,16 @@ function renderAdminDashboard() {
       </div>
     </div>
 
+    <!-- GUIDE OPÉRATIONNEL -->
+    <a href="https://drive.google.com/file/d/1ejgKAurx-HBdRtMtElkr-2f_rF2KR0Xu/view" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-bottom:12px;text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,.06);" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.06)'">
+      <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#003DA5,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;">📖</div>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:.92rem;color:#1f2937;">Guide opérationnel agence Essid</div>
+        <div style="font-size:.78rem;color:#6b7280;margin-top:2px;">Procédures, produits, tarification, conseils — v16</div>
+      </div>
+      <span style="font-size:.82rem;color:#1d4ed8;font-weight:700;white-space:nowrap;background:#eff6ff;padding:6px 14px;border-radius:8px;">Ouvrir →</span>
+    </a>
+
     <!-- 5. CARTES COLLABORATRICES -->
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
       ${collabData.map(cd=>mkCard(cd)).join('')}
@@ -6678,7 +6706,7 @@ PAGES['admin-resil'] = (mc) => {
 
 function renderAdminResil() {
   const mois = parseInt(document.getElementById('ar-mois').value);
-  renderResilList('admin-resil-table', mois, nowAnnee());
+  renderResilList('admin-resil-table', mois, nowAnnee(), true); // showFinances=true pour admin
 }
 
 // ---- ADMIN: TÉLÉPHONIE ----
