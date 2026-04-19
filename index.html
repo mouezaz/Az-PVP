@@ -10196,10 +10196,26 @@ function resetAll() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function getTaches(collab) {
+function getTaches(collab, opts) {
   if (!DB.taches) DB.taches = [];
-  if (collab) return DB.taches.filter(function(t){ return t.collab === collab; });
-  return DB.taches;
+  // Par défaut, exclure les tâches admin-only des vues collab
+  var all = (opts && opts.includeAdminOnly)
+    ? DB.taches
+    : DB.taches.filter(function(t){ return !t.adminOnly; });
+  if (collab) return all.filter(function(t){ return t.collab === collab; });
+  return all;
+}
+function getAdminPrivateTaches() {
+  if (!DB.taches) DB.taches = [];
+  return DB.taches.filter(function(t){ return t.adminOnly && !t.remontePar; });
+}
+function getEscaladeTaches() {
+  if (!DB.taches) DB.taches = [];
+  return DB.taches.filter(function(t){ return t.adminOnly && t.remontePar; });
+}
+function getMyEscaladeTaches(collab) {
+  if (!DB.taches) DB.taches = [];
+  return DB.taches.filter(function(t){ return t.adminOnly && t.remontePar === collab; });
 }
 
 function saveTache(tache) {
@@ -10232,7 +10248,10 @@ PAGES['collab-taches'] = function(mc) {
   mc.innerHTML = `
     <div class="page-header flex-between" style="flex-wrap:wrap;gap:10px;">
       <div><h1>✅ Tâches équipe</h1><p style="color:#6b7280;margin:0;font-size:.85rem;">Toutes les tâches — visibles et réassignables par toute l'équipe</p></div>
-      <button onclick="openTacheModal()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 18px;font-weight:600;font-size:.88rem;cursor:pointer;">+ Nouvelle tâche</button>
+      <div style="display:flex;gap:8px;">
+        <button onclick="openRemonterAdminModal()" style="background:#f59e0b;color:white;border:none;border-radius:8px;padding:9px 16px;font-weight:600;font-size:.88rem;cursor:pointer;">📤 Remonter à l'admin</button>
+        <button onclick="openTacheModal()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 18px;font-weight:600;font-size:.88rem;cursor:pointer;">+ Nouvelle tâche</button>
+      </div>
     </div>
 
     <!-- Filtres -->
@@ -10250,7 +10269,45 @@ PAGES['collab-taches'] = function(mc) {
       <button onclick="renderMesTaches('Terminé')" id="tf-termine" class="tf-btn"           style="border-radius:99px;border:1.5px solid #e5e7eb;padding:5px 14px;font-size:.8rem;cursor:pointer;background:white;">Terminées</button>
     </div>
 
+    <!-- Mes remontées admin -->
+    <div id="mes-remontees-zone"></div>
+
     <div id="taches-list-zone"></div>
+
+    <!-- Modal remontée admin -->
+    <div id="remonter-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9200;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:white;border-radius:16px;width:100%;max-width:460px;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+        <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;">
+          <h3 style="margin:0;font-size:1.05rem;font-weight:700;">📤 Remonter à l'admin</h3>
+          <button onclick="closeRemonterModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#9ca3af;">×</button>
+        </div>
+        <div style="padding:16px 24px 24px;">
+          <p style="font-size:.82rem;color:#6b7280;margin:0 0 16px;">Seul l'admin pourra voir cette remontée. Vos collègues ne la verront pas.</p>
+          <div style="margin-bottom:14px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Objet *</label>
+            <input id="rm-titre" type="text" placeholder="Ex: Problème client Dupont, Demande de formation…" maxlength="120"
+              style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.9rem;">
+          </div>
+          <div style="margin-bottom:14px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Détails / contexte</label>
+            <textarea id="rm-desc" rows="4" placeholder="Expliquez la situation, ce dont vous avez besoin…"
+              style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;resize:vertical;"></textarea>
+          </div>
+          <div style="margin-bottom:20px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Urgence</label>
+            <select id="rm-priorite" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+              <option value="normale">🟡 Normale</option>
+              <option value="haute">🔴 Urgente</option>
+              <option value="basse">🟢 Pas pressé</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button onclick="closeRemonterModal()" style="background:white;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 18px;font-size:.88rem;cursor:pointer;">Annuler</button>
+            <button onclick="submitRemonter()" style="background:#f59e0b;color:white;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:.88rem;cursor:pointer;">Envoyer à l'admin</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Modal création/édition -->
     <div id="tache-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center;padding:16px;">
@@ -10328,7 +10385,64 @@ PAGES['collab-taches'] = function(mc) {
     </div>
   `;
   renderMesTaches('all');
+  renderMesRemontees();
 };
+
+function renderMesRemontees() {
+  var zone = document.getElementById('mes-remontees-zone');
+  if (!zone) return;
+  var mes = getMyEscaladeTaches(currentUser.name);
+  if (mes.length === 0) { zone.innerHTML = ''; return; }
+  var today = new Date(); today.setHours(0,0,0,0);
+  var html = '<div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:12px;padding:14px 18px;margin-bottom:16px;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+    +'<div style="font-weight:700;font-size:.9rem;color:#92400e;">📤 Mes remontées à l\'admin <span style="display:inline-block;background:#f59e0b;color:white;border-radius:99px;font-size:.72rem;padding:2px 8px;margin-left:6px;">'+mes.length+'</span></div>'
+    +'</div>'
+    + mes.map(function(t) {
+        var sc  = tacheStatutColor(t.statut);
+        var pc  = tachePrioriteColor(t.priorite);
+        var termine = t.statut==='Terminé';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #fde68a;">'
+          +'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+(termine?'#22c55e':'#f59e0b')+';flex-shrink:0;"></span>'
+          +'<div style="flex:1;font-size:.83rem;color:'+(termine?'#9ca3af':'#1f2937')+';'+(termine?'text-decoration:line-through':'')+';">'+t.titre+'</div>'
+          +'<span style="font-size:.72rem;background:'+sc+'18;color:'+sc+';padding:2px 8px;border-radius:99px;">'+t.statut+'</span>'
+          +'</div>';
+      }).join('')
+    +'</div>';
+  zone.innerHTML = html;
+}
+
+function openRemonterAdminModal() {
+  document.getElementById('rm-titre').value    = '';
+  document.getElementById('rm-desc').value     = '';
+  document.getElementById('rm-priorite').value = 'normale';
+  var m = document.getElementById('remonter-modal');
+  if (m) m.style.display = 'flex';
+}
+function closeRemonterModal() {
+  var m = document.getElementById('remonter-modal');
+  if (m) m.style.display = 'none';
+}
+function submitRemonter() {
+  var titre = (document.getElementById('rm-titre').value||'').trim();
+  if (!titre) { toast('L\'objet est obligatoire', 'error'); return; }
+  var tache = {
+    id:         String(Date.now()),
+    collab:     '__admin__',
+    adminOnly:  true,
+    remontePar: currentUser.name,
+    titre:      titre,
+    description:(document.getElementById('rm-desc').value||'').trim(),
+    priorite:   document.getElementById('rm-priorite').value || 'normale',
+    statut:     'À faire',
+    createdAt:  Date.now(),
+    createdBy:  currentUser.name,
+  };
+  saveTache(tache);
+  closeRemonterModal();
+  toast('Remontée envoyée à l\'admin ✓', 'success');
+  renderMesRemontees();
+}
 
 var _tachesFiltreActif = 'all';
 
@@ -10524,57 +10638,277 @@ function confirmTransfer() {
 PAGES['admin-taches'] = function(mc) {
   mc.innerHTML = `
     <div class="page-header flex-between" style="flex-wrap:wrap;gap:10px;">
-      <div><h1>✅ Tâches équipe</h1><p style="color:#6b7280;margin:0;font-size:.85rem;">Vue consolidée des tâches de toutes les collaboratrices</p></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <select id="at-filtre-collab" onchange="renderAdminTaches()" style="font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid #e5e7eb;">
-          <option value="">Toutes</option>
-          ${getCollabNames().map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('')}
-        </select>
-        <select id="at-filtre-statut" onchange="renderAdminTaches()" style="font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid #e5e7eb;">
-          <option value="">Tous statuts</option>
-          <option value="À faire">À faire</option>
-          <option value="En cours">En cours</option>
-          <option value="Terminé">Terminé</option>
-        </select>
+      <div><h1>✅ Tâches</h1><p style="color:#6b7280;margin:0;font-size:.85rem;">Vos tâches privées, remontées équipe, et vue équipe</p></div>
+      <button onclick="openAdminTacheModal()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 18px;font-weight:600;font-size:.88rem;cursor:pointer;">+ Ma tâche privée</button>
+    </div>
+
+    <!-- Section 1 : Mes tâches privées -->
+    <div style="margin-bottom:28px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h2 style="margin:0;font-size:1rem;font-weight:700;color:#1f2937;">🔒 Mes tâches privées <span style="font-size:.72rem;font-weight:400;color:#9ca3af;">— invisibles aux collaboratrices</span></h2>
+      </div>
+      <div id="admin-private-zone"></div>
+    </div>
+
+    <!-- Section 2 : Remontées équipe -->
+    <div style="margin-bottom:28px;">
+      <div style="display:flex;align-items:center;margin-bottom:12px;">
+        <h2 style="margin:0;font-size:1rem;font-weight:700;color:#92400e;">📤 Remontées équipe <span style="font-size:.72rem;font-weight:400;color:#9ca3af;">— messages envoyés par vos collaboratrices</span></h2>
+      </div>
+      <div id="admin-remontees-zone"></div>
+    </div>
+
+    <!-- Section 3 : Tâches équipe -->
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <h2 style="margin:0;font-size:1rem;font-weight:700;color:#1f2937;">📋 Tâches équipe</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select id="at-filtre-collab" onchange="renderAdminTaches()" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid #e5e7eb;">
+            <option value="">Toutes</option>
+            ${getCollabNames().map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('')}
+          </select>
+          <select id="at-filtre-statut" onchange="renderAdminTaches()" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid #e5e7eb;">
+            <option value="">Tous statuts</option>
+            <option value="À faire">À faire</option>
+            <option value="En cours">En cours</option>
+            <option value="Terminé">Terminé</option>
+          </select>
+        </div>
+      </div>
+      <div id="admin-equipe-zone"></div>
+    </div>
+
+    <!-- Modal tâche privée admin -->
+    <div id="admin-tache-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9300;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:white;border-radius:16px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+        <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;">
+          <h3 id="atm-title" style="margin:0;font-size:1.05rem;font-weight:700;">🔒 Nouvelle tâche privée</h3>
+          <button onclick="closeAdminTacheModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#9ca3af;">×</button>
+        </div>
+        <div style="padding:20px 24px;">
+          <p style="font-size:.8rem;color:#9ca3af;margin:0 0 16px;">Cette tâche ne sera visible que par vous.</p>
+          <input type="hidden" id="atm-id">
+          <div style="margin-bottom:14px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Titre *</label>
+            <input id="atm-titre" type="text" maxlength="120" placeholder="Ex: Préparer entretien annuel"
+              style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.9rem;">
+          </div>
+          <div style="margin-bottom:14px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Note / mémo</label>
+            <textarea id="atm-desc" rows="3" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;resize:vertical;"></textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
+            <div>
+              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Échéance</label>
+              <input id="atm-echeance" type="date" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.85rem;">
+            </div>
+            <div>
+              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Priorité</label>
+              <select id="atm-priorite" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.85rem;">
+                <option value="normale">🟡 Normale</option>
+                <option value="haute">🔴 Haute</option>
+                <option value="basse">🟢 Basse</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Statut</label>
+              <select id="atm-statut" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.85rem;">
+                <option value="À faire">À faire</option>
+                <option value="En cours">En cours</option>
+                <option value="Terminé">Terminé</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button onclick="closeAdminTacheModal()" style="background:white;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 18px;font-size:.88rem;cursor:pointer;">Annuler</button>
+            <button onclick="submitAdminTache()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:.88rem;cursor:pointer;">Enregistrer</button>
+          </div>
+        </div>
       </div>
     </div>
-    <div id="admin-taches-content"></div>
   `;
+  renderAdminPrivate();
+  renderAdminRemontees();
   renderAdminTaches();
 };
 
+// ── Admin private taches ──────────────────────────────────────────────────────
+function openAdminTacheModal(id) {
+  var modal = document.getElementById('admin-tache-modal');
+  if (!modal) return;
+  if (id) {
+    var t = (DB.taches||[]).find(function(x){ return x.id===id; });
+    if (!t) return;
+    document.getElementById('atm-id').value       = t.id;
+    document.getElementById('atm-titre').value    = t.titre||'';
+    document.getElementById('atm-desc').value     = t.description||'';
+    document.getElementById('atm-echeance').value = t.echeance||'';
+    document.getElementById('atm-priorite').value = t.priorite||'normale';
+    document.getElementById('atm-statut').value   = t.statut||'À faire';
+    document.getElementById('atm-title').textContent = '🔒 Modifier la tâche';
+  } else {
+    document.getElementById('atm-id').value       = '';
+    document.getElementById('atm-titre').value    = '';
+    document.getElementById('atm-desc').value     = '';
+    document.getElementById('atm-echeance').value = '';
+    document.getElementById('atm-priorite').value = 'normale';
+    document.getElementById('atm-statut').value   = 'À faire';
+    document.getElementById('atm-title').textContent = '🔒 Nouvelle tâche privée';
+  }
+  modal.style.display = 'flex';
+}
+function closeAdminTacheModal() {
+  var m = document.getElementById('admin-tache-modal');
+  if (m) m.style.display = 'none';
+}
+function submitAdminTache() {
+  var titre = (document.getElementById('atm-titre').value||'').trim();
+  if (!titre) { toast('Le titre est obligatoire', 'error'); return; }
+  var existingId = document.getElementById('atm-id').value;
+  var id = existingId || String(Date.now());
+  var existing = existingId ? (DB.taches||[]).find(function(t){return t.id===id;}) : null;
+  var tache = {
+    id:          id,
+    collab:      '__admin__',
+    adminOnly:   true,
+    titre:       titre,
+    description: (document.getElementById('atm-desc').value||'').trim(),
+    echeance:    document.getElementById('atm-echeance').value || null,
+    priorite:    document.getElementById('atm-priorite').value || 'normale',
+    statut:      document.getElementById('atm-statut').value   || 'À faire',
+    createdAt:   existing ? existing.createdAt || Date.now() : Date.now(),
+    createdBy:   'admin',
+  };
+  saveTache(tache);
+  closeAdminTacheModal();
+  toast('Tâche enregistrée ✓', 'success');
+  renderAdminPrivate();
+}
+
+function renderAdminPrivate() {
+  var zone = document.getElementById('admin-private-zone');
+  if (!zone) return;
+  var taches = getAdminPrivateTaches();
+  var today  = new Date(); today.setHours(0,0,0,0);
+  taches.sort(function(a,b){
+    if (a.statut==='Terminé' && b.statut!=='Terminé') return 1;
+    if (b.statut==='Terminé' && a.statut!=='Terminé') return -1;
+    var da=a.echeance?new Date(a.echeance):new Date('9999-12-31');
+    var db2=b.echeance?new Date(b.echeance):new Date('9999-12-31');
+    return da-db2;
+  });
+  if (taches.length===0) {
+    zone.innerHTML='<div style="background:white;border-radius:12px;border:1.5px dashed #e5e7eb;padding:28px;text-align:center;color:#9ca3af;font-size:.88rem;">Aucune tâche privée — cliquez sur <strong>+ Ma tâche privée</strong> pour commencer</div>';
+    return;
+  }
+  zone.innerHTML = '<div style="background:white;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;">'
+    + taches.map(function(t){
+        var pc=tachePrioriteColor(t.priorite), sc=tacheStatutColor(t.statut);
+        var termine=t.statut==='Terminé';
+        var flag='';
+        if(t.echeance&&!termine){var de=new Date(t.echeance);de.setHours(0,0,0,0);var diff=Math.round((de-today)/86400000);flag=diff<0?'<span style="color:#ef4444;font-size:.72rem;font-weight:700;">⚠ J'+diff+'</span>':diff===0?'<span style="color:#f59e0b;font-size:.72rem;font-weight:700;">Auj.</span>':'<span style="color:#9ca3af;font-size:.72rem;">J+'+diff+'</span>';}
+        return '<div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px;'+(t.echeance&&!termine&&Math.round((new Date(t.echeance)-today)/86400000)<0?'background:#fff5f5;':'')+(termine?'opacity:.6':'')+';">'
+          +'<button onclick="toggleAdminTacheTermine(\''+t.id+'\')" style="flex-shrink:0;width:20px;height:20px;border-radius:50%;border:2px solid '+sc+';background:'+(termine?sc:'white')+';cursor:pointer;display:flex;align-items:center;justify-content:center;">'+(termine?'<span style="color:white;font-size:.65rem;">✓</span>':'')+'</button>'
+          +'<div style="flex:1;min-width:0;">'
+            +'<div style="font-weight:600;font-size:.88rem;color:'+(termine?'#9ca3af':'#111')+';'+(termine?'text-decoration:line-through':'')+';">'+t.titre+'</div>'
+            +(t.description?'<div style="font-size:.75rem;color:#6b7280;margin-top:2px;">'+t.description+'</div>':'')
+          +'</div>'
+          +'<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">'
+            +'<span style="font-size:.72rem;background:'+pc+'18;color:'+pc+';padding:2px 7px;border-radius:99px;font-weight:600;">'+tachePrioriteLabel(t.priorite)+'</span>'
+            +'<span style="font-size:.72rem;background:'+sc+'18;color:'+sc+';padding:2px 7px;border-radius:99px;">'+t.statut+'</span>'
+            +flag
+            +'<button onclick="openAdminTacheModal(\''+t.id+'\')" style="background:#f1f5f9;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">✏️</button>'
+            +'<button onclick="deleteAdminTache(\''+t.id+'\')" style="background:#fef2f2;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">🗑</button>'
+          +'</div>'
+          +'</div>';
+      }).join('')
+    +'</div>';
+}
+
+function toggleAdminTacheTermine(id) {
+  var t=(DB.taches||[]).find(function(x){return x.id===id;});
+  if(!t) return;
+  t.statut=(t.statut==='Terminé')?'À faire':'Terminé';
+  if(t.statut==='Terminé') t.completedAt=Date.now();
+  saveTache(t);
+  renderAdminPrivate();
+}
+function deleteAdminTache(id) {
+  if(!confirm('Supprimer cette tâche ?')) return;
+  deleteTache(id);
+  toast('Tâche supprimée','info');
+  renderAdminPrivate();
+}
+
+// ── Remontées équipe ──────────────────────────────────────────────────────────
+function renderAdminRemontees() {
+  var zone = document.getElementById('admin-remontees-zone');
+  if (!zone) return;
+  var COLORS = getCollabColors();
+  var today  = new Date(); today.setHours(0,0,0,0);
+  var remontees = getEscaladeTaches().sort(function(a,b){
+    if (a.statut==='Terminé'&&b.statut!=='Terminé') return 1;
+    if (b.statut==='Terminé'&&a.statut!=='Terminé') return -1;
+    var pOrder={'haute':0,'normale':1,'basse':2};
+    return (pOrder[a.priorite]||1)-(pOrder[b.priorite]||1);
+  });
+  if (remontees.length===0) {
+    zone.innerHTML='<div style="background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:12px;padding:28px;text-align:center;color:#92400e;font-size:.88rem;">Aucune remontée de l\'équipe pour le moment</div>';
+    return;
+  }
+  zone.innerHTML='<div style="background:white;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;">'
+    +remontees.map(function(t){
+      var color=COLORS[t.remontePar]||'#6b7280';
+      var pc=tachePrioriteColor(t.priorite), sc=tacheStatutColor(t.statut);
+      var termine=t.statut==='Terminé';
+      return '<div style="padding:14px 16px;border-bottom:1px solid #f1f5f9;'+(t.priorite==='haute'&&!termine?'background:#fff5f5;':'')+(termine?'opacity:.6':'')+';">'
+        +'<div style="display:flex;align-items:flex-start;gap:10px;">'
+        +'<div style="width:34px;height:34px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:.85rem;flex-shrink:0;">'+t.remontePar[0]+'</div>'
+        +'<div style="flex:1;min-width:0;">'
+          +'<div style="font-weight:700;font-size:.88rem;color:'+(termine?'#9ca3af':'#111')+';'+(termine?'text-decoration:line-through':'')+';">'+t.titre+'</div>'
+          +(t.description?'<div style="font-size:.78rem;color:#6b7280;margin-top:3px;white-space:pre-wrap;">'+t.description+'</div>':'')
+          +'<div style="font-size:.72rem;color:'+color+';margin-top:4px;font-weight:600;">De : '+t.remontePar+'</div>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;">'
+          +'<span style="font-size:.72rem;background:'+pc+'18;color:'+pc+';padding:2px 7px;border-radius:99px;font-weight:600;">'+tachePrioriteLabel(t.priorite)+'</span>'
+          +'<span style="font-size:.72rem;background:'+sc+'18;color:'+sc+';padding:2px 7px;border-radius:99px;">'+t.statut+'</span>'
+          +'<button onclick="toggleRemonteStatut(\''+t.id+'\')" style="background:'+(termine?'#f1f5f9':'#f0fdf4')+';border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.75rem;font-weight:600;color:'+(termine?'#6b7280':'#16a34a')+';">'+(termine?'↺ Réouvrir':'✓ Traiter')+'</button>'
+          +'<button onclick="deleteAdminRemontee(\''+t.id+'\')" style="background:#fef2f2;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">🗑</button>'
+        +'</div>'
+        +'</div>'
+        +'</div>';
+    }).join('')
+    +'</div>';
+}
+
+function toggleRemonteStatut(id) {
+  var t=(DB.taches||[]).find(function(x){return x.id===id;});
+  if(!t) return;
+  t.statut=(t.statut==='Terminé')?'À faire':'Terminé';
+  saveTache(t);
+  renderAdminRemontees();
+}
+function deleteAdminRemontee(id) {
+  if(!confirm('Supprimer cette remontée ?')) return;
+  deleteTache(id);
+  toast('Remontée supprimée','info');
+  renderAdminRemontees();
+}
+
+// ── Tâches équipe (section 3) ─────────────────────────────────────────────────
 function renderAdminTaches() {
   var filtCollab = (document.getElementById('at-filtre-collab')||{}).value || '';
   var filtStatut = (document.getElementById('at-filtre-statut')||{}).value || '';
   var COLORS = getCollabColors();
   var today  = new Date(); today.setHours(0,0,0,0);
 
-  var taches = (DB.taches||[]).slice();
-  if (filtCollab) taches = taches.filter(function(t){ return t.collab===filtCollab; });
+  // Tâches équipe uniquement (pas admin-only)
+  var taches = getTaches(filtCollab || null);
   if (filtStatut) taches = taches.filter(function(t){ return t.statut===filtStatut; });
 
-  // KPI rapides
-  var total    = taches.length;
-  var retard   = taches.filter(function(t){
-    if (!t.echeance || t.statut==='Terminé') return false;
-    var d=new Date(t.echeance); d.setHours(0,0,0,0); return d<today;
-  }).length;
-  var encours  = taches.filter(function(t){ return t.statut==='En cours'; }).length;
-  var termine  = taches.filter(function(t){ return t.statut==='Terminé'; }).length;
-
-  var zone = document.getElementById('admin-taches-content');
+  var zone = document.getElementById('admin-equipe-zone');
   if (!zone) return;
 
-  var kpiHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;">
-    ${[['📋','Total',total,'#4f46e5'],['⚠️','En retard',retard,'#ef4444'],['🔄','En cours',encours,'#3b82f6'],['✅','Terminées',termine,'#22c55e']]
-      .map(function(x){return `<div style="background:white;border-radius:12px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.07);border-top:3px solid ${x[3]};">
-        <div style="font-size:1.5rem;">${x[0]}</div>
-        <div style="font-size:1.6rem;font-weight:900;color:${x[3]};">${x[2]}</div>
-        <div style="font-size:.72rem;color:#9ca3af;">${x[1]}</div>
-      </div>`;}).join('')}
-  </div>`;
-
-  // Trier : retard > aujourd'hui > reste ; terminé en bas
   taches.sort(function(a,b){
     if (a.statut==='Terminé' && b.statut!=='Terminé') return 1;
     if (b.statut==='Terminé' && a.statut!=='Terminé') return -1;
@@ -10583,51 +10917,32 @@ function renderAdminTaches() {
     return da-db2;
   });
 
-  var listHtml = '';
   if (taches.length===0) {
-    listHtml = '<div style="text-align:center;padding:50px;color:#9ca3af;font-size:.9rem;">Aucune tâche trouvée</div>';
-  } else {
-    listHtml = '<div style="background:white;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;">';
-    taches.forEach(function(t, i) {
-      var color = COLORS[t.collab]||'#6b7280';
-      var pc    = tachePrioriteColor(t.priorite);
-      var sc    = tacheStatutColor(t.statut);
-      var echeanceStr = '—';
-      var retardFlag  = false;
-      if (t.echeance) {
-        var de = new Date(t.echeance); de.setHours(0,0,0,0);
-        var diff = Math.round((de-today)/86400000);
-        if (t.statut!=='Terminé') {
-          retardFlag  = diff < 0;
-          echeanceStr = diff < 0  ? '<span style="color:#ef4444;font-weight:700;">⚠ J'+diff+'</span>'
-                      : diff===0  ? '<span style="color:#f59e0b;font-weight:700;">Auj.</span>'
-                      :             'J+'+diff;
-        } else {
-          echeanceStr = t.echeance;
-        }
-      }
-      var transferInfo = t.transferePar ? ' <span style="font-size:.7rem;color:#9ca3af;">(↩ de '+t.transferePar+')</span>' : '';
-      listHtml += `<div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:12px;flex-wrap:wrap;${retardFlag?'background:#fff5f5':''};">
-        <!-- Collab badge -->
-        <div style="width:32px;height:32px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:.8rem;flex-shrink:0;">${t.collab[0]}</div>
-        <!-- Contenu -->
-        <div style="flex:1;min-width:140px;">
-          <div style="font-weight:600;font-size:.9rem;color:${t.statut==='Terminé'?'#9ca3af':'#111'};${t.statut==='Terminé'?'text-decoration:line-through':''};">${t.titre}${transferInfo}</div>
-          ${t.description?'<div style="font-size:.76rem;color:#6b7280;margin-top:2px;">'+t.description+'</div>':''}
-        </div>
-        <!-- Méta -->
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0;">
-          <span style="font-size:.72rem;color:${color};font-weight:700;">${t.collab}</span>
-          <span style="font-size:.72rem;background:${pc}18;color:${pc};padding:2px 8px;border-radius:99px;font-weight:600;">${tachePrioriteLabel(t.priorite)}</span>
-          <span style="font-size:.72rem;background:${sc}18;color:${sc};padding:2px 8px;border-radius:99px;">${t.statut}</span>
-          <span style="font-size:.76rem;">${echeanceStr}</span>
-        </div>
-      </div>`;
-    });
-    listHtml += '</div>';
+    zone.innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;font-size:.88rem;">Aucune tâche équipe trouvée</div>';
+    return;
   }
-
-  zone.innerHTML = kpiHtml + listHtml;
+  zone.innerHTML='<div style="background:white;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;">'
+    +taches.map(function(t){
+      var color=COLORS[t.collab]||'#6b7280';
+      var pc=tachePrioriteColor(t.priorite),sc=tacheStatutColor(t.statut);
+      var retardFlag=false,echeanceStr='—';
+      if(t.echeance){var de=new Date(t.echeance);de.setHours(0,0,0,0);var diff=Math.round((de-today)/86400000);if(t.statut!=='Terminé'){retardFlag=diff<0;echeanceStr=diff<0?'<span style="color:#ef4444;font-weight:700;">⚠ J'+diff+'</span>':diff===0?'<span style="color:#f59e0b;font-weight:700;">Auj.</span>':'J+'+diff;}else{echeanceStr=t.echeance;}}
+      var transferInfo=t.transferePar?' <span style="font-size:.68rem;color:#9ca3af;">(↩ de '+t.transferePar+')</span>':'';
+      return '<div style="padding:11px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px;flex-wrap:wrap;'+(retardFlag?'background:#fff5f5;':'')+(t.statut==='Terminé'?'opacity:.6':'')+';">'
+        +'<div style="width:30px;height:30px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:.78rem;flex-shrink:0;">'+t.collab[0]+'</div>'
+        +'<div style="flex:1;min-width:120px;">'
+          +'<div style="font-weight:600;font-size:.87rem;color:'+(t.statut==='Terminé'?'#9ca3af':'#111')+';'+(t.statut==='Terminé'?'text-decoration:line-through':'')+';">'+t.titre+transferInfo+'</div>'
+          +(t.description?'<div style="font-size:.74rem;color:#6b7280;margin-top:2px;">'+t.description+'</div>':'')
+        +'</div>'
+        +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0;">'
+          +'<span style="font-size:.7rem;color:'+color+';font-weight:700;">'+t.collab+'</span>'
+          +'<span style="font-size:.7rem;background:'+pc+'18;color:'+pc+';padding:2px 7px;border-radius:99px;font-weight:600;">'+tachePrioriteLabel(t.priorite)+'</span>'
+          +'<span style="font-size:.7rem;background:'+sc+'18;color:'+sc+';padding:2px 7px;border-radius:99px;">'+t.statut+'</span>'
+          +'<span style="font-size:.73rem;">'+echeanceStr+'</span>'
+        +'</div>'
+        +'</div>';
+    }).join('')
+    +'</div>';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
