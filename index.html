@@ -10196,6 +10196,42 @@ function resetAll() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Périodicité tâches ────────────────────────────────────────────────────────
+var PERIODICITES = [
+  { val:'',              label:'Aucune (ponctuelle)'  },
+  { val:'quotidienne',   label:'🔁 Chaque jour'       },
+  { val:'hebdomadaire',  label:'🔁 Chaque semaine'    },
+  { val:'mensuelle',     label:'🔁 Chaque mois'       },
+  { val:'trimestrielle', label:'🔁 Chaque trimestre'  },
+  { val:'semestrielle',  label:'🔁 Chaque semestre'   },
+  { val:'annuelle',      label:'🔁 Chaque année'      },
+];
+function periodiciteLabel(p) {
+  var found = PERIODICITES.find(function(x){ return x.val===p; });
+  return found ? found.label : '';
+}
+function periodiciteColor(p) {
+  return p==='quotidienne'?'#3b82f6':p==='hebdomadaire'?'#8b5cf6':p==='mensuelle'?'#10b981':p==='trimestrielle'?'#f59e0b':p==='semestrielle'?'#f97316':'#ef4444';
+}
+function buildPeriodiciteSelect(id, selected, style) {
+  return '<select id="'+id+'" style="'+(style||'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;')+'">'
+    + PERIODICITES.map(function(p){ return '<option value="'+p.val+'"'+(p.val===selected?' selected':'')+'>'+p.label+'</option>'; }).join('')
+    +'</select>';
+}
+function getNextRecurrenceDate(echeance, periodicite) {
+  if (!periodicite) return null;
+  var base = echeance ? new Date(echeance) : new Date();
+  base.setHours(0,0,0,0);
+  if (periodicite==='quotidienne')   base.setDate(base.getDate()+1);
+  else if (periodicite==='hebdomadaire') base.setDate(base.getDate()+7);
+  else if (periodicite==='mensuelle')    base.setMonth(base.getMonth()+1);
+  else if (periodicite==='trimestrielle')base.setMonth(base.getMonth()+3);
+  else if (periodicite==='semestrielle') base.setMonth(base.getMonth()+6);
+  else if (periodicite==='annuelle')     base.setFullYear(base.getFullYear()+1);
+  return base.toISOString().slice(0,10);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function getTaches(collab, opts) {
   if (!DB.taches) DB.taches = [];
   // Par défaut, exclure les tâches admin-only des vues collab
@@ -10359,6 +10395,13 @@ PAGES['collab-taches'] = function(mc) {
               </select>
             </div>
           </div>
+          <div style="margin-bottom:20px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">🔁 Périodicité</label>
+            <select id="tm-periodicite" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+              ${PERIODICITES.map(function(p){ return '<option value="'+p.val+'">'+p.label+'</option>'; }).join('')}
+            </select>
+            <div style="font-size:.73rem;color:#9ca3af;margin-top:4px;">Si une échéance est fixée, la tâche se replanifie automatiquement à l'issue.</div>
+          </div>
           <div style="display:flex;gap:10px;justify-content:flex-end;">
             <button onclick="closeTacheModal()" style="background:white;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 18px;font-size:.88rem;cursor:pointer;">Annuler</button>
             <button onclick="submitTache()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:.88rem;cursor:pointer;">Enregistrer</button>
@@ -10517,6 +10560,7 @@ function renderMesTaches(filtre) {
           +'<span style="font-size:.72rem;background:'+pc+'18;color:'+pc+';padding:2px 8px;border-radius:99px;font-weight:600;">'+tachePrioriteLabel(t.priorite)+'</span>'
           +'<span style="font-size:.72rem;background:'+sc+'18;color:'+sc+';padding:2px 8px;border-radius:99px;">'+t.statut+'</span>'
           +echeanceLabel
+          +(t.periodicite?'<span style="font-size:.7rem;background:'+periodiciteColor(t.periodicite)+'18;color:'+periodiciteColor(t.periodicite)+';padding:2px 8px;border-radius:99px;font-weight:600;">'+periodiciteLabel(t.periodicite)+'</span>':'')
         +'</div>'
       +'</div>'
       +'<div style="display:flex;gap:5px;flex-shrink:0;">'
@@ -10539,16 +10583,18 @@ function openTacheModal(id) {
     document.getElementById('tm-desc').value     = t.description||'';
     document.getElementById('tm-echeance').value = t.echeance||'';
     document.getElementById('tm-priorite').value = t.priorite||'normale';
-    document.getElementById('tm-statut').value   = t.statut||'À faire';
+    document.getElementById('tm-statut').value      = t.statut||'À faire';
+    document.getElementById('tm-periodicite').value = t.periodicite||'';
     if (document.getElementById('tm-collab')) document.getElementById('tm-collab').value = t.collab||currentUser.name;
     document.getElementById('tache-modal-title').textContent = 'Modifier la tâche';
   } else {
-    document.getElementById('tm-id').value       = '';
-    document.getElementById('tm-titre').value    = '';
-    document.getElementById('tm-desc').value     = '';
-    document.getElementById('tm-echeance').value = '';
-    document.getElementById('tm-priorite').value = 'normale';
-    document.getElementById('tm-statut').value   = 'À faire';
+    document.getElementById('tm-id').value          = '';
+    document.getElementById('tm-titre').value        = '';
+    document.getElementById('tm-desc').value         = '';
+    document.getElementById('tm-echeance').value     = '';
+    document.getElementById('tm-priorite').value     = 'normale';
+    document.getElementById('tm-statut').value       = 'À faire';
+    document.getElementById('tm-periodicite').value  = '';
     if (document.getElementById('tm-collab')) document.getElementById('tm-collab').value = currentUser.name;
     document.getElementById('tache-modal-title').textContent = 'Nouvelle tâche';
   }
@@ -10574,7 +10620,8 @@ function submitTache() {
     description: (document.getElementById('tm-desc').value||'').trim(),
     echeance:    document.getElementById('tm-echeance').value || null,
     priorite:    document.getElementById('tm-priorite').value || 'normale',
-    statut:      document.getElementById('tm-statut').value   || 'À faire',
+    statut:      document.getElementById('tm-statut').value      || 'À faire',
+    periodicite: document.getElementById('tm-periodicite').value || '',
     createdAt:   existing ? existing.createdAt || Date.now() : Date.now(),
     createdBy:   existing ? existing.createdBy || currentUser.name : currentUser.name,
     transferePar: existing && existing.collab !== assignee ? currentUser.name : (existing ? existing.transferePar || null : null),
@@ -10588,10 +10635,29 @@ function submitTache() {
 function toggleTacheTermine(id) {
   var t = (DB.taches||[]).find(function(x){ return x.id===id; });
   if (!t) return;
-  t.statut = (t.statut==='Terminé') ? 'À faire' : 'Terminé';
-  if (t.statut==='Terminé') t.completedAt = Date.now();
+  var wasTermine = t.statut === 'Terminé';
+  t.statut = wasTermine ? 'À faire' : 'Terminé';
+  if (!wasTermine) {
+    t.completedAt = Date.now();
+    // Replanification automatique si périodique
+    if (t.periodicite) {
+      var nextDate = getNextRecurrenceDate(t.echeance, t.periodicite);
+      saveTache(t); // save as done first
+      var newTask = JSON.parse(JSON.stringify(t));
+      newTask.id       = String(Date.now());
+      newTask.statut   = 'À faire';
+      newTask.echeance = nextDate;
+      newTask.completedAt = null;
+      saveTache(newTask);
+      toast('✅ Terminée · Prochaine occurrence : ' + (nextDate ? new Date(nextDate).toLocaleDateString('fr-FR') : '—'), 'success', 4000);
+      renderMesTaches();
+      renderMesRemontees && renderMesRemontees();
+      return;
+    }
+  }
   saveTache(t);
   renderMesTaches();
+  if (typeof renderMesRemontees === 'function') renderMesRemontees();
 }
 
 function confirmDeleteTache(id) {
@@ -10719,6 +10785,13 @@ PAGES['admin-taches'] = function(mc) {
               </select>
             </div>
           </div>
+          <div style="margin-bottom:20px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">🔁 Périodicité</label>
+            <select id="atm-periodicite" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.85rem;">
+              ${PERIODICITES.map(function(p){ return '<option value="'+p.val+'">'+p.label+'</option>'; }).join('')}
+            </select>
+            <div style="font-size:.73rem;color:#9ca3af;margin-top:4px;">La tâche se replanifie automatiquement à chaque validation.</div>
+          </div>
           <div style="display:flex;gap:10px;justify-content:flex-end;">
             <button onclick="closeAdminTacheModal()" style="background:white;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 18px;font-size:.88rem;cursor:pointer;">Annuler</button>
             <button onclick="submitAdminTache()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:.88rem;cursor:pointer;">Enregistrer</button>
@@ -10744,15 +10817,17 @@ function openAdminTacheModal(id) {
     document.getElementById('atm-desc').value     = t.description||'';
     document.getElementById('atm-echeance').value = t.echeance||'';
     document.getElementById('atm-priorite').value = t.priorite||'normale';
-    document.getElementById('atm-statut').value   = t.statut||'À faire';
+    document.getElementById('atm-statut').value      = t.statut||'À faire';
+    document.getElementById('atm-periodicite').value = t.periodicite||'';
     document.getElementById('atm-title').textContent = '🔒 Modifier la tâche';
   } else {
-    document.getElementById('atm-id').value       = '';
-    document.getElementById('atm-titre').value    = '';
-    document.getElementById('atm-desc').value     = '';
-    document.getElementById('atm-echeance').value = '';
-    document.getElementById('atm-priorite').value = 'normale';
-    document.getElementById('atm-statut').value   = 'À faire';
+    document.getElementById('atm-id').value          = '';
+    document.getElementById('atm-titre').value        = '';
+    document.getElementById('atm-desc').value         = '';
+    document.getElementById('atm-echeance').value     = '';
+    document.getElementById('atm-priorite').value     = 'normale';
+    document.getElementById('atm-statut').value       = 'À faire';
+    document.getElementById('atm-periodicite').value  = '';
     document.getElementById('atm-title').textContent = '🔒 Nouvelle tâche privée';
   }
   modal.style.display = 'flex';
@@ -10775,7 +10850,8 @@ function submitAdminTache() {
     description: (document.getElementById('atm-desc').value||'').trim(),
     echeance:    document.getElementById('atm-echeance').value || null,
     priorite:    document.getElementById('atm-priorite').value || 'normale',
-    statut:      document.getElementById('atm-statut').value   || 'À faire',
+    statut:      document.getElementById('atm-statut').value      || 'À faire',
+    periodicite: document.getElementById('atm-periodicite').value || '',
     createdAt:   existing ? existing.createdAt || Date.now() : Date.now(),
     createdBy:   'admin',
   };
@@ -10816,6 +10892,7 @@ function renderAdminPrivate() {
           +'<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">'
             +'<span style="font-size:.72rem;background:'+pc+'18;color:'+pc+';padding:2px 7px;border-radius:99px;font-weight:600;">'+tachePrioriteLabel(t.priorite)+'</span>'
             +'<span style="font-size:.72rem;background:'+sc+'18;color:'+sc+';padding:2px 7px;border-radius:99px;">'+t.statut+'</span>'
+            +(t.periodicite?'<span style="font-size:.7rem;background:'+periodiciteColor(t.periodicite)+'18;color:'+periodiciteColor(t.periodicite)+';padding:2px 7px;border-radius:99px;font-weight:600;">'+periodiciteLabel(t.periodicite)+'</span>':'')
             +flag
             +'<button onclick="openAdminTacheModal(\''+t.id+'\')" style="background:#f1f5f9;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">✏️</button>'
             +'<button onclick="deleteAdminTache(\''+t.id+'\')" style="background:#fef2f2;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">🗑</button>'
@@ -10828,8 +10905,24 @@ function renderAdminPrivate() {
 function toggleAdminTacheTermine(id) {
   var t=(DB.taches||[]).find(function(x){return x.id===id;});
   if(!t) return;
-  t.statut=(t.statut==='Terminé')?'À faire':'Terminé';
-  if(t.statut==='Terminé') t.completedAt=Date.now();
+  var wasTermine = t.statut==='Terminé';
+  t.statut = wasTermine ? 'À faire' : 'Terminé';
+  if (!wasTermine) {
+    t.completedAt = Date.now();
+    if (t.periodicite) {
+      var nextDate = getNextRecurrenceDate(t.echeance, t.periodicite);
+      saveTache(t);
+      var newTask = JSON.parse(JSON.stringify(t));
+      newTask.id       = String(Date.now());
+      newTask.statut   = 'À faire';
+      newTask.echeance = nextDate;
+      newTask.completedAt = null;
+      saveTache(newTask);
+      toast('✅ Terminée · Prochaine occurrence : '+(nextDate?new Date(nextDate).toLocaleDateString('fr-FR'):'—'),'success',4000);
+      renderAdminPrivate();
+      return;
+    }
+  }
   saveTache(t);
   renderAdminPrivate();
 }
