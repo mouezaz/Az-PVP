@@ -777,6 +777,12 @@ function buildProduitOptions(sel) {
 const MOTIFS = ['Loi Hamon','Infra Annuel','Contentieux','Autre','Vente'];
 const MOIS_LABELS = ['','Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
 const MOIS_FULL = ['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const PROD_ICON = {
+  'Auto':'🚗','MRH':'🏠','Santé':'💊','NOP':'🏢','GAV':'🛡️',
+  'PER':'🏦','Emprunteur':'🔑','PJ Pro':'⚖️','PJ Part':'⚖️',
+  'Assurance-vie':'🌿','Actif':'🔧','Profil Pro':'💼',
+  'Allianz Immeuble':'🏛️','Assur Immeuble':'🏛️'
+};
 const OBJ = { AN: 25, NOP: 4, GAV: 2, Sante: 2, PJ: 5 };
 
 // ============================================================
@@ -1002,9 +1008,7 @@ function buildCollabSidebar() {
   const commercial = [
     { id: 'collab-home',        icon: '🏠', label: "Accueil — Aujourd'hui" },
     { id: 'collab-suivi',       icon: '🎯', label: 'Mes objectifs' },
-    { id: 'collab-decouverte',  icon: '🔍', label: 'Découverte client' },
-    { id: 'collab-prospection', icon: '📋', label: 'Devis & Relances' },
-    { id: 'collab-leads',       icon: '📞', label: 'Suivi leads' },
+    { id: 'collab-leads',       icon: '📞', label: 'Leads & Relances' },
     { id: 'collab-taches',      icon: '✅',  label: 'Mes tâches' },
     { id: 'collab-saisir',      icon: '✚',  label: 'Saisir une vente' },
     { id: 'collab-ventes',      icon: '📂', label: 'Mes affaires' },
@@ -1114,7 +1118,17 @@ function showPage(id) {
   const mc = document.getElementById('main-content');
   mc.innerHTML = '';
   const fn = PAGES[id];
-  if (fn) fn(mc);
+  if (fn) {
+    try { fn(mc); }
+    catch(e) {
+      console.error('showPage ['+id+']:', e);
+      mc.innerHTML = '<div style="padding:24px;color:#dc2626;background:#fef2f2;border-radius:10px;margin:20px;">'
+        +'<div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">⚠️ Erreur de chargement</div>'
+        +'<div style="font-size:.85rem;font-family:monospace;white-space:pre-wrap;">'+(e.message||String(e))+'</div>'
+        +'<button onclick="showPage(\''+id+'\')" style="margin-top:12px;background:#dc2626;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:600;">↺ Réessayer</button>'
+        +'</div>';
+    }
+  }
   else mc.innerHTML = '<p class="muted">Page en cours de développement.</p>';
 }
 
@@ -1682,6 +1696,7 @@ function saveResil() {
   if (!produit||!client) { toast('Produit et client requis', 'error'); return; }
   DB.resiliations.push({
     id: uid(), mois: nowMois(), annee: nowAnnee(),
+    collab: currentUser ? currentUser.name : '',
     produit, client,
     contrat: document.getElementById('r-contrat').value.trim(),
     motif: document.getElementById('r-motif').value,
@@ -1698,25 +1713,148 @@ function saveResil() {
 }
 
 function renderResilList(zoneId, mois, annee) {
-  const zone = document.getElementById(zoneId);
+  var zone = document.getElementById(zoneId);
   if (!zone) return;
-  const list = DB.resiliations.filter(r => r.mois===mois && r.annee===annee);
-  if (!list.length) { zone.innerHTML = `<p class="muted">Aucune résiliation pour ${MOIS_FULL[mois]} ${annee}.</p>`; return; }
-  const total = list.reduce((s,r)=>s+(parseFloat(r.prime)||0),0);
-  zone.innerHTML = `<table class="data-table">
-    <thead><tr><th>Produit</th><th>Client</th><th>Contrat</th><th>Motif</th><th>Prime</th><th>Action</th></tr></thead>
-    <tbody>${list.map(r=>`<tr>
-      <td><span class="pill pill-orange">${r.produit}</span></td>
-      <td class="fw600">${r.client}</td>
-      <td class="muted">${r.contrat||'—'}</td>
-      <td>${r.motif||'—'}</td>
-      <td class="fw600" style="color:var(--red)">${fmtEuro(r.prime)}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="deleteResil('${r.id}','collab-resil-list',${mois},${annee})">✕</button></td>
-    </tr>`).join('')}</tbody>
-  </table>
-  <div style="text-align:right;padding:10px 12px;font-size:13px;font-weight:600;color:var(--red);border-top:1px solid var(--gray-100)">
-    Prime résiliée : ${fmtEuro(total)}
-  </div>`;
+  var allList = (DB.resiliations||[]).filter(function(r){ return r.mois===mois && r.annee===annee; })
+    .slice().sort(function(a,b){ return (b.createdAt||'')>(a.createdAt||'')?1:-1; });
+
+  // Lire filtres actifs
+  var fProd   = (document.getElementById('rf-produit-'+zoneId)||{}).value||'';
+  var fMotif  = (document.getElementById('rf-motif-'+zoneId)||{}).value||'';
+  var fCollab = (document.getElementById('rf-collab-'+zoneId)||{}).value||'';
+  var fSearch = ((document.getElementById('rf-search-'+zoneId)||{}).value||'').toLowerCase();
+
+  var list = allList.filter(function(r){
+    if (fProd   && r.produit!==fProd)   return false;
+    if (fMotif  && r.motif!==fMotif)    return false;
+    if (fCollab && (r.collab||'')!==fCollab) return false;
+    if (fSearch && !(r.client||'').toLowerCase().includes(fSearch) && !(r.contrat||'').toLowerCase().includes(fSearch)) return false;
+    return true;
+  });
+
+  // KPI calculs
+  var totalPrime = list.reduce(function(s,r){ return s+(parseFloat(r.prime)||0); },0);
+  var totalCommAgence = list.reduce(function(s,r){
+    var rate = COMM_RATES[r.produit];
+    if (!rate) return s;
+    if (rate.type==='forfait') return s+rate.val;
+    return s + (parseFloat(r.prime)||0)*rate.val;
+  },0);
+  var byProdStat = {}, byMotifStat = {};
+  list.forEach(function(r){
+    byProdStat[r.produit]=(byProdStat[r.produit]||0)+1;
+    if(r.motif) byMotifStat[r.motif]=(byMotifStat[r.motif]||0)+1;
+  });
+
+  var prodOpts   = [...new Set(allList.map(function(r){return r.produit;}))].filter(Boolean);
+  var motifOpts  = [...new Set(allList.map(function(r){return r.motif;}))].filter(Boolean);
+  var collabOpts = [...new Set(allList.map(function(r){return r.collab||'';}))].filter(Boolean);
+
+  var html = '';
+
+  // ── FILTRES ──────────────────────────────────────────────────────────────
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:12px 16px;background:#f8fafc;border-bottom:1px solid #e5e7eb;">';
+  html += '<div><label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px;">Produit</label>'
+    +'<select id="rf-produit-'+zoneId+'" onchange="renderResilList(\''+zoneId+'\','+mois+','+annee+')" style="font-size:.82rem;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;">'
+    +'<option value="">Tous</option>'
+    +prodOpts.map(function(p){ return '<option value="'+p+'"'+(fProd===p?' selected':'')+'>'+p+'</option>'; }).join('')
+    +'</select></div>';
+  html += '<div><label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px;">Motif</label>'
+    +'<select id="rf-motif-'+zoneId+'" onchange="renderResilList(\''+zoneId+'\','+mois+','+annee+')" style="font-size:.82rem;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;">'
+    +'<option value="">Tous</option>'
+    +motifOpts.map(function(m){ return '<option value="'+m+'"'+(fMotif===m?' selected':'')+'>'+m+'</option>'; }).join('')
+    +'</select></div>';
+  if (collabOpts.length>0) {
+    html += '<div><label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px;">Collaborateur</label>'
+      +'<select id="rf-collab-'+zoneId+'" onchange="renderResilList(\''+zoneId+'\','+mois+','+annee+')" style="font-size:.82rem;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;">'
+      +'<option value="">Tous</option>'
+      +collabOpts.map(function(c){ return '<option value="'+c+'"'+(fCollab===c?' selected':'')+'>'+c+'</option>'; }).join('')
+      +'</select></div>';
+  }
+  html += '<div style="flex:1;min-width:160px;"><label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px;">Recherche client / contrat</label>'
+    +'<input id="rf-search-'+zoneId+'" type="text" value="'+fSearch+'" placeholder="Nom ou n° contrat…" oninput="renderResilList(\''+zoneId+'\','+mois+','+annee+')" style="width:100%;font-size:.82rem;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;"></div>';
+  html += '</div>';
+
+  // ── BANDEAU KPI FINANCIER ─────────────────────────────────────────────────
+  html += '<div style="background:linear-gradient(135deg,#fff5f5,#fef2f2);border-bottom:2px solid #fca5a5;padding:14px 16px;">'
+    +'<div style="font-size:.72rem;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📉 Impact financier — '+list.length+' résiliation'+(list.length!==1?'s':'')+' sélectionnée'+(list.length!==1?'s':'')+' / '+allList.length+' ce mois</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:12px;">'
+
+    // Prime perdue
+    +'<div style="background:#fff;border:2px solid #fca5a5;border-radius:10px;padding:12px 18px;text-align:center;min-width:140px;">'
+    +'<div style="font-size:.68rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">💸 Prime résiliée</div>'
+    +'<div style="font-size:1.5rem;font-weight:900;color:#dc2626;">'+fmtEuro(totalPrime)+'</div>'
+    +'<div style="font-size:.7rem;color:#9ca3af;margin-top:2px;">prime annuelle perdue</div></div>'
+
+    // Commission agence perdue
+    +'<div style="background:#fff;border:2px solid #fb923c;border-radius:10px;padding:12px 18px;text-align:center;min-width:160px;">'
+    +'<div style="font-size:.68rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">🏦 Commission agence perdue</div>'
+    +'<div style="font-size:1.5rem;font-weight:900;color:#ea580c;">'+fmtEuro(totalCommAgence)+'</div>'
+    +'<div style="font-size:.7rem;color:#9ca3af;margin-top:2px;">selon taux agence par produit</div></div>'
+
+    // Par produit
+    +Object.keys(byProdStat).map(function(p){
+      var rate = COMM_RATES[p]; var taux = rate ? (rate.type==='forfait'?rate.val+'€ forfait':Math.round(rate.val*100)+'%') : '—';
+      return '<div style="background:#fff;border:1px solid #fed7aa;border-radius:10px;padding:10px 14px;text-align:center;">'
+        +'<div style="font-size:1rem;">'+(PROD_ICON[p]||'📄')+'</div>'
+        +'<div style="font-size:1.1rem;font-weight:800;color:#c2410c;">'+byProdStat[p]+'</div>'
+        +'<div style="font-size:.7rem;color:#92400e;font-weight:600;">'+p+'</div>'
+        +'<div style="font-size:.65rem;color:#9ca3af;">taux '+taux+'</div></div>';
+    }).join('')
+    +'</div></div>';
+
+  // Top motifs
+  if (Object.keys(byMotifStat).length>0) {
+    html += '<div style="padding:8px 16px;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:.8rem;color:#6b7280;display:flex;align-items:center;flex-wrap:wrap;gap:6px;">'
+      +'<span style="font-weight:700;color:#92400e;">⚠️ Motifs de résiliation : </span>'
+      +Object.keys(byMotifStat).sort(function(a,b){return byMotifStat[b]-byMotifStat[a];}).map(function(m){
+        return '<span style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:2px 10px;font-weight:600;color:#78350f;">'+m+' × '+byMotifStat[m]+'</span>';
+      }).join('')+'</div>';
+  }
+
+  if (!list.length) {
+    html += '<div style="padding:32px;text-align:center;color:#6b7280;font-size:.9rem;"><div style="font-size:2rem;margin-bottom:8px;">✅</div>Aucune résiliation pour ces critères.</div>';
+    zone.innerHTML = html; return;
+  }
+
+  // ── TABLEAU ───────────────────────────────────────────────────────────────
+  html += '<div style="overflow-x:auto;">'
+    +'<table class="data-table"><thead><tr>'
+    +'<th>Date</th><th>Produit</th><th>Client</th><th>Contrat</th><th>Motif</th>'
+    +'<th style="color:#dc2626;">💸 Prime</th>'
+    +'<th style="color:#ea580c;">🏦 Comm. agence</th>'
+    +(collabOpts.length>0?'<th>Saisi par</th>':'')
+    +'<th></th>'
+    +'</tr></thead><tbody>'
+    +list.map(function(r){
+      var d = r.createdAt ? new Date(r.createdAt).toLocaleDateString('fr-FR') : (r.mois?r.mois+'/'+r.annee:'—');
+      var prime = parseFloat(r.prime)||0;
+      var rate = COMM_RATES[r.produit];
+      var commAgence = 0;
+      if (rate) { commAgence = rate.type==='forfait' ? rate.val : prime*rate.val; }
+      var tauxLabel = rate ? (rate.type==='forfait'?rate.val+'€':'('+Math.round(rate.val*100)+'%)') : '';
+      return '<tr>'
+        +'<td class="muted" style="white-space:nowrap;font-size:.82rem;">'+d+'</td>'
+        +'<td><span class="pill pill-orange">'+r.produit+'</span></td>'
+        +'<td class="fw600" style="font-size:.88rem;">'+r.client+'</td>'
+        +'<td class="muted" style="font-size:.8rem;">'+(r.contrat||'—')+'</td>'
+        +'<td style="font-size:.82rem;">'+(r.motif||'—')+'</td>'
+        +'<td style="text-align:right;font-weight:800;color:#dc2626;white-space:nowrap;">'+fmtEuro(prime)+'</td>'
+        +'<td style="text-align:right;white-space:nowrap;">'
+          +'<span style="font-weight:700;color:#ea580c;">'+fmtEuro(commAgence)+'</span>'
+          +(tauxLabel?'<span style="font-size:.68rem;color:#9ca3af;margin-left:4px;">'+tauxLabel+'</span>':'')
+        +'</td>'
+        +(collabOpts.length>0?'<td style="font-size:.78rem;color:#6b7280;">'+(r.collab||'—')+'</td>':'')
+        +'<td><button class="btn btn-ghost btn-sm" onclick="deleteResil(\''+r.id+'\',\''+zoneId+'\','+mois+','+annee+')">✕</button></td>'
+        +'</tr>';
+    }).join('')
+    +'</tbody></table></div>'
+    +'<div style="display:flex;justify-content:flex-end;gap:24px;padding:10px 16px;font-size:.85rem;font-weight:700;background:#fef2f2;border-top:2px solid #fca5a5;">'
+    +'<span style="color:#dc2626;">💸 Total prime : '+fmtEuro(totalPrime)+'</span>'
+    +'<span style="color:#ea580c;">🏦 Comm. agence : '+fmtEuro(totalCommAgence)+'</span>'
+    +'</div>';
+
+  zone.innerHTML = html;
 }
 
 function deleteResil(id, zoneId, mois, annee) {
@@ -1741,8 +1879,21 @@ const LEAD_STATUT_PILLS = {
 PAGES['collab-leads'] = (mc) => {
   mc.innerHTML = `
     <div class="page-header flex-between">
-      <div><h1>Mes leads</h1><p>Vos contacts et opportunités personnelles</p></div>
+      <div><h1>📞 Leads & Relances</h1><p>Vos contacts, devis et découvertes</p></div>
       <button class="btn btn-primary" onclick="openAddLead()">✚ Nouveau lead</button>
+    </div>
+
+    <!-- Onglets de navigation prospection -->
+    <div style="display:flex;gap:8px;margin-bottom:18px;border-bottom:2px solid #e5e7eb;padding-bottom:0;">
+      <button onclick="" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px 8px 0 0;padding:9px 18px;font-size:.88rem;font-weight:700;cursor:default;margin-bottom:-2px;border-bottom:2px solid #1d4ed8;">
+        📞 Leads
+      </button>
+      <button onclick="showPage('collab-prospection')" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px 8px 0 0;padding:9px 18px;font-size:.88rem;font-weight:600;cursor:pointer;margin-bottom:-2px;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+        📋 Devis & Relances
+      </button>
+      <button onclick="showPage('collab-decouverte')" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px 8px 0 0;padding:9px 18px;font-size:.88rem;font-weight:600;cursor:pointer;margin-bottom:-2px;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+        🔍 Découverte client
+      </button>
     </div>
 
     <!-- KPIs leads -->
@@ -1855,10 +2006,27 @@ function renderLeadsTable() {
   }
 
   const COLLAB_COLORS_MAP = getCollabColors();
+  // Pipeline stages for ascenseur indicator
+  const PIPELINE_STAGES = ['À contacter','Contacté — en attente','Devis envoyé','Contrat signé'];
+  function leadPipelineHTML(statut) {
+    if (statut === 'Sans suite') return '<span style="font-size:.7rem;color:#9ca3af;font-style:italic;">Sans suite</span>';
+    const idx = PIPELINE_STAGES.indexOf(statut);
+    const colors = ['#f97316','#3b82f6','#8b5cf6','#22c55e'];
+    const labels = ['📞','✉️','📋','✅'];
+    return '<div style="display:flex;align-items:center;gap:2px;margin-top:3px;">'
+      + PIPELINE_STAGES.map((s, i) => {
+          const active = i === idx;
+          const done = i < idx;
+          const col = done||active ? colors[i] : '#e5e7eb';
+          return `<div title="${s}" style="width:${active?'24px':'14px'};height:14px;border-radius:7px;background:${col};display:flex;align-items:center;justify-content:center;font-size:${active?'8px':'0'};color:#fff;transition:all .2s;flex-shrink:0;">${active?labels[i]:''}</div>`;
+        }).join('<div style="width:6px;height:2px;background:#e5e7eb;flex-shrink:0;"></div>')
+      + '</div>';
+  }
+
   zone.innerHTML = `<table class="data-table">
     <thead><tr>
       <th>Contact</th><th>Téléphone</th><th>Collaborateur</th><th>Produit visé</th>
-      <th>Statut</th><th>Priorité</th><th>Prochain rappel</th>
+      <th>Progression</th><th>Priorité</th><th>Prochain rappel</th>
       <th>Origine</th><th>Actions</th>
     </tr></thead>
     <tbody>${leads.map(l => {
@@ -1872,7 +2040,7 @@ function renderLeadsTable() {
         <td class="muted" style="font-family:'DM Mono',monospace;font-size:12px">${l.telephone||'—'}</td>
         <td><span style="display:inline-flex;align-items:center;gap:4px;background:${collabColor}18;border:1px solid ${collabColor}40;border-radius:99px;padding:2px 8px;font-size:11px;font-weight:600;color:${collabColor}"><span style="width:14px;height:14px;border-radius:50%;background:${collabColor};color:white;font-size:8px;display:inline-flex;align-items:center;justify-content:center">${(l.collab||'?').slice(0,1)}</span>${l.collab||'—'}</span></td>
         <td>${l.produit?`<span class="pill pill-blue">${l.produit}</span>`:'—'}</td>
-        <td><span class="pill ${pillCls}">${l.statut}</span></td>
+        <td><span class="pill ${pillCls}" style="font-size:.7rem;">${l.statut}</span>${leadPipelineHTML(l.statut)}</td>
         <td>${l.priorite||'—'}</td>
         <td ${rappelCls}>${l.rappel ? new Date(l.rappel).toLocaleDateString('fr-FR') : '—'}</td>
         <td class="muted" style="font-size:12px">${l.origine||'—'}</td>
@@ -2486,595 +2654,217 @@ function deleteLead(id) {
 }
 
 
+
 // ---- PAGE: ACCUEIL COLLABORATEUR (home) ----
-PAGES['collab-home'] = (mc) => {
-  const mois = nowMois(), annee = nowAnnee();
-  const today = new Date().toISOString().slice(0,10);
-  const collab = currentUser.name;
+PAGES['collab-home'] = function(mc) {
+  try {
+    var mois = nowMois(), annee = nowAnnee();
+    var today = new Date().toISOString().slice(0,10);
+    var collab = currentUser ? currentUser.name : '';
 
-  // --- Relances du jour ---
-  const relances = (DB.prospects||[]).filter(p => {
-    if (p.collab !== collab) return false;
-    if (p.statut === 'Signé') return false;
-    if (!p.rappel) return false;
-    return p.rappel <= today;
-  }).sort((a,b) => (a.rappel||'') > (b.rappel||'') ? 1 : -1);
+    var ventesM = (DB.ventes||[]).filter(function(v){
+      return v.collab===collab && v.mois===mois && v.annee===annee && v.affaireNouvelle==='Oui';
+    });
+    var nbVentes = ventesM.length;
+    var commTotal = 0; try { commTotal = calcCommissionCollabMensuel(collab, mois, annee); } catch(e){}
+    var primeTotal = ventesM.reduce(function(s,v){ return s+(parseFloat(v.prime)||0); },0);
+    var byProd = {}; ventesM.forEach(function(v){ byProd[v.produit]=(byProd[v.produit]||0)+1; });
 
-  // --- Succès du mois ---
-  // Support both date-based entries (imported) and mois/annee-based (manually entered)
-  const ventesM = (DB.ventes||[]).filter(v => {
-    if (v.collab !== collab) return false;
-    // Prefer mois/annee fields (manual entries use these)
-    if (v.mois !== undefined && v.annee !== undefined) {
-      return v.mois === mois && v.annee === annee;
+    var objStatus = {nopOK:false,autoOK:false,mrhOK:false,nbNOP:0,nbAuto:0,nbMRH:0};
+    try { objStatus = getObjectifsStatus(collab, mois, annee); } catch(e){}
+
+    var relances = (DB.prospects||[]).filter(function(p){
+      return p.collab===collab && p.statut!=='Signé' && p.rappel && p.rappel<=today;
+    }).sort(function(a,b){ return (a.rappel||'')>(b.rappel||'')?1:-1; });
+
+    var myLeads = (DB.leads||[]).filter(function(l){
+      return l.collab===collab && ['À contacter','Contacté — en attente'].includes(l.statut);
+    });
+    var myDevis = (DB.devis||[]).filter(function(d){
+      return d.collab===collab && !['Gagné','Perdu','Abandonné'].includes(d.statut);
+    });
+    var mesTaches = (DB.taches||[]).filter(function(t){
+      return t.collab===collab && !t.adminOnly && t.statut!=='Terminé';
+    }).sort(function(a,b){
+      return (a.echeance?new Date(a.echeance):new Date('9999'))-(b.echeance?new Date(b.echeance):new Date('9999'));
+    });
+    var tachesRetard = mesTaches.filter(function(t){
+      if(!t.echeance) return false;
+      var d=new Date(t.echeance); d.setHours(0,0,0,0);
+      return d < new Date(new Date().setHours(0,0,0,0));
+    });
+
+    var h = new Date().getHours();
+    var greeting = h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir';
+    var quotes = ['Chaque appel est une nouvelle chance ! 💪',"Un prospect aujourd'hui, un client demain. 🌟",'La régularité fait la réussite. 🏆','Votre énergie fait la différence ! ✨','Ensemble, on va plus loin. 🚀'];
+    var quote = quotes[new Date().getDay()%quotes.length];
+
+    var challengeHTML = ''; try { challengeHTML = buildChallengeWidget(collab)||''; } catch(e){}
+
+    var html = '<div style="max-width:860px;margin:0 auto;padding:20px;font-family:var(--font);">';
+
+    // Challenge
+    if (challengeHTML) html += challengeHTML;
+
+    // URGENCES
+    var urg = [];
+    if (relances.length>0) urg.push('<button onclick="showPage(\'collab-leads\')" style="background:#ef4444;color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:.8rem;font-weight:700;cursor:pointer;">⚠️ '+relances.length+' relance'+(relances.length>1?'s':'')+' en retard</button>');
+    if (tachesRetard.length>0) urg.push('<button onclick="showPage(\'collab-taches\')" style="background:#f59e0b;color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:.8rem;font-weight:700;cursor:pointer;">⏰ '+tachesRetard.length+' tâche'+(tachesRetard.length>1?'s':'')+' en retard</button>');
+    if (urg.length>0) html += '<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><span style="font-size:1.1rem;">🚨</span><div style="display:flex;gap:8px;flex-wrap:wrap;">'+urg.join('')+'</div></div>';
+
+    // BANNIÈRE
+    html += '<div style="background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:16px;padding:20px 24px;color:#fff;margin-bottom:20px;display:flex;align-items:center;gap:16px;">'
+      +'<div style="font-size:2.2rem;">👋</div>'
+      +'<div style="flex:1;"><div style="font-size:1.2rem;font-weight:700;">'+greeting+', '+collab+' !</div><div style="opacity:.8;margin-top:3px;font-size:.88rem;">'+quote+'</div></div>'
+      +'<div style="text-align:right;"><div style="font-size:.7rem;opacity:.7;text-transform:uppercase;letter-spacing:.08em;">'+MOIS_FULL[mois]+' '+annee+'</div>'
+      +'<div style="font-size:1.8rem;font-weight:800;">'+nbVentes+' <span style="font-size:.9rem;opacity:.8;">affaires</span></div>'
+      +'<div style="font-size:.8rem;opacity:.75;">'+fmtEuro(commTotal)+' commissions</div></div></div>';
+
+    // OBJECTIFS
+    var nopOK=objStatus.nopOK,autoOK=objStatus.autoOK,mrhOK=objStatus.mrhOK,allOK=nopOK&&autoOK&&mrhOK;
+    function bar(nb,target,label,icon,unlocked){
+      var pct=Math.min(Math.round((nb/target)*100),100),ok=nb>=target;
+      var c=ok?'#22c55e':(unlocked===false?'#fca5a5':'#93c5fd');
+      var tc=ok?'#15803d':(unlocked===false?'#dc2626':'#64748b');
+      return '<div style="flex:1;min-width:80px;">'
+        +'<div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:.7rem;font-weight:700;color:'+tc+';">'+icon+' '+label+'<span style="color:#374151;">'+nb+'/'+target+'</span></div>'
+        +'<div style="background:#e5e7eb;border-radius:99px;height:6px;"><div style="height:100%;width:'+pct+'%;border-radius:99px;background:'+c+';"></div></div></div>';
     }
-    // Fallback for entries with date field
-    const d = new Date(v.date||'');
-    return !isNaN(d) && d.getMonth() === mois - 1 && d.getFullYear() === annee;
-  });
-  const nbVentes = ventesM.length;
-  const primeTotal = ventesM.reduce((s,v)=>s+(parseFloat(v.prime)||0),0);
-  // Commission effective : tout ou rien selon objectifs (Auto≥10, MRH≥8, NOP≥4)
-  const objStatus = getObjectifsStatus(collab, mois, annee);
-  const commTotal = calcCommissionCollabMensuel(collab, mois, annee);
+    html += '<div style="background:'+(allOK?'linear-gradient(135deg,#064e3b,#059669)':'#fff')+';border-radius:12px;padding:14px 16px;margin-bottom:18px;border:1.5px solid '+(allOK?'transparent':'#e2e8f0')+';box-shadow:0 1px 3px rgba(0,0,0,.06);">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+      +'<div style="font-weight:700;font-size:.9rem;color:'+(allOK?'#fff':'#0f172a')+';">🎯 Objectifs — '+MOIS_FULL[mois]+' '+annee+'</div>'
+      +(allOK?'<span style="background:rgba(255,255,255,.2);color:#fff;font-size:.72rem;font-weight:700;padding:2px 10px;border-radius:20px;">✅ Commissions OK</span>'
+        :!nopOK?'<span style="background:#fee2e2;color:#991b1b;font-size:.72rem;font-weight:700;padding:2px 10px;border-radius:20px;">⚠️ NOP insuffisant</span>'
+        :'<span style="background:#fef9c3;color:#92400e;font-size:.72rem;font-weight:700;padding:2px 10px;border-radius:20px;">En cours…</span>')
+      +'</div><div style="display:flex;gap:12px;flex-wrap:wrap;">'
+      +bar(objStatus.nbNOP,OBJECTIFS_COLLAB.nopMin,'NOP','🏢',true)
+      +bar(objStatus.nbAuto,OBJECTIFS_COLLAB.autoMin,'Auto','🚗',nopOK)
+      +bar(objStatus.nbMRH,OBJECTIFS_COLLAB.mrhMin,'MRH','🏠',nopOK)
+      +'</div></div>';
 
-  // Group by product for the wins grid
-  const byProd = {};
-  ventesM.forEach(v => { byProd[v.produit]=(byProd[v.produit]||0)+1; });
+    // ACTIONS RAPIDES
+    function tile(fn,bg,icon,title,sub){
+      return '<button onclick="'+fn+'" style="background:#fff;border:2px solid #e5e7eb;border-radius:14px;padding:16px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:border-color .15s,transform .12s;font-family:var(--font);" onmouseover="this.style.borderColor=\''+bg.split(',')[0].replace('linear-gradient(135deg,','').trim()+'\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'#e5e7eb\';this.style.transform=\'none\'">'
+        +'<div style="width:48px;height:48px;border-radius:12px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:1.5rem;">'+icon+'</div>'
+        +'<div style="text-align:center;"><div style="font-weight:700;font-size:.85rem;color:#1f2937;">'+title+'</div><div style="font-size:.72rem;color:#6b7280;margin-top:1px;">'+sub+'</div></div></button>';
+    }
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:20px;">'
+      +tile('openAddLead()','linear-gradient(135deg,#3b82f6,#1d4ed8)','📞','Nouveau lead','Saisir un prospect')
+      +tile('openAddDevis()','linear-gradient(135deg,#10b981,#059669)','📋','Nouveau devis','Créer un devis')
+      +tile("showPage('collab-suivi')",'linear-gradient(135deg,#f59e0b,#d97706)','📊','Mes stats','Objectifs du mois')
+      +tile("showPage('collab-saisir')",'linear-gradient(135deg,#0891b2,#0e7490)','✚','Vente','Saisir une vente')
+      +'</div>';
 
-  // Product icons
-  const PROD_ICON = {
-    // Particuliers IARD
-    'Auto':'🚗','MRH':'🏠','NOP':'🏢','GAV':'🛡️','PJ Part':'⚖️',
-    // Particuliers VIE
-    'Santé':'💊','Emprunteur':'🔑',
-    // Professionnels IARD
-    'Actif':'🔧','Décennale':'🏗️','Allianz Immeuble':'🏛️','Profil Pro':'💼','Flotte':'🚐','ASE':'🏭','PJ Pro':'⚖️',
-    // Professionnels VIE
-    'Collective Santé':'👥','Collective Prévoyance':'🩺','PERE':'📊','PEE':'💹','PERCO':'📈',
-    // Placements
-    'PER':'🏦','Assurance-vie':'🌿',
-    // legacy
-    'Assur Immeuble':'🏛️',
-  };
+    // 2 COL: Relances | Succès
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;">';
+    // Relances
+    html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:16px;">'
+      +'<div style="font-weight:700;font-size:.95rem;color:#1f2937;margin-bottom:12px;">📞 Relances du jour'
+      +(relances.length>0?' <span style="display:inline-block;background:#ef4444;color:#fff;border-radius:20px;font-size:.7rem;padding:1px 8px;margin-left:4px;">'+relances.length+'</span>':'')+'</div>';
+    if (relances.length===0) {
+      html += '<div style="text-align:center;padding:20px;color:#6b7280;font-size:.88rem;"><div style="font-size:1.8rem;margin-bottom:8px;">✅</div>Aucune relance aujourd\'hui</div>';
+    } else {
+      html += relances.slice(0,5).map(function(p){
+        var d=Math.floor((new Date(p.rappel)-new Date(today))/(1000*3600*24));
+        var col=d<0?'#ef4444':d===0?'#f97316':'#3b82f6';
+        var lbl=d<0?'Retard '+Math.abs(d)+'j':d===0?"Aujourd'hui":'Dans '+d+'j';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f1f5f9;">'
+          +'<div style="flex:1;font-size:.84rem;color:#1f2937;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(p.prenom||'')+' '+(p.nom||p.client||'Prospect')+'</div>'
+          +'<span style="font-size:.72rem;font-weight:700;color:'+col+';background:'+col+'18;padding:2px 7px;border-radius:20px;white-space:nowrap;">'+lbl+'</span></div>';
+      }).join('');
+      if (relances.length>5) html += '<div style="font-size:.75rem;color:#6b7280;text-align:center;padding:5px;">+'+(relances.length-5)+' autres</div>';
+    }
+    html += '<button onclick="showPage(\'collab-leads\')" style="margin-top:10px;width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px;font-size:.8rem;font-weight:600;color:#374151;cursor:pointer;">Voir tous les leads →</button></div>';
+    // Succès
+    html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:16px;">'
+      +'<div style="font-weight:700;font-size:.95rem;color:#1f2937;margin-bottom:8px;">🏆 Succès — '+MOIS_FULL[mois]+'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">'
+      +'<div style="background:#f0fdf4;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:1.5rem;font-weight:800;color:#15803d;">'+nbVentes+'</div><div style="font-size:.72rem;color:#166534;">contrats</div></div>'
+      +'<div style="background:#eff6ff;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:1rem;font-weight:800;color:#1d4ed8;">'+fmtEuro(primeTotal)+'</div><div style="font-size:.72rem;color:#1e40af;">primes</div></div></div>';
+    var prodKeys=Object.keys(byProd);
+    if (prodKeys.length===0) {
+      html += '<div style="text-align:center;padding:16px;color:#9ca3af;font-size:.84rem;"><div style="font-size:1.5rem;margin-bottom:6px;">🌱</div>Votre premier succès arrive !</div>';
+    } else {
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(75px,1fr));gap:5px;">'
+        +prodKeys.map(function(p){ return '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:7px;text-align:center;">'
+          +'<div style="font-size:1.1rem;">'+(PROD_ICON[p]||'📄')+'</div>'
+          +'<div style="font-weight:700;font-size:1rem;color:#15803d;">'+byProd[p]+'</div>'
+          +'<div style="font-size:.65rem;color:#166534;">'+p+'</div></div>'; }).join('')+'</div>';
+    }
+    html += '<button onclick="showPage(\'collab-suivi\')" style="margin-top:10px;width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px;font-size:.8rem;font-weight:600;color:#374151;cursor:pointer;">Voir mes objectifs →</button></div>';
+    html += '</div>'; // fin 2-col
 
-  // --- Relance urgency helper ---
-  function urgColor(rappel) {
-    if (!rappel) return '#6b7280';
-    const diff = Math.floor((new Date(rappel)-new Date(today))/(1000*3600*24));
-    if (diff < 0) return '#ef4444';   // overdue
-    if (diff === 0) return '#f97316'; // today
-    return '#3b82f6';                 // future (shouldn't appear here but just in case)
-  }
-  function urgLabel(rappel) {
-    if (!rappel) return '';
-    const diff = Math.floor((new Date(rappel)-new Date(today))/(1000*3600*24));
-    if (diff < 0) return `En retard de ${Math.abs(diff)}j`;
-    if (diff === 0) return 'Aujourd\'hui';
-    return `Dans ${diff}j`;
-  }
-
-  // Build relances HTML
-  let relancesHTML = '';
-  if (relances.length === 0) {
-    relancesHTML = `<div style="text-align:center;padding:24px;color:#6b7280;font-size:.9rem;">
-      <div style="font-size:2rem;margin-bottom:8px;">✅</div>
-      <div>Aucune relance à faire aujourd'hui.</div>
-      <div style="margin-top:4px;color:#9ca3af;font-size:.8rem;">Vous êtes à jour !</div>
-    </div>`;
-  } else {
-    relancesHTML = relances.map(p => {
-      const col = urgColor(p.rappel);
-      const lbl = urgLabel(p.rappel);
-      const score = p.score||0;
-      const scoreBar = `<div style="background:#e5e7eb;border-radius:4px;height:6px;width:100%;margin-top:6px;">
-        <div style="background:${score>=70?'#22c55e':score>=40?'#f97316':'#ef4444'};width:${score}%;height:6px;border-radius:4px;"></div>
-      </div>`;
-      return `<div style="background:#fff;border:1.5px solid ${col};border-radius:10px;padding:14px 16px;
-        display:flex;align-items:center;gap:14px;transition:box-shadow .15s;"
-        onmouseover="this.style.boxShadow='0 2px 10px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow='none'">
-        <div style="font-size:1.6rem;">👤</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-weight:600;font-size:.95rem;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-            ${p.prenom||''} ${p.nom||'Prospect anonyme'}
-          </div>
-          <div style="font-size:.78rem;color:#6b7280;margin-top:2px;">
-            ${p.score!=null?`Score ${p.score}/100 — `:''}${p.statut||'En cours'}
-          </div>
-          ${scoreBar}
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;white-space:nowrap;">
-          <div style="font-size:.75rem;font-weight:600;color:${col};background:${col}18;padding:3px 8px;border-radius:20px;">${lbl}</div>
-          ${!p.convertedToDevis
-            ? `<button onclick="convertProspectToDevis('${p.id}')" style="font-size:.72rem;background:#059669;color:#fff;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;">📋 Devis</button>`
-            : `<span style="font-size:.72rem;color:#059669;">✅ Devis</span>`}
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  // Build succès grid
-  let sucGrid = '';
-  const prodKeys = Object.keys(byProd);
-  if (prodKeys.length === 0) {
-    sucGrid = `<div style="text-align:center;padding:24px;color:#6b7280;font-size:.9rem;">
-      <div style="font-size:2rem;margin-bottom:8px;">🌱</div>
-      <div>Votre premier succès est pour bientôt !</div>
-    </div>`;
-  } else {
-    sucGrid = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;">
-      ${prodKeys.map(p => `
-        <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:1.5rem;">${PROD_ICON[p]||'📄'}</div>
-          <div style="font-weight:700;font-size:1.3rem;color:#15803d;margin-top:4px;">${byProd[p]}</div>
-          <div style="font-size:.75rem;color:#166534;">${p}</div>
-        </div>`).join('')}
-    </div>`;
-  }
-
-  // Recent signed contracts list
-  const signed = ventesM.slice().sort((a,b)=>(b.date||'')>(a.date||'')?1:-1).slice(0,5);
-  let signedHTML = '';
-  if (signed.length > 0) {
-    signedHTML = `<div style="margin-top:12px;">
-      <div style="font-size:.8rem;color:#6b7280;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Derniers contrats signés</div>
-      ${signed.map(v=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f3f4f6;">
-        <span style="font-size:1.1rem;">${PROD_ICON[v.produit]||'📄'}</span>
-        <span style="flex:1;font-size:.88rem;color:#374151;">${v.produit}${v.client?' — '+v.client:''}</span>
-        <span style="font-size:.82rem;color:#6b7280;">${v.date||''}</span>
-        <span style="font-size:.88rem;font-weight:600;color:#059669;">${fmtEuro(parseFloat(v.prime)||0)}</span>
-      </div>`).join('')}
-    </div>`;
-  }
-
-  // Greeting based on time
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
-  const motivQuotes = [
-    'Chaque appel est une nouvelle chance ! 💪',
-    'Un prospect aujourd\'hui, un client demain. 🌟',
-    'La régularité fait la réussite. 🏆',
-    'Votre énergie fait la différence ! ✨',
-    'Ensemble, on va plus loin. 🚀',
-  ];
-  const quote = motivQuotes[new Date().getDay() % motivQuotes.length];
-
-  // --- Challenge widget ---
-  var challengeWidgetHTML = buildChallengeWidget(collab);
-
-  // --- Planning widget (alternating weeks) ---
-  var planningWidgetHTML = (collab==='Dorina'||collab==='Rihem') ? buildPlanningWidget(collab) : '';
-
-  // --- Veille congé banner ---
-  var veilleCongeHome = isVeilleCongé(collab);
-  var veilleBannerHTML = veilleCongeHome
-    ? '<div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px">'
-      + '<span style="font-size:1.4rem">📞</span>'
-      + '<div style="flex:1"><div style="font-weight:700;font-size:.9rem;color:#92400e">Pensez à régler le répondeur téléphonique !</div>'
-      + '<div style="font-size:.8rem;color:#b45309;margin-top:2px">Votre congé débute demain ('
-      + new Date(veilleCongeHome.dateDebut).toLocaleDateString('fr-FR')
-      + '). Activez le message d\'accueil avant de partir.</div></div>'
-      + '<button onclick="showPage(\'collab-conges\')" style="background:#f59e0b;color:white;border:none;border-radius:6px;padding:6px 12px;font-size:.8rem;font-weight:600;cursor:pointer">Mes congés</button>'
-      + '</div>'
-    : '';
-
-  // --- Absent colleague banner ---
-  const absentPeers = getAbsentCollabs().filter(function(n){return n !== collab;});
-  let absentBannerHTML = '';
-  if (absentPeers.length > 0) {
-    const peerDetails = absentPeers.map(function(n){
-      const pl = (DB.leads||[]).filter(function(l){return l.collab===n && ['À contacter','Contacté — en attente'].includes(l.statut);}).length;
-      const pd = (DB.devis||[]).filter(function(d){return d.collab===n && !['Gagné','Perdu','Abandonné'].includes(d.statut);}).length;
-      return {name:n, leads:pl, devis:pd, total:pl+pd};
-    });
-    const totalTasks = peerDetails.reduce(function(s,p){return s+p.total;}, 0);
-    const names = peerDetails.map(function(p){return p.name;}).join(', ');
-    const isPlural = peerDetails.length > 1;
-    absentBannerHTML = '<div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">'
-      + '<span style="font-size:1.4rem">🏖️</span>'
-      + '<div style="flex:1"><div style="font-weight:700;font-size:.9rem;color:#92400e;">' + names + (isPlural ? ' sont absentes' : ' est absente') + '</div>'
-      + '<div style="font-size:.8rem;color:#b45309;margin-top:2px;">' + totalTasks + ' tâche' + (totalTasks>1?'s':'') + ' en attente — disponibles dans Leads &amp; Devis</div></div>'
-      + '<button onclick="showPage(\'collab-leads\')" style="background:#f59e0b;color:white;border:none;border-radius:6px;padding:6px 12px;font-size:.8rem;font-weight:600;cursor:pointer;">Voir les leads</button>'
-      + '</div>';
-  }
-
-  // --- Mes tâches assignées (leads + devis) ---
-  const myLeadsTasks = (DB.leads||[]).filter(l =>
-    l.collab === collab && ['À contacter','Contacté — en attente'].includes(l.statut)
-  ).sort((a,b)=>((a.dateCreation||'') > (b.dateCreation||'') ? 1 : -1));
-  const myDevisTasks = (DB.devis||[]).filter(d =>
-    d.collab === collab && !['Gagné','Perdu','Abandonné'].includes(d.statut)
-  ).sort((a,b)=>((a.dateCreation||'') > (b.dateCreation||'') ? 1 : -1));
-  const totalMyTasks = myLeadsTasks.length + myDevisTasks.length;
-
-  // Build "Mes tâches" HTML
-  let tachesHTML = '';
-  if (totalMyTasks === 0) {
-    tachesHTML = '<div style="text-align:center;padding:20px;color:#6b7280;font-size:.9rem;">'
-      + '<div style="font-size:2rem;margin-bottom:8px;">✅</div>'
-      + '<div>Aucune tâche en attente — vous êtes à jour !</div>'
-      + '</div>';
-  } else {
-    const leadsCol = myLeadsTasks.length === 0
-      ? '<div style="font-size:.82rem;color:#9ca3af;padding:8px 0;">Aucun lead actif</div>'
-      : myLeadsTasks.slice(0,5).map(function(l){
-          return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:6px;' + (l.reassignedFrom?'border-left:3px solid #f59e0b;':'') + '">'
-            + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;">'
-            + '<div style="flex:1;min-width:0;">'
-            + '<div style="font-weight:600;font-size:.88rem;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (l.nom||l.client||'Lead') + (l.prenom?' '+l.prenom:'') + '</div>'
-            + '<div style="font-size:.75rem;color:#6b7280;margin-top:2px;">' + (l.produit||'') + (l.statut?' — '+l.statut:'') + '</div>'
-            + '</div>'
-            + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">'
-            + (l.reassignedFrom ? '<span style="font-size:.68rem;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:10px;padding:1px 6px;white-space:nowrap;">🔄 Transféré</span>' : '')
-            + '<button onclick="showPage(\'collab-leads\')" style="font-size:.7rem;background:#3b82f6;color:#fff;border:none;border-radius:5px;padding:2px 7px;cursor:pointer;">Voir</button>'
-            + '</div></div></div>';
-        }).join('')
-        + (myLeadsTasks.length > 5 ? '<div style="font-size:.78rem;color:#6b7280;text-align:center;padding:4px;">+' + (myLeadsTasks.length-5) + ' autres…</div>' : '');
-    const devisCol = myDevisTasks.length === 0
-      ? '<div style="font-size:.82rem;color:#9ca3af;padding:8px 0;">Aucun devis actif</div>'
-      : myDevisTasks.slice(0,5).map(function(d){
-          return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:6px;' + (d.reassignedFrom?'border-left:3px solid #f59e0b;':'') + '">'
-            + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;">'
-            + '<div style="flex:1;min-width:0;">'
-            + '<div style="font-weight:600;font-size:.88rem;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (d.client||d.nom||'Devis') + '</div>'
-            + '<div style="font-size:.75rem;color:#6b7280;margin-top:2px;">' + (d.produit||'') + (d.statut?' — '+d.statut:'') + '</div>'
-            + '</div>'
-            + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">'
-            + (d.reassignedFrom ? '<span style="font-size:.68rem;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:10px;padding:1px 6px;white-space:nowrap;">🔄 Transféré</span>' : '')
-            + '<button onclick="showPage(\'collab-prospection\')" style="font-size:.7rem;background:#059669;color:#fff;border:none;border-radius:5px;padding:2px 7px;cursor:pointer;">Voir</button>'
-            + '</div></div></div>';
-        }).join('')
-        + (myDevisTasks.length > 5 ? '<div style="font-size:.78rem;color:#6b7280;text-align:center;padding:4px;">+' + (myDevisTasks.length-5) + ' autres…</div>' : '');
-    tachesHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
-      + '<div>'
-      + '<div style="font-size:.78rem;font-weight:600;color:#1d4ed8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">🎯 Leads (' + myLeadsTasks.length + ')</div>'
-      + leadsCol + '</div>'
-      + '<div>'
-      + '<div style="font-size:.78rem;font-weight:600;color:#059669;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">📋 Devis (' + myDevisTasks.length + ')</div>'
-      + devisCol + '</div>'
-      + '</div>';
-  }
-
-  // Build "Vue équipe" HTML
-  const equipeItems = getCollabs().map(function(c){
-    const cLeads = (DB.leads||[]).filter(function(l){ return l.collab===c.name && ['À contacter','Contacté — en attente'].includes(l.statut); }).length;
-    const cDevis = (DB.devis||[]).filter(function(d){ return d.collab===c.name && !['Gagné','Perdu','Abandonné'].includes(d.statut); }).length;
-    const isMe = c.name === collab;
-    return '<div style="flex:1;min-width:140px;background:' + (isMe?'#eff6ff':'#f8fafc') + ';border:1.5px solid ' + (isMe?'#3b82f6':'#e2e8f0') + ';border-radius:10px;padding:12px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
-      + '<div style="width:28px;height:28px;border-radius:50%;background:' + c.color + ';color:#fff;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;">' + c.init + '</div>'
-      + '<div style="font-weight:600;font-size:.85rem;color:#1f2937;">' + c.name + (isMe?' <span style="font-size:.72rem;color:#3b82f6;">(moi)</span>':'') + '</div>'
-      + '</div>'
-      + '<div style="display:flex;gap:5px;flex-wrap:wrap;">'
-      + '<span style="font-size:.72rem;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:10px;">🎯 ' + cLeads + ' leads</span>'
-      + '<span style="font-size:.72rem;background:#dcfce7;color:#15803d;padding:2px 7px;border-radius:10px;">📋 ' + cDevis + ' devis</span>'
-      + '</div></div>';
-  }).join('');
-
-  // ── Widget objectifs mensuels ──────────────────────────────────────────────
-  function objBar(nb, target, label, icon, unlocked) {
-    var pct = Math.min(Math.round((nb/target)*100), 100);
-    var ok  = nb >= target;
-    return '<div style="flex:1;min-width:0;">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
-      + '<span style="font-size:.72rem;font-weight:700;color:' + (ok?'#15803d':unlocked===false?'#dc2626':'#64748b') + ';">' + icon + ' ' + label + '</span>'
-      + '<span style="font-size:.7rem;font-weight:800;color:' + (ok?'#15803d':'#374151') + ';">' + nb + '/' + target + '</span>'
-      + '</div>'
-      + '<div style="background:#e5e7eb;border-radius:99px;height:7px;">'
-      + '<div style="height:100%;width:' + pct + '%;border-radius:99px;background:' + (ok?'#22c55e':unlocked===false?'#fca5a5':'#93c5fd') + ';transition:width .5s;"></div>'
-      + '</div>'
-      + '</div>';
-  }
-  var nopOK_  = objStatus.nopOK;
-  var autoOK_ = objStatus.autoOK;
-  var mrhOK_  = objStatus.mrhOK;
-  var allOK   = autoOK_ && mrhOK_ && nopOK_;
-  var objWidgetHTML = '<div style="background:' + (allOK?'linear-gradient(135deg,#064e3b,#059669)':'#fff') + ';border-radius:14px;padding:16px 18px;margin-bottom:16px;border:1.5px solid ' + (allOK?'transparent':'#e2e8f0') + ';box-shadow:0 1px 4px rgba(0,0,0,.06);">'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
-    + '<div style="font-weight:800;font-size:.9rem;color:' + (allOK?'#fff':'#0f172a') + ';">🎯 Objectifs du mois — ' + MOIS_FULL[mois] + ' ' + annee + '</div>'
-    + (allOK ? '<span style="background:rgba(255,255,255,.2);color:#fff;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px;">✅ Commissions débloquées !</span>'
-             : (!nopOK_ ? '<span style="background:#fee2e2;color:#991b1b;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px;">⚠️ Prérequis NOP non atteint</span>'
-                        : '<span style="background:#fef9c3;color:#92400e;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px;">En cours…</span>'))
-    + '</div>'
-    + '<div style="display:flex;gap:14px;flex-wrap:wrap;">'
-    + objBar(objStatus.nbNOP,  OBJECTIFS_COLLAB.nopMin,  'NOP (prérequis)',  '🏢', true)
-    + objBar(objStatus.nbAuto, OBJECTIFS_COLLAB.autoMin, 'Auto',             '🚗', nopOK_)
-    + objBar(objStatus.nbMRH,  OBJECTIFS_COLLAB.mrhMin,  'MRH',              '🏠', nopOK_)
-    + '</div>'
-    + (!nopOK_ ? '<div style="margin-top:10px;font-size:.75rem;color:#dc2626;font-weight:600;">🔒 ' + OBJECTIFS_COLLAB.nopMin + ' NOP requis pour débloquer les commissions Auto et MRH.</div>'
-               : (!autoOK_ || !mrhOK_ ? '<div style="margin-top:10px;font-size:.75rem;color:#f97316;font-weight:600;">⚠️ Commissions ' + (!autoOK_&&!mrhOK_?'Auto et MRH':!autoOK_?'Auto':'MRH') + ' non déclenchées. Les autres produits (Santé, NOP, GAV…) sont payés normalement.</div>' : ''))
-    + '</div>';
-  // ──────────────────────────────────────────────────────────────────────────
-
-  mc.innerHTML = `
-<div style="max-width:820px;margin:0 auto;padding:20px;font-family:var(--font);">
-
-  <!-- Challenge temporaire -->
-  ${challengeWidgetHTML}
-
-  <!-- Objectifs mensuels -->
-  ${objWidgetHTML}
-
-  <!-- Planning semaine alternée -->
-  ${planningWidgetHTML}
-
-  <!-- Veille congé banner -->
-  ${veilleBannerHTML}
-
-  <!-- Absent colleague banner -->
-  ${absentBannerHTML}
-
-  <!-- Header banner -->
-  <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:16px;padding:24px 28px;color:#fff;margin-bottom:24px;display:flex;align-items:center;gap:20px;">
-    <div style="font-size:2.5rem;">👋</div>
-    <div style="flex:1;">
-      <div style="font-size:1.3rem;font-weight:700;">${greeting}, ${collab} !</div>
-      <div style="opacity:.85;margin-top:4px;font-size:.92rem;">${quote}</div>
-    </div>
-    <div style="text-align:right;">
-      <div style="font-size:.75rem;opacity:.7;text-transform:uppercase;letter-spacing:.08em;">Ce mois</div>
-      <div style="font-size:2rem;font-weight:800;">${nbVentes} <span style="font-size:1rem;opacity:.8;">affaires</span></div>
-      <div style="font-size:.82rem;opacity:.75;">${fmtEuro(commTotal)} de commissions</div>
-    </div>
-  </div>
-
-  <!-- Quick-action tiles -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:22px;">
-
-    <!-- Tile: Nouveau lead -->
-    <button onclick="openAddLead()"
-      style="background:#fff;border:2px solid #e5e7eb;border-radius:14px;padding:18px 12px;
-             display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;
-             transition:border-color .18s,box-shadow .18s,transform .12s;font-family:var(--font);
-             -webkit-tap-highlight-color:transparent;"
-      onmouseover="this.style.borderColor='#3b82f6';this.style.boxShadow='0 4px 16px rgba(59,130,246,.18)';this.style.transform='translateY(-2px)'"
-      onmouseout="this.style.borderColor='#e5e7eb';this.style.boxShadow='none';this.style.transform='none'">
-      <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);
-                  display:flex;align-items:center;justify-content:center;font-size:1.6rem;">📞</div>
-      <div style="text-align:center;">
-        <div style="font-weight:700;font-size:.92rem;color:#1f2937;">Nouveau lead</div>
-        <div style="font-size:.75rem;color:#6b7280;margin-top:2px;">Saisir un prospect</div>
-      </div>
-    </button>
-
-    <!-- Tile: Nouveau devis -->
-    <button onclick="openAddDevis()"
-      style="background:#fff;border:2px solid #e5e7eb;border-radius:14px;padding:18px 12px;
-             display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;
-             transition:border-color .18s,box-shadow .18s,transform .12s;font-family:var(--font);
-             -webkit-tap-highlight-color:transparent;"
-      onmouseover="this.style.borderColor='#10b981';this.style.boxShadow='0 4px 16px rgba(16,185,129,.18)';this.style.transform='translateY(-2px)'"
-      onmouseout="this.style.borderColor='#e5e7eb';this.style.boxShadow='none';this.style.transform='none'">
-      <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#10b981,#059669);
-                  display:flex;align-items:center;justify-content:center;font-size:1.6rem;">📋</div>
-      <div style="text-align:center;">
-        <div style="font-weight:700;font-size:.92rem;color:#1f2937;">Nouveau devis</div>
-        <div style="font-size:.75rem;color:#6b7280;margin-top:2px;">Créer un devis</div>
-      </div>
-    </button>
-
-    <!-- Tile: Mes stats du mois -->
-    <button onclick="showPage('collab-suivi')"
-      style="background:#fff;border:2px solid #e5e7eb;border-radius:14px;padding:18px 12px;
-             display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;
-             transition:border-color .18s,box-shadow .18s,transform .12s;font-family:var(--font);
-             -webkit-tap-highlight-color:transparent;"
-      onmouseover="this.style.borderColor='#f59e0b';this.style.boxShadow='0 4px 16px rgba(245,158,11,.18)';this.style.transform='translateY(-2px)'"
-      onmouseout="this.style.borderColor='#e5e7eb';this.style.boxShadow='none';this.style.transform='none'">
-      <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#f59e0b,#d97706);
-                  display:flex;align-items:center;justify-content:center;font-size:1.6rem;">📊</div>
-      <div style="text-align:center;">
-        <div style="font-weight:700;font-size:.92rem;color:#1f2937;">Mes stats</div>
-        <div style="font-size:.75rem;color:#6b7280;margin-top:2px;">Objectifs du mois</div>
-      </div>
-    </button>
-
-
-    <!-- Tile: Saisir une vente -->
-    <button onclick="showPage('collab-saisir')"
-      style="background:#fff;border:2px solid #e5e7eb;border-radius:14px;padding:18px 12px;
-             display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;
-             transition:border-color .18s,box-shadow .18s,transform .12s;font-family:var(--font);
-             -webkit-tap-highlight-color:transparent;"
-      onmouseover="this.style.borderColor='#0891b2';this.style.boxShadow='0 4px 16px rgba(8,145,178,.18)';this.style.transform='translateY(-2px)'"
-      onmouseout="this.style.borderColor='#e5e7eb';this.style.boxShadow='none';this.style.transform='none'">
-      <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#0891b2,#0e7490);
-                  display:flex;align-items:center;justify-content:center;font-size:1.6rem;">✚</div>
-      <div style="text-align:center;">
-        <div style="font-weight:700;font-size:.92rem;color:#1f2937;">Vente</div>
-        <div style="font-size:.75rem;color:#6b7280;margin-top:2px;">Saisir une vente</div>
-      </div>
-    </button>
-
-  </div>
-
-  <!-- Mes tâches en attente -->
-  <div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:18px;margin-bottom:20px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div style="font-weight:700;font-size:1rem;color:#1f2937;">
-        📌 Mes tâches en attente
-        ${totalMyTasks > 0 ? `<span style="display:inline-block;background:#3b82f6;color:#fff;border-radius:20px;font-size:.72rem;padding:2px 8px;margin-left:6px;vertical-align:middle;">${totalMyTasks}</span>` : ''}
-      </div>
-      <div style="display:flex;gap:8px;">
-        <button onclick="showPage('collab-leads')" style="font-size:.78rem;background:#eff6ff;color:#1d4ed8;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:600;">Tous les leads</button>
-        <button onclick="showPage('collab-prospection')" style="font-size:.78rem;background:#f0fdf4;color:#15803d;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:600;">Tous les devis</button>
-      </div>
-    </div>
-    ${tachesHTML}
-  </div>
-
-  <!-- Mes tâches admin (mémos) -->
-  ${(function(){
-    if (!DB.taches) return '';
-    var mesTaches = DB.taches.filter(function(t){ return t.collab===collab && t.statut!=='Terminé'; });
-    var retardTaches = mesTaches.filter(function(t){
-      if (!t.echeance) return false;
-      var d=new Date(t.echeance); d.setHours(0,0,0,0); return d<new Date(new Date().setHours(0,0,0,0));
-    });
-    if (mesTaches.length===0) return '';
-    var items = mesTaches.sort(function(a,b){
-      var da=a.echeance?new Date(a.echeance):new Date('9999-12-31');
-      var db2=b.echeance?new Date(b.echeance):new Date('9999-12-31');
-      return da-db2;
-    }).slice(0,4).map(function(t){
-      var pc=tachePrioriteColor(t.priorite);
-      var today2=new Date(); today2.setHours(0,0,0,0);
-      var flag='';
-      if(t.echeance){var de=new Date(t.echeance);de.setHours(0,0,0,0);var diff=Math.round((de-today2)/86400000);flag=diff<0?'<span style="color:#ef4444;font-size:.7rem;font-weight:700;"> ⚠ J'+diff+'</span>':diff===0?'<span style="color:#f59e0b;font-size:.7rem;font-weight:700;"> ⏰ Auj.</span>':'<span style="color:#9ca3af;font-size:.7rem;"> J+'+diff+'</span>';}
-      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;">'
-        +'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+pc+';flex-shrink:0;"></span>'
-        +'<span style="font-size:.82rem;color:#1f2937;flex:1;">'+t.titre+'</span>'+flag+'</div>';
-    }).join('');
-    return '<div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:18px;margin-bottom:20px;">'
+    // TÂCHES LEADS+DEVIS
+    var totalTasks = myLeads.length+myDevis.length;
+    html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:16px;margin-bottom:16px;">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
-      +'<div style="font-weight:700;font-size:1rem;color:#1f2937;">✅ Mes tâches admin <span style="display:inline-block;background:#4f46e5;color:#fff;border-radius:20px;font-size:.72rem;padding:2px 8px;margin-left:6px;vertical-align:middle;">'+mesTaches.length+'</span>'+(retardTaches.length>0?'<span style="display:inline-block;background:#ef4444;color:#fff;border-radius:20px;font-size:.7rem;padding:2px 7px;margin-left:4px;vertical-align:middle;">'+retardTaches.length+' retard</span>':'')+'</div>'
-      +'<button onclick="showPage(\'collab-taches\')" style="font-size:.78rem;background:#eff6ff;color:#4f46e5;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:600;">Voir tout</button>'
-      +'</div>'+items+'</div>';
-  })()}
+      +'<div style="font-weight:700;font-size:.95rem;color:#1f2937;">📌 Tâches en attente'
+      +(totalTasks>0?' <span style="display:inline-block;background:#3b82f6;color:#fff;border-radius:20px;font-size:.7rem;padding:1px 8px;margin-left:4px;">'+totalTasks+'</span>':'')+'</div>'
+      +'<div style="display:flex;gap:6px;"><button onclick="showPage(\'collab-leads\')" style="font-size:.75rem;background:#eff6ff;color:#1d4ed8;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-weight:600;">Leads</button>'
+      +'<button onclick="showPage(\'collab-prospection\')" style="font-size:.75rem;background:#f0fdf4;color:#15803d;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-weight:600;">Devis</button></div></div>';
+    if (totalTasks===0) {
+      html += '<div style="text-align:center;padding:16px;color:#6b7280;font-size:.88rem;"><div style="font-size:1.5rem;margin-bottom:6px;">✅</div>Aucune tâche en attente !</div>';
+    } else {
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+        +'<div><div style="font-size:.75rem;font-weight:700;color:#1d4ed8;text-transform:uppercase;margin-bottom:6px;">📞 Leads ('+myLeads.length+')</div>'
+        +(myLeads.length===0?'<div style="font-size:.8rem;color:#9ca3af;">Aucun lead actif</div>'
+          :myLeads.slice(0,4).map(function(l){ return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 10px;margin-bottom:5px;"><div style="font-weight:600;font-size:.82rem;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(l.nom||l.client||'Lead')+'</div><div style="color:#6b7280;font-size:.75rem;">'+l.statut+'</div></div>'; }).join('')
+          +(myLeads.length>4?'<div style="font-size:.75rem;color:#6b7280;text-align:center;">+'+(myLeads.length-4)+' autres</div>':''))
+        +'</div>'
+        +'<div><div style="font-size:.75rem;font-weight:700;color:#059669;text-transform:uppercase;margin-bottom:6px;">📋 Devis ('+myDevis.length+')</div>'
+        +(myDevis.length===0?'<div style="font-size:.8rem;color:#9ca3af;">Aucun devis actif</div>'
+          :myDevis.slice(0,4).map(function(d){ return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 10px;margin-bottom:5px;"><div style="font-weight:600;font-size:.82rem;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(d.client||d.nom||'Devis')+'</div><div style="color:#6b7280;font-size:.75rem;">'+d.statut+'</div></div>'; }).join('')
+          +(myDevis.length>4?'<div style="font-size:.75rem;color:#6b7280;text-align:center;">+'+(myDevis.length-4)+' autres</div>':''))
+        +'</div></div>';
+    }
+    if (mesTaches.length>0) {
+      html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;">'
+        +'<div style="font-size:.75rem;font-weight:700;color:#4f46e5;text-transform:uppercase;margin-bottom:6px;">✅ Mémos admin ('+mesTaches.length+')'+(tachesRetard.length>0?' <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:.68rem;">'+tachesRetard.length+' retard</span>':'')+'</div>'
+        +mesTaches.slice(0,4).map(function(t){
+          var pc='#6b7280'; try{pc=tachePrioriteColor(t.priorite);}catch(e){}
+          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f8fafc;">'
+            +'<span style="width:8px;height:8px;border-radius:50%;background:'+pc+';flex-shrink:0;display:inline-block;"></span>'
+            +'<span style="font-size:.82rem;flex:1;color:#1f2937;">'+t.titre+'</span>'
+            +(t.echeance?'<span style="font-size:.72rem;color:#6b7280;">'+new Date(t.echeance).toLocaleDateString('fr-FR')+'</span>':'')
+            +'</div>';
+        }).join('')
+        +(mesTaches.length>4?'<button onclick="showPage(\'collab-taches\')" style="margin-top:6px;width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:6px;font-size:.78rem;font-weight:600;color:#4f46e5;cursor:pointer;">Voir toutes mes tâches →</button>':'')
+        +'</div>';
+    }
+    html += '</div>'; // fin tâches card
 
-  <!-- Vue équipe -->
-  <div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:18px;margin-bottom:20px;">
-    <div style="font-weight:700;font-size:1rem;color:#1f2937;margin-bottom:14px;">👥 Vue équipe — tâches en cours</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;">${equipeItems}</div>
-  </div>
+    // VUE ÉQUIPE
+    html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:16px;">'
+      +'<div style="font-weight:700;font-size:.95rem;color:#1f2937;margin-bottom:12px;">👥 Vue équipe</div>'
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      +getCollabs().map(function(c){
+        var cl=(DB.leads||[]).filter(function(l){return l.collab===c.name&&['À contacter','Contacté — en attente'].includes(l.statut);}).length;
+        var cd=(DB.devis||[]).filter(function(d){return d.collab===c.name&&!['Gagné','Perdu','Abandonné'].includes(d.statut);}).length;
+        var me=c.name===collab;
+        return '<div style="flex:1;min-width:120px;background:'+(me?'#eff6ff':'#f8fafc')+';border:1.5px solid '+(me?'#3b82f6':'#e2e8f0')+';border-radius:10px;padding:10px;">'
+          +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;">'
+          +'<div style="width:26px;height:26px;border-radius:50%;background:'+c.color+';color:#fff;font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;">'+c.init+'</div>'
+          +'<div style="font-weight:600;font-size:.83rem;color:#1f2937;">'+c.name+(me?' <span style="font-size:.68rem;color:#3b82f6;">(moi)</span>':'')+'</div></div>'
+          +'<div style="display:flex;gap:5px;flex-wrap:wrap;">'
+          +'<span style="font-size:.7rem;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:10px;">📞 '+cl+'</span>'
+          +'<span style="font-size:.7rem;background:#dcfce7;color:#15803d;padding:2px 7px;border-radius:10px;">📋 '+cd+'</span>'
+          +'</div></div>';
+      }).join('')
+      +'</div></div>';
 
-    <!-- 2-column layout -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    html += '</div>'; // fin container
+    mc.innerHTML = html;
 
-    <!-- LEFT: Relances -->
-    <div style="grid-column:1 / 2;">
-      <div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:18px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-          <div style="font-weight:700;font-size:1rem;color:#1f2937;">
-            📞 Relances du jour
-            ${relances.length > 0 ? `<span style="display:inline-block;background:#ef4444;color:#fff;border-radius:20px;font-size:.72rem;padding:2px 8px;margin-left:6px;vertical-align:middle;">${relances.length}</span>` : ''}
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px;">${relancesHTML}</div>
-      </div>
-
-      <!-- Nouvelle découverte -->
-      <div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:18px;margin-top:16px;">
-        <div style="font-weight:700;font-size:1rem;color:#1f2937;margin-bottom:14px;">🔍 Découverte client</div>
-        <p style="font-size:.88rem;color:#6b7280;margin:0 0 14px;">Commencez une nouvelle découverte pour identifier les besoins de votre prospect et proposer les solutions adaptées.</p>
-        <button onclick="showPage('collab-decouverte')" style="width:100%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;border-radius:8px;padding:12px;font-size:.95rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s;" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-          <span>🚀</span> Démarrer une découverte
-        </button>
-      </div>
-    </div>
-
-    <!-- RIGHT: Succès du mois -->
-    <div style="grid-column:2 / 3;">
-      <div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:18px;height:100%;box-sizing:border-box;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-          <div style="font-weight:700;font-size:1rem;color:#1f2937;">🏆 Mes succès du mois</div>
-          <div style="font-size:.8rem;color:#6b7280;">${MOIS_FULL[mois]} ${annee}</div>
-        </div>
-
-        <!-- Stats summary -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-          <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center;">
-            <div style="font-size:1.6rem;font-weight:800;color:#15803d;">${nbVentes}</div>
-            <div style="font-size:.75rem;color:#166534;">contrats signés</div>
-          </div>
-          <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center;">
-            <div style="font-size:1.1rem;font-weight:800;color:#1d4ed8;">${fmtEuro(primeTotal)}</div>
-            <div style="font-size:.75rem;color:#1e40af;">primes totales</div>
-          </div>
-        </div>
-
-        <!-- Products breakdown -->
-        ${sucGrid}
-
-        <!-- Recent contracts -->
-        ${signedHTML}
-
-        ${nbVentes === 0 ? '' : `<div style="margin-top:16px;text-align:center;">
-          <button onclick="showPage('collab-suivi')" style="background:transparent;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 18px;font-size:.85rem;color:#374151;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
-            Voir mes objectifs →
-          </button>
-        </div>`}
-      </div>
-    </div>
-
-  </div>
-
-  <!-- ===== ENCART RÉFÉRENTIEL COMMISSIONS ===== -->
-  <div style="margin-top:24px;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:16px;padding:24px 28px;color:#fff;position:relative;overflow:hidden;">
-    <!-- Background decoration -->
-    <div style="position:absolute;top:-30px;right:-30px;width:160px;height:160px;border-radius:50%;background:rgba(59,130,246,.15);pointer-events:none;"></div>
-    <div style="position:absolute;bottom:-20px;left:40px;width:100px;height:100px;border-radius:50%;background:rgba(16,185,129,.10);pointer-events:none;"></div>
-
-    <!-- Title -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-      <div style="width:42px;height:42px;border-radius:12px;background:rgba(59,130,246,.3);display:flex;align-items:center;justify-content:center;font-size:1.4rem;">💰</div>
-      <div>
-        <div style="font-size:1.05rem;font-weight:700;letter-spacing:-.01em;">Référentiel des commissions</div>
-        <div style="font-size:.78rem;opacity:.65;margin-top:2px;">Vos taux applicables sur chaque produit</div>
-      </div>
-    </div>
-
-    <!-- FORFAITS section -->
-    <div style="margin-bottom:16px;">
-      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#93c5fd;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
-        <span style="display:inline-block;width:20px;height:2px;background:#93c5fd;border-radius:2px;"></span>
-        Forfait fixe par contrat
-        <span style="display:inline-block;width:20px;height:2px;background:#93c5fd;border-radius:2px;"></span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;">
-        ${[
-          {prod:'Auto',      icon:'🚗', val:'8 €'},
-          {prod:'MRH',       icon:'🏠', val:'10 €'},
-          {prod:'Emprunteur',icon:'🔑', val:'20 €'},
-          {prod:'GAV',       icon:'🛡️', val:'20 €'},
-          {prod:'PER',       icon:'🏦', val:'10 €'},
-          {prod:'NOP',       icon:'🏢', val:'3 €'},
-        ].map(p=>`
-          <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 8px;text-align:center;transition:background .15s;"
-               onmouseover="this.style.background='rgba(59,130,246,.25)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">
-            <div style="font-size:1.3rem;">${p.icon}</div>
-            <div style="font-size:.78rem;font-weight:600;color:#e2e8f0;margin-top:4px;">${p.prod}</div>
-            <div style="font-size:1.1rem;font-weight:800;color:#34d399;margin-top:3px;">${p.val}</div>
-          </div>`).join('')}
-      </div>
-    </div>
-
-    <!-- POURCENTAGES section -->
-    <div>
-      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6ee7b7;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
-        <span style="display:inline-block;width:20px;height:2px;background:#6ee7b7;border-radius:2px;"></span>
-        Pourcentage de la prime annuelle
-        <span style="display:inline-block;width:20px;height:2px;background:#6ee7b7;border-radius:2px;"></span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;">
-        ${[
-          {prod:'Santé',          icon:'💊', val:'10 %', color:'#34d399'},
-          {prod:'Allianz Immeuble',icon:'🏛️', val:'7 %',  color:'#93c5fd'},
-          {prod:'Actif',           icon:'🔧', val:'7 %',  color:'#93c5fd'},
-          {prod:'Profil Pro',      icon:'💼', val:'7 %',  color:'#93c5fd'},
-          {prod:'PJ Pro',          icon:'⚖️', val:'8 %',  color:'#fbbf24'},
-          {prod:'PJ Part',         icon:'⚖️', val:'8 %',  color:'#fbbf24'},
-        ].map(p=>`
-          <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 8px;display:flex;align-items:center;gap:8px;transition:background .15s;"
-               onmouseover="this.style.background='rgba(16,185,129,.2)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">
-            <div style="font-size:1.3rem;flex-shrink:0;">${p.icon}</div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:.78rem;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.prod}</div>
-              <div style="font-size:1.0rem;font-weight:800;color:${p.color};margin-top:1px;">${p.val}</div>
-            </div>
-          </div>`).join('')}
-      </div>
-    </div>
-
-    <!-- Footer note -->
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);font-size:.75rem;opacity:.55;text-align:center;">
-      Les commissions % sont calculées sur la prime annuelle TTC • Mis à jour selon le référentiel produits Allianz
-    </div>
-  </div>
-  <!-- ===== FIN ENCART COMMISSIONS ===== -->
-
-</div>`;
+  } catch(err) {
+    console.error('collab-home error:', err);
+    mc.innerHTML = '<div style="padding:24px;color:#dc2626;background:#fef2f2;border-radius:10px;margin:20px;">'
+      +'<div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">⚠️ Erreur page accueil</div>'
+      +'<div style="font-size:.85rem;font-family:monospace;">'+(err.message||String(err))+'</div>'
+      +'<button onclick="showPage(\'collab-home\')" style="margin-top:12px;background:#dc2626;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:600;">↺ Réessayer</button>'
+      +'</div>';
+  }
 };
+
 
 // ---- PAGE: MON SUIVI (overview) ----
 PAGES['collab-suivi'] = (mc) => {
@@ -3555,10 +3345,23 @@ PAGES['collab-prospection'] = (mc) => {
   mc.innerHTML = `
     <div class="page-header flex-between">
       <div>
-        <h1>Devis & Prospection — Équipe</h1>
+        <h1>📋 Devis & Relances — Équipe</h1>
         <p>Tous les devis de l'équipe — visibles et réassignables</p>
       </div>
       <button class="btn btn-primary" onclick="openAddDevis()">✚ Nouveau devis</button>
+    </div>
+
+    <!-- Onglets de navigation prospection -->
+    <div style="display:flex;gap:8px;margin-bottom:18px;border-bottom:2px solid #e5e7eb;padding-bottom:0;">
+      <button onclick="showPage('collab-leads')" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px 8px 0 0;padding:9px 18px;font-size:.88rem;font-weight:600;cursor:pointer;margin-bottom:-2px;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+        📞 Leads
+      </button>
+      <button onclick="" style="background:#059669;color:#fff;border:none;border-radius:8px 8px 0 0;padding:9px 18px;font-size:.88rem;font-weight:700;cursor:default;margin-bottom:-2px;border-bottom:2px solid #059669;">
+        📋 Devis & Relances
+      </button>
+      <button onclick="showPage('collab-decouverte')" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px 8px 0 0;padding:9px 18px;font-size:.88rem;font-weight:600;cursor:pointer;margin-bottom:-2px;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+        🔍 Découverte client
+      </button>
     </div>
 
     <!-- KPIs -->
@@ -3616,48 +3419,81 @@ PAGES['collab-prospection'] = (mc) => {
 };
 
 function renderProspKpis() {
-  const devis = DB.devis || [];
-  const actifs = devis.filter(d => !['Gagné','Perdu','Abandonné'].includes(d.statut));
-  const gagnes = devis.filter(d => d.statut === 'Gagné');
-  const perdus = devis.filter(d => d.statut === 'Perdu');
-  const enRetard = actifs.filter(d => joursRestants(d.prochainContact) < 0);
-  const primeActifs = actifs.reduce((s,d) => s + (parseFloat(d.primeEstimee)||0), 0);
-  const tx = devis.length > 0 ? Math.round(gagnes.length / (gagnes.length + perdus.length || 1) * 100) : 0;
-  const byCollab = getCollabNames().map(function(n){
-    const dc = actifs.filter(function(d){return d.collab===n;});
-    return { n, tot:dc.length, retard:dc.filter(function(d){return joursRestants(d.prochainContact)<0;}).length };
+  var allDevis = DB.devis || [];
+  // Filtres actifs (lire les selects si présents)
+  var fCollab  = (document.getElementById('df-collab')||{value:''}).value||'';
+  var fStatut  = (document.getElementById('df-statut')||{value:''}).value||'';
+  var fProduit = (document.getElementById('df-produit')||{value:''}).value||'';
+  var fSearch  = ((document.getElementById('df-search')||{value:''}).value||'').toLowerCase();
+
+  // Sous-ensemble filtré pour les stats (hors filtre urgence)
+  var scope = allDevis.slice();
+  if (fCollab)  scope = scope.filter(function(d){ return d.collab===fCollab; });
+  if (fProduit) scope = scope.filter(function(d){ return d.produit===fProduit; });
+  if (fSearch)  scope = scope.filter(function(d){ return (d.client||'').toLowerCase().includes(fSearch)||(d.telephone||'').includes(fSearch); });
+  var scopeActifs = scope.filter(function(d){ return !['Gagné','Perdu','Abandonné'].includes(d.statut); });
+  if (fStatut && fStatut!=='all') scopeActifs = scope.filter(function(d){ return d.statut===fStatut; });
+
+  var gagnes = scope.filter(function(d){ return d.statut==='Gagné'; });
+  var perdus  = scope.filter(function(d){ return d.statut==='Perdu'; });
+  var actifs  = scope.filter(function(d){ return !['Gagné','Perdu','Abandonné'].includes(d.statut); });
+  var enRetard = actifs.filter(function(d){ return joursRestants(d.prochainContact)<0; });
+  var primeActifs = actifs.reduce(function(s,d){ return s+(parseFloat(d.primeEstimee)||0); },0);
+  var primeGagnee = gagnes.reduce(function(s,d){ return s+(parseFloat(d.primeEstimee)||0); },0);
+  var tx = (gagnes.length+perdus.length)>0 ? Math.round(gagnes.length/(gagnes.length+perdus.length)*100) : 0;
+
+  // Par produit (actifs)
+  var byProdActif = {};
+  actifs.forEach(function(d){ if(d.produit) byProdActif[d.produit]=(byProdActif[d.produit]||0)+1; });
+  // Par collaboratrice
+  var COLLAB_COLORS_MAP2 = getCollabColors();
+  var byCollab = getCollabNames().map(function(n){
+    var dc = actifs.filter(function(d){ return d.collab===n; });
+    return { n:n, tot:dc.length, retard:dc.filter(function(d){ return joursRestants(d.prochainContact)<0; }).length };
   });
-  const COLLAB_COLORS_MAP2 = getCollabColors();
-  const collabBadges = byCollab.filter(function(c){return c.tot>0;}).map(function(c){
-    const col = COLLAB_COLORS_MAP2[c.n]||'#6b7280';
+  var collabBadges = byCollab.filter(function(c){ return c.tot>0; }).map(function(c){
+    var col = COLLAB_COLORS_MAP2[c.n]||'#6b7280';
     return '<span style="display:inline-flex;align-items:center;gap:5px;background:white;border:1px solid '+col+';border-radius:99px;padding:3px 10px 3px 5px;font-size:11px;font-weight:600;color:'+col+'">'
-      +'<span style="width:18px;height:18px;border-radius:50%;background:'+col+';color:white;font-size:9px;display:inline-flex;align-items:center;justify-content:center;font-weight:700">'+c.n.slice(0,1)+'</span>'
-      +c.n+' <span style="opacity:.7">'+c.tot+' actif(s)'+(c.retard>0?' · <span style="color:#dc2626">'+c.retard+' retard</span>':'')+'</span></span>';
+      +'<span style="width:18px;height:18px;border-radius:50%;background:'+col+';color:white;font-size:9px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;">'+c.n.slice(0,1)+'</span>'
+      +c.n+' <span style="opacity:.7;">'+c.tot+' actif'+(c.tot>1?'s':'')+(c.retard>0?' · <span style="color:#dc2626;">'+c.retard+' retard</span>':'')+'</span></span>';
   }).join('');
 
-  const z = document.getElementById('prosp-kpis');
+  var z = document.getElementById('prosp-kpis');
   if (!z) return;
-  z.innerHTML = `<div class="kpi-grid kpi-grid-4 sep16">
-    <div class="kpi">
-      <div class="kpi-val">${actifs.length}</div>
-      <div class="kpi-lbl">Devis en cours (équipe)</div>
-      <div class="kpi-sub">${fmtEuro(primeActifs)} prime potentielle</div>
-    </div>
-    <div class="kpi ${enRetard.length>0?'danger':'good'}">
-      <div class="kpi-val">${enRetard.length}</div>
-      <div class="kpi-lbl">Relances en retard</div>
-    </div>
-    <div class="kpi good">
-      <div class="kpi-val">${gagnes.length}</div>
-      <div class="kpi-lbl">Devis gagnés</div>
-    </div>
-    <div class="kpi gold">
-      <div class="kpi-val">${tx}%</div>
-      <div class="kpi-lbl">Taux de transformation</div>
-      <div class="kpi-sub">${gagnes.length} gagnés / ${perdus.length} perdus</div>
-    </div>
-  </div>
-  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">${collabBadges}</div>`;
+
+  var html = '<div class="kpi-grid kpi-grid-4 sep16">'
+    +'<div class="kpi"><div class="kpi-val">'+actifs.length+'</div><div class="kpi-lbl">En cours</div><div class="kpi-sub">'+fmtEuro(primeActifs)+' potentiel</div></div>'
+    +'<div class="kpi '+(enRetard.length>0?'danger':'good')+'"><div class="kpi-val">'+enRetard.length+'</div><div class="kpi-lbl">Relances en retard</div></div>'
+    +'<div class="kpi good"><div class="kpi-val">'+gagnes.length+'</div><div class="kpi-lbl">Devis gagnés</div><div class="kpi-sub">'+fmtEuro(primeGagnee)+' prime</div></div>'
+    +'<div class="kpi gold"><div class="kpi-val">'+tx+'%</div><div class="kpi-lbl">Taux de transfo.</div><div class="kpi-sub">'+gagnes.length+' gagnés / '+perdus.length+' perdus</div></div>'
+    +'</div>';
+
+  // Badges collaboratrices
+  if (collabBadges) html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">'+collabBadges+'</div>';
+
+  // Répartition par produit
+  var prodKeys = Object.keys(byProdActif);
+  if (prodKeys.length>0) {
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">'
+      +'<span style="font-size:.78rem;font-weight:600;color:#374151;align-self:center;">Par produit (en cours) : </span>'
+      +prodKeys.sort(function(a,b){ return byProdActif[b]-byProdActif[a]; }).map(function(p){
+        return '<span style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:3px 10px;font-size:.75rem;font-weight:600;color:#1d4ed8;">'+(PROD_ICON[p]||'')+''+p+' <strong>'+byProdActif[p]+'</strong></span>';
+      }).join('')+'</div>';
+  }
+
+  // Motifs de perte
+  var byMotifPerte = {};
+  perdus.forEach(function(d){ if(d.motifPerte) byMotifPerte[d.motifPerte]=(byMotifPerte[d.motifPerte]||0)+1; });
+  var motifKeys = Object.keys(byMotifPerte);
+  if (motifKeys.length>0) {
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">'
+      +'<span style="font-size:.78rem;font-weight:600;color:#dc2626;align-self:center;">Motifs de perte : </span>'
+      +motifKeys.sort(function(a,b){ return byMotifPerte[b]-byMotifPerte[a]; }).map(function(m){
+        return '<span style="background:#fef2f2;border:1px solid #fca5a5;border-radius:20px;padding:3px 10px;font-size:.75rem;font-weight:600;color:#dc2626;">'+m+' <strong>'+byMotifPerte[m]+'</strong></span>';
+      }).join('')+'</div>';
+  }
+
+  z.innerHTML = html;
 }
 
 function renderProspAlertes() {
@@ -5298,6 +5134,155 @@ PAGES['admin-dashboard'] = (mc) => {
   renderAdminDashboard();
 };
 
+function buildDashboardTachesWidget() {
+  var today = new Date(); today.setHours(0,0,0,0);
+  var COLORS = getCollabColors();
+
+  // 1. Mes tâches privées urgentes
+  var privateTaches = getAdminPrivateTaches ? getAdminPrivateTaches() : [];
+  var privateActives = privateTaches.filter(function(t){ return t.statut !== 'Terminé'; });
+  var privateUrgentes = privateActives.filter(function(t){
+    if (!t.echeance) return false;
+    var d = new Date(t.echeance); d.setHours(0,0,0,0);
+    return d <= today;
+  }).sort(function(a,b){ return new Date(a.echeance)-new Date(b.echeance); });
+
+  // 2. Remontées équipe non traitées
+  var remontees = getEscaladeTaches ? getEscaladeTaches().filter(function(t){ return t.statut !== 'Terminé'; }) : [];
+  remontees.sort(function(a,b){
+    var pO={'haute':0,'normale':1,'basse':2};
+    return (pO[a.priorite]||1)-(pO[b.priorite]||1);
+  });
+
+  // 3. Tâches équipe : résumé par collab
+  var equipeTaches = getTaches ? getTaches() : [];
+  var equipeActives = equipeTaches.filter(function(t){ return t.statut !== 'Terminé'; });
+  var equipeRetard  = equipeActives.filter(function(t){
+    if (!t.echeance) return false;
+    var d = new Date(t.echeance); d.setHours(0,0,0,0); return d < today;
+  });
+
+  var totalPrivee    = privateActives.length;
+  var totalRemontees = remontees.length;
+  var totalEquipe    = equipeActives.length;
+  var totalRetard    = equipeRetard.length + privateUrgentes.length;
+
+  // Si rien à montrer : widget minimal
+  if (totalPrivee === 0 && totalRemontees === 0 && totalEquipe === 0) {
+    return '<div style="background:white;border-radius:12px;border:1.5px solid #e5e7eb;padding:14px 18px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">'
+      +'<span style="font-size:1.4rem;">✅</span>'
+      +'<span style="font-size:.88rem;color:#6b7280;">Aucune tâche en cours — tout est à jour.</span>'
+      +'<button onclick="showPage(\'admin-taches\')" style="margin-left:auto;background:#f1f5f9;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;color:#4f46e5;font-weight:600;cursor:pointer;">Gérer les tâches</button>'
+      +'</div>';
+  }
+
+  var html = '<div style="background:white;border-radius:14px;border:1.5px solid #e5e7eb;padding:16px 18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);">';
+
+  // Header
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'
+    +'<div style="display:flex;align-items:center;gap:8px;">'
+    +'<span style="font-size:1.1rem;">✅</span>'
+    +'<span style="font-weight:700;font-size:.95rem;color:#1f2937;">Tâches</span>'
+    +(totalRetard>0?'<span style="background:#ef4444;color:white;border-radius:99px;font-size:.72rem;padding:2px 9px;font-weight:700;">'+totalRetard+' en retard</span>':'')
+    +(remontees.length>0?'<span style="background:#f59e0b;color:white;border-radius:99px;font-size:.72rem;padding:2px 9px;font-weight:700;">'+remontees.length+' remontée'+(remontees.length>1?'s':'')+'</span>':'')
+    +'</div>'
+    +'<button onclick="showPage(\'admin-taches\')" style="background:#f1f5f9;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;color:#4f46e5;font-weight:600;cursor:pointer;">Voir tout →</button>'
+    +'</div>';
+
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">';
+
+  // ── Bloc : Mes tâches privées ─────────────────────────────────────────────
+  html += '<div style="background:#f8fafc;border-radius:10px;padding:12px;">'
+    +'<div style="font-size:.78rem;font-weight:700;color:#4f46e5;margin-bottom:8px;display:flex;align-items:center;gap:6px;">🔒 Mes tâches privées'
+    +(totalPrivee>0?'<span style="background:#4f46e5;color:white;border-radius:99px;font-size:.67rem;padding:1px 7px;">'+totalPrivee+'</span>':'')
+    +'</div>';
+
+  if (privateActives.length === 0) {
+    html += '<div style="font-size:.78rem;color:#9ca3af;padding:6px 0;">Aucune tâche privée active</div>';
+  } else {
+    privateActives.slice(0,5).forEach(function(t) {
+      var de = t.echeance ? new Date(t.echeance) : null; if(de) de.setHours(0,0,0,0);
+      var diff = de ? Math.round((de-today)/86400000) : null;
+      var flag = diff===null ? '' : diff<0 ? '<span style="color:#ef4444;font-size:.68rem;font-weight:700;"> ⚠ J'+diff+'</span>' : diff===0 ? '<span style="color:#f59e0b;font-size:.68rem;font-weight:700;"> Auj.</span>' : '<span style="color:#9ca3af;font-size:.68rem;"> J+'+diff+'</span>';
+      var pc = tachePrioriteColor(t.priorite);
+      html += '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #e5e7eb;">'
+        +'<button onclick="toggleAdminTacheTermine(\''+t.id+'\');renderAdminDashboard();" style="flex-shrink:0;width:16px;height:16px;border-radius:50%;border:2px solid '+pc+';background:white;cursor:pointer;"></button>'
+        +'<span style="font-size:.8rem;color:#111;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+t.titre+'</span>'
+        +flag
+        +(t.periodicite?'<span style="font-size:.65rem;color:'+periodiciteColor(t.periodicite)+';font-weight:600;">🔁</span>':'')
+        +'</div>';
+    });
+    if (privateActives.length > 5) html += '<div style="font-size:.73rem;color:#9ca3af;margin-top:4px;text-align:center;">+' + (privateActives.length-5) + ' autres</div>';
+  }
+  html += '</div>';
+
+  // ── Bloc : Remontées équipe ───────────────────────────────────────────────
+  html += '<div style="background:#fffbeb;border-radius:10px;padding:12px;border:1px solid #fde68a;">'
+    +'<div style="font-size:.78rem;font-weight:700;color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:6px;">📤 Remontées équipe'
+    +(remontees.length>0?'<span style="background:#f59e0b;color:white;border-radius:99px;font-size:.67rem;padding:1px 7px;">'+remontees.length+'</span>':'')
+    +'</div>';
+
+  if (remontees.length === 0) {
+    html += '<div style="font-size:.78rem;color:#a16207;padding:6px 0;">Aucune remontée en attente</div>';
+  } else {
+    remontees.slice(0,5).forEach(function(t) {
+      var color = COLORS[t.remontePar] || '#6b7280';
+      var pc    = tachePrioriteColor(t.priorite);
+      html += '<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid #fde68a;">'
+        +'<div style="width:20px;height:20px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;color:white;font-size:.65rem;font-weight:700;flex-shrink:0;">'+t.remontePar[0]+'</div>'
+        +'<span style="font-size:.8rem;color:#1f2937;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+t.titre+'</span>'
+        +(t.priorite==='haute'?'<span style="color:#ef4444;font-size:.75rem;font-weight:700;">🔴</span>':'')
+        +'<button onclick="toggleRemonteStatut(\''+t.id+'\');renderAdminDashboard();" style="background:#f59e0b;color:white;border:none;border-radius:5px;padding:2px 8px;font-size:.7rem;font-weight:600;cursor:pointer;white-space:nowrap;">Traiter</button>'
+        +'</div>';
+    });
+    if (remontees.length > 5) html += '<div style="font-size:.73rem;color:#a16207;margin-top:4px;text-align:center;">+' + (remontees.length-5) + ' autres</div>';
+  }
+  html += '</div>';
+
+  // ── Bloc : Tâches équipe résumé ───────────────────────────────────────────
+  html += '<div style="background:#f8fafc;border-radius:10px;padding:12px;">'
+    +'<div style="font-size:.78rem;font-weight:700;color:#374151;margin-bottom:8px;display:flex;align-items:center;gap:6px;">📋 Tâches équipe'
+    +(totalEquipe>0?'<span style="background:#6b7280;color:white;border-radius:99px;font-size:.67rem;padding:1px 7px;">'+totalEquipe+'</span>':'')
+    +(totalRetard>0?'<span style="background:#ef4444;color:white;border-radius:99px;font-size:.67rem;padding:1px 7px;">'+equipeRetard.length+' retard</span>':'')
+    +'</div>';
+
+  if (totalEquipe === 0) {
+    html += '<div style="font-size:.78rem;color:#9ca3af;padding:6px 0;">Aucune tâche équipe active</div>';
+  } else {
+    getCollabNames().forEach(function(name) {
+      var colTaches = equipeActives.filter(function(t){ return t.collab===name; });
+      if (colTaches.length === 0) return;
+      var colRetard = colTaches.filter(function(t){
+        if (!t.echeance) return false;
+        var d=new Date(t.echeance); d.setHours(0,0,0,0); return d<today;
+      }).length;
+      var color = COLORS[name]||'#6b7280';
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #e5e7eb;">'
+        +'<div style="width:20px;height:20px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;color:white;font-size:.65rem;font-weight:700;flex-shrink:0;">'+name[0]+'</div>'
+        +'<span style="font-size:.82rem;font-weight:600;color:'+color+';flex:1;">'+name+'</span>'
+        +'<span style="font-size:.78rem;color:#6b7280;">'+colTaches.length+' tâche'+(colTaches.length>1?'s':'')+'</span>'
+        +(colRetard>0?'<span style="background:#fef2f2;color:#ef4444;border-radius:99px;font-size:.68rem;padding:1px 7px;font-weight:700;">'+colRetard+' retard</span>':'')
+        +'</div>';
+      // Montrer les 3 premières tâches
+      colTaches.slice(0,3).forEach(function(t){
+        var de=t.echeance?new Date(t.echeance):null; if(de) de.setHours(0,0,0,0);
+        var diff=de?Math.round((de-today)/86400000):null;
+        var flag=diff===null?'':diff<0?'<span style="color:#ef4444;font-size:.67rem;font-weight:700;"> J'+diff+'</span>':diff===0?'<span style="color:#f59e0b;font-size:.67rem;"> Auj.</span>':'';
+        html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 0 3px 28px;">'
+          +'<span style="font-size:.75rem;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">'+t.titre+'</span>'
+          +flag
+          +(t.periodicite?'<span style="font-size:.65rem;color:'+periodiciteColor(t.periodicite)+';font-weight:600;">🔁</span>':'')
+          +'</div>';
+      });
+      if (colTaches.length > 3) html += '<div style="font-size:.7rem;color:#9ca3af;padding:2px 0 0 28px;">+' + (colTaches.length-3) + ' autres…</div>';
+    });
+  }
+  html += '</div>';
+
+  html += '</div></div>'; // close grid + card
+  return html;
+}
+
 function renderAdminDashboard() {
   const mois = parseInt(document.getElementById('filter-mois')?.value) || nowMois();
   const annee = nowAnnee();
@@ -5444,258 +5429,173 @@ function renderAdminDashboard() {
   const zone = document.getElementById('admin-db-content');
   zone.innerHTML = `
 
-    <!-- ══ CHALLENGE WIDGET ══ -->
-    ${buildChallengeAdminWidget()}
-
-    <!-- ══ ALERTES MOUEZ ══ -->
+    <!-- 1. URGENCES STRIP - Horizontal compact band with alerts -->
     ${(()=>{
       const mouezBlocages = (DB.ventes||[]).filter(v=>v.blocage==='En attente retour Mouez');
-      if (!mouezBlocages.length) return '';
-      const rows = mouezBlocages.map(v=>`
-        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:white;border-radius:8px;border-left:4px solid #dc2626;">
-          <div style="font-size:1.3rem">🔴</div>
-          <div style="flex:1;">
-            <div style="font-weight:700;font-size:.9rem;color:#1f2937;">${v.client} — ${v.produit}</div>
-            <div style="font-size:.78rem;color:#6b7280;margin-top:1px;">${v.collab} · ${v.blocageDate||'Date inconnue'}</div>
-          </div>
-          <button onclick="setBlocageAdmin('${v.id}','Résolu')"
-            style="background:#16a34a;color:white;border:none;border-radius:6px;padding:6px 12px;font-size:.8rem;font-weight:600;cursor:pointer;white-space:nowrap;">
-            ✅ Résoudre
-          </button>
-          <button onclick="openAdminBlocageDetail('${v.id}')"
-            style="background:#f3f4f6;color:#374151;border:none;border-radius:6px;padding:6px 12px;font-size:.8rem;cursor:pointer;white-space:nowrap;">
-            Voir
-          </button>
-        </div>`).join('');
-      return `<div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:12px;padding:14px 16px;margin-bottom:12px;animation:pulse-alert 2s infinite;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-          <span style="font-size:1.2rem;">⚠️</span>
-          <span style="font-weight:800;font-size:.95rem;color:#dc2626;">${mouezBlocages.length} dossier${mouezBlocages.length>1?'s':''} en attente de votre intervention</span>
+      const tachesRetard = (DB.taches||[]).filter(t=>{
+        if (t.statut==='Terminé' || !t.echeance) return false;
+        const d = new Date(t.echeance); d.setHours(0,0,0,0);
+        return d < new Date(new Date().setHours(0,0,0,0));
+      });
+      const remontees = getEscaladeTaches().filter(t=>t.statut!=='Terminé');
+      const totalUrgent = mouezBlocages.length + tachesRetard.length + remontees.length;
+      if (totalUrgent === 0) return '';
+      return `<div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-size:1.2rem;">⚠️</span>
+        <div style="flex:1;display:flex;gap:12px;flex-wrap:wrap;">
+          ${mouezBlocages.length>0?`<button onclick="showPage('admin-ventes')" style="background:#dc2626;color:white;border:none;border-radius:20px;padding:6px 12px;font-size:.8rem;font-weight:600;cursor:pointer;white-space:nowrap;"><span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.3);text-align:center;line-height:20px;margin-right:6px;font-size:.7rem;font-weight:800;">${mouezBlocages.length}</span>Mouez</button>`:''}
+          ${tachesRetard.length>0?`<button onclick="showPage('admin-taches')" style="background:#f59e0b;color:white;border:none;border-radius:20px;padding:6px 12px;font-size:.8rem;font-weight:600;cursor:pointer;white-space:nowrap;"><span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.3);text-align:center;line-height:20px;margin-right:6px;font-size:.7rem;font-weight:800;">${tachesRetard.length}</span>Retard</button>`:''}
+          ${remontees.length>0?`<button onclick="showPage('admin-taches')" style="background:#3b82f6;color:white;border:none;border-radius:20px;padding:6px 12px;font-size:.8rem;font-weight:600;cursor:pointer;white-space:nowrap;"><span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.3);text-align:center;line-height:20px;margin-right:6px;font-size:.7rem;font-weight:800;">${remontees.length}</span>Escalades</button>`:''}
         </div>
-        <div style="display:flex;flex-direction:column;gap:6px;">${rows}</div>
       </div>`;
     })()}
 
+    <!-- 2. TABLEAU ÉCONOMIQUE DU MOIS - Hero section with KPIs -->
+    <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div style="font-weight:700;font-size:1rem;color:#1f2937;">📊 Bilan du mois — ${MOIS_FULL[mois]} ${annee}</div>
+        <select id="filter-mois" onchange="renderAdminDashboard()" style="font-size:13px;padding:7px 10px;border:1px solid var(--gray-200);border-radius:8px;background:white;cursor:pointer;">
+          ${MOIS_FULL.slice(1).map((m,i)=>`<option value="${i+1}" ${mois===i+1?'selected':''}>${m}</option>`).join('')}
+        </select>
+      </div>
 
-    <!-- ══ PRÉSENCES + BASE COMMUNE TÂCHES ══ -->
-    ${(()=>{
-      const colorsMap = getCollabColors();
-      // Présences
-      let html = '<div style="background:white;border:1px solid var(--gray-100);border-radius:var(--r);padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.07)">';
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
-        + '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:1rem;">👥</span><span style="font-weight:700;font-size:.9rem;color:#1f2937;">Présences de l\'équipe</span></div>'
-        + '</div>';
-      html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">';
-      getCollabNames().forEach(function(n){
-        const absent = isAbsent(n);
-        const pl = (DB.leads||[]).filter(function(l){return l.collab===n && ['À contacter','Contacté — en attente'].includes(l.statut);}).length;
-        const pd = (DB.devis||[]).filter(function(d){return d.collab===n && !['Gagné','Perdu','Abandonné'].includes(d.statut);}).length;
-        const tot = pl + pd;
-        const bg  = absent ? '#fef3c7' : '#f0fdf4';
-        const br  = absent ? '#f59e0b' : '#86efac';
-        const btnBg = absent ? '#d97706' : '#16a34a';
-        const btnLbl = absent ? '🏖️ Absent(e)' : '✅ Présent(e)';
-        const sub = tot + ' tâche' + (tot>1?'s':'') + ' en base' + (absent?' (absent)':'');
-        const initials = n.slice(0,2).toUpperCase();
-        const col = colorsMap[n] || '#6b7280';
-        html += '<div style="display:flex;align-items:center;gap:10px;background:' + bg + ';border:1.5px solid ' + br + ';border-radius:10px;padding:10px 14px;">';
-        html += '<div style="width:32px;height:32px;border-radius:50%;background:' + col + ';color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">' + initials + '</div>';
-        html += '<div style="flex:1;"><div style="font-weight:700;font-size:.88rem;">' + n + '</div><div style="font-size:.75rem;color:#6b7280;">' + sub + '</div></div>';
-        html += '<button onclick="toggleAbsence(\'' + n + '\')" style="background:' + btnBg + ';color:white;border:none;border-radius:6px;padding:5px 12px;font-size:.8rem;font-weight:600;cursor:pointer;">' + btnLbl + '</button>';
-        html += '</div>';
-      });
-      html += '</div>';
-      html += '</div>';
+      <!-- BLOC MOIS : 3 colonnes AN | Résil | Bilan net — même période -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;">
 
-      // Base commune des tâches — toute l'équipe, indépendamment des absences
-      const allLeads = (DB.leads||[]).filter(function(l){return ['À contacter','Contacté — en attente'].includes(l.statut);});
-      const allDevis = (DB.devis||[]).filter(function(d){return !['Gagné','Perdu','Abandonné'].includes(d.statut);});
-      const totalTasks = allLeads.length + allDevis.length;
-      if (totalTasks > 0) {
-        html += '<div style="background:white;border:1px solid var(--gray-100);border-radius:var(--r);padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.07)">';
-        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">'
-          +'<span style="font-size:1rem;">📋</span>'
-          +'<span style="font-weight:700;font-size:.9rem;color:#1f2937;">Base commune des tâches — '+totalTasks+' en cours</span>'
-          +'<span style="margin-left:auto;font-size:.78rem;color:#6b7280;font-style:italic;">Visible par toute l\'équipe</span>'
-          +'</div>';
-        // Par collaborateur
-        getCollabNames().forEach(function(n){
-          const lC = allLeads.filter(function(l){return l.collab===n;});
-          const dC = allDevis.filter(function(d){return d.collab===n;});
-          if (!lC.length && !dC.length) return;
-          const tot2 = lC.length + dC.length;
-          const absent = isAbsent(n);
-          const col = colorsMap[n]||'#6b7280';
-          html += '<div style="margin-bottom:10px;">';
-          html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
-            +'<div style="width:22px;height:22px;border-radius:50%;background:'+col+';color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">'+n.slice(0,1)+'</div>'
-            +'<span style="font-weight:700;font-size:.85rem;color:'+col+'">'+n+'</span>'
-            +(absent?'<span style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:1px 7px;font-size:.7rem;color:#92400e;font-weight:600">🏖️ Absent</span>':'')
-            +'<span style="font-size:.78rem;color:#6b7280;margin-left:4px">'+tot2+' tâche'+(tot2>1?'s':'')+'</span>'
-            +'</div>';
-          html += '<div style="display:flex;flex-direction:column;gap:4px;margin-left:30px;">';
-          lC.forEach(function(l){
-            html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#eff6ff;border-radius:6px;border-left:3px solid #3b82f6;">'
-              +'<span style="font-size:.8rem;flex:1">📞 <strong>'+l.client+'</strong> — <span style="color:#1d4ed8;font-size:.75rem">'+l.statut+'</span>'+(l.produit?' · '+l.produit:'')+'</span>'
-              +'<button onclick="openReassignModal(\'leads\',\''+l.id+'\')" style="background:#3b82f6;color:white;border:none;border-radius:5px;padding:3px 8px;font-size:.73rem;cursor:pointer;white-space:nowrap;">🔄 Réassigner</button>'
-              +'</div>';
-          });
-          dC.forEach(function(d){
-            html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f5f3ff;border-radius:6px;border-left:3px solid #8b5cf6;">'
-              +'<span style="font-size:.8rem;flex:1">📋 <strong>'+d.client+'</strong> — '+d.produit+' <span style="color:#6d28d9;font-size:.75rem">'+d.statut+'</span></span>'
-              +'<button onclick="openReassignModal(\'devis\',\''+d.id+'\')" style="background:#8b5cf6;color:white;border:none;border-radius:5px;padding:3px 8px;font-size:.73rem;cursor:pointer;white-space:nowrap;">🔄 Réassigner</button>'
-              +'</div>';
-          });
-          html += '</div></div>';
-        });
-        html += '</div>';
-      }
-      return html;
-    })()}
-
-    <!-- ══ LIGNE 1 : OBJECTIFS ÉQUIPE CE MOIS ══ -->
-    <div style="background:linear-gradient(135deg,#001F6B,#003DA5);color:white;border-radius:var(--r);padding:16px 20px;margin-bottom:12px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;opacity:.65;margin-bottom:12px">Objectifs équipe — ${MOIS_FULL[mois]} ${annee}</div>
-      <div style="display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;gap:12px;align-items:start">
-        <!-- AN total -->
-        <div>
-          <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:6px">
-            <div style="font-size:52px;font-weight:700;line-height:1;letter-spacing:-3px">${nbAN}</div>
-            <div style="padding-bottom:8px;font-size:20px;opacity:.55">/ ${OBJ_AN_EQ}</div>
-          </div>
-          <div style="font-size:11px;opacity:.8;margin-bottom:8px">${nbAN>=OBJ_AN_EQ?'🏆 Objectif atteint !':Math.max(0,OBJ_AN_EQ-nbAN)+' AN restant'+( Math.max(0,OBJ_AN_EQ-nbAN)>1?'s':'')+' sur l\'équipe'}</div>
-          <div style="height:7px;background:rgba(255,255,255,.18);border-radius:99px;overflow:hidden">
-            <div style="height:100%;width:${Math.min(Math.round(nbAN/OBJ_AN_EQ*100),100)}%;background:${nbAN>=OBJ_AN_EQ?'#4ADE80':'white'};border-radius:99px"></div>
-          </div>
-          <div style="margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;font-size:11px;opacity:.75">
-            <span>🔵 IARD: ${nbIARD}</span>
-            <span>🟢 Santé: ${nbSante}</span>
-            <span>🟣 Prév: ${nbPrev}</span>
+        <!-- AN ce mois -->
+        <div style="background:#eff6ff;padding:16px 14px;border-right:1.5px solid #e2e8f0;">
+          <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#1d4ed8;margin-bottom:6px;letter-spacing:.05em;">📈 AN — ${MOIS_FULL[mois]}</div>
+          <div style="font-size:2.4rem;font-weight:900;color:#1d4ed8;line-height:1;">${nbAN}</div>
+          <div style="font-size:.8rem;color:#374151;margin-top:6px;font-weight:600;">${fmtEuro(primeAN)}</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;">
+            <span style="font-size:.68rem;background:#dbeafe;color:#1e40af;padding:2px 7px;border-radius:99px;font-weight:700;">🔵 IARD ${nbIARD}</span>
+            <span style="font-size:.68rem;background:#dcfce7;color:#15803d;padding:2px 7px;border-radius:99px;font-weight:700;">🟢 Santé ${nbSante}</span>
+            <span style="font-size:.68rem;background:#f5f3ff;color:#6d28d9;padding:2px 7px;border-radius:99px;font-weight:700;">🟣 Prév. ${nbPrev}</span>
           </div>
         </div>
-        <!-- IARD -->
-        <div style="background:rgba(255,255,255,.1);border-radius:var(--rs);padding:12px;border:1px solid rgba(255,255,255,.15)">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;opacity:.7;margin-bottom:6px">🔵 IARD</div>
-          <div style="font-size:28px;font-weight:700;color:${nbIARD>=OBJ_IARD_EQ?'#4ADE80':'white'};line-height:1">${nbIARD}</div>
-          <div style="font-size:10px;opacity:.6;margin-top:2px">/ ${OBJ_IARD_EQ} (Auto ${nbAuto} · MRH ${nbMRH})</div>
-          <div style="margin-top:7px;height:4px;background:rgba(255,255,255,.18);border-radius:99px"><div style="height:100%;width:${Math.min(Math.round(nbIARD/OBJ_IARD_EQ*100),100)}%;background:${nbIARD>=OBJ_IARD_EQ?'#4ADE80':'rgba(255,255,255,.7)'};border-radius:99px"></div></div>
+
+        <!-- Résiliations ce même mois -->
+        <div style="background:${nbResil>0?'#fef2f2':'#f0fdf4'};padding:16px 14px;border-right:1.5px solid #e2e8f0;">
+          <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:${nbResil>0?'#dc2626':'#15803d'};margin-bottom:6px;letter-spacing:.05em;">📉 Résil. — ${MOIS_FULL[mois]}</div>
+          <div style="font-size:2.4rem;font-weight:900;color:${nbResil>0?'#dc2626':'#15803d'};line-height:1;">${nbResil}</div>
+          <div style="font-size:.8rem;color:#374151;margin-top:6px;font-weight:600;">${nbResil>0?'-'+fmtEuro(prResil)+' prime':'Aucune 🎉'}</div>
+          ${nbResil>0?`<div style="margin-top:8px;font-size:.72rem;color:#dc2626;">Comm. agence perdue :<br><strong>-${fmtEuro(commResil)}</strong></div>`:''}
         </div>
-        <!-- Santé -->
-        <div style="background:rgba(22,163,74,.2);border-radius:var(--rs);padding:12px;border:1px solid rgba(134,239,172,.3)">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;opacity:.85;margin-bottom:6px;color:#86EFAC">🟢 Santé</div>
-          <div style="font-size:28px;font-weight:700;color:${nbSante>=OBJ_SANT_EQ?'#4ADE80':'white'};line-height:1">${nbSante}</div>
-          <div style="font-size:10px;opacity:.65;margin-top:2px">obj. ${OBJ_SANT_EQ} équipe</div>
-          <div style="margin-top:7px;height:4px;background:rgba(255,255,255,.18);border-radius:99px"><div style="height:100%;width:${Math.min(Math.round(nbSante/OBJ_SANT_EQ*100),100)}%;background:${nbSante>=OBJ_SANT_EQ?'#4ADE80':'#86EFAC'};border-radius:99px"></div></div>
+
+        <!-- Bilan net = AN - Résil (même mois) -->
+        <div style="background:${soldeNb>0?'#f0fdf4':soldeNb===0?'#f8fafc':'#fef2f2'};padding:16px 14px;">
+          <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:${soldeNb>0?'#15803d':'#dc2626'};margin-bottom:6px;letter-spacing:.05em;">⚖️ Bilan net — ${MOIS_FULL[mois]}</div>
+          <div style="font-size:2.4rem;font-weight:900;color:${soldeNb>0?'#15803d':soldeNb===0?'#6b7280':'#dc2626'};line-height:1;">${soldeNb>0?'+':''}${soldeNb} AN</div>
+          <div style="font-size:.8rem;color:#374151;margin-top:6px;font-weight:600;">${soldePrime>=0?'+':''}${fmtEuro(soldePrime)} prime</div>
+          <div style="margin-top:8px;">
+            ${nbResil>0?`<div style="font-size:.72rem;font-weight:700;color:${rapColor(rapport)};">Taux de perte : ${Math.round(nbResil/nbAN*100)}%</div>`:''}
+            <div style="font-size:.78rem;font-weight:800;color:#1d4ed8;margin-top:4px;">Comm. nette : ${fmtEuro(commNette)}</div>
+          </div>
         </div>
-        <!-- Prévoyance -->
-        <div style="background:rgba(124,58,237,.2);border-radius:var(--rs);padding:12px;border:1px solid rgba(196,181,253,.3)">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;opacity:.85;margin-bottom:6px;color:#C4B5FD">🟣 Prévoyance</div>
-          <div style="font-size:28px;font-weight:700;color:${nbPrev>=OBJ_PREV_EQ?'#4ADE80':'white'};line-height:1">${nbPrev}</div>
-          <div style="font-size:10px;opacity:.65;margin-top:2px">obj. ${OBJ_PREV_EQ} équipe</div>
-          <div style="margin-top:7px;height:4px;background:rgba(255,255,255,.18);border-radius:99px"><div style="height:100%;width:${Math.min(Math.round(nbPrev/OBJ_PREV_EQ*100),100)}%;background:${nbPrev>=OBJ_PREV_EQ?'#4ADE80':'#C4B5FD'};border-radius:99px"></div></div>
+      </div>
+
+      <!-- YTD strip — clairement séparé, autre période -->
+      <div style="background:#f8fafc;border-radius:10px;padding:10px 14px;">
+        <div style="font-size:.68rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">📆 Cumul annuel ${annee} (janvier → ${MOIS_FULL[mois]})</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+          <div style="text-align:center;">
+            <div style="font-size:.7rem;color:#6b7280;margin-bottom:3px;">AN total</div>
+            <div style="font-size:1.25rem;font-weight:800;color:#1d4ed8;">${ytdAN}</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:.7rem;color:#6b7280;margin-bottom:3px;">Résil. total</div>
+            <div style="font-size:1.25rem;font-weight:800;color:#dc2626;">${ytdNbR}</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:.7rem;color:#6b7280;margin-bottom:3px;">Solde AN net</div>
+            <div style="font-size:1.25rem;font-weight:800;color:${ytdSolde>=0?'#15803d':'#dc2626'};">${ytdSolde>=0?'+':''}${ytdSolde}</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:.7rem;color:#6b7280;margin-bottom:3px;">Comm. nette</div>
+            <div style="font-size:1.1rem;font-weight:800;color:#1d4ed8;">
+              ${(()=>{
+                const cYTD = DB.ventes.filter(v=>v.annee===annee&&v.affaireNouvelle==='Oui').reduce((s,v)=>s+calcCommission(v.produit,v.prime),0);
+                const cRYTD = DB.resiliations.filter(r=>r.annee===annee).reduce((s,r)=>s+calcCommission(r.produit,r.prime),0);
+                return fmtEuro(cYTD - cRYTD);
+              })()}
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- ══ LIGNE 2 : RÉSILIATIONS + SOLDES NETS + COMMISSIONS ══ -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:12px">
-      <!-- AN mois -->
-      <div style="background:var(--blue-light);border:1px solid var(--gray-200);border-radius:var(--r);padding:14px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--blue);margin-bottom:8px">AN — ${MOIS_FULL[mois]}</div>
-        <div style="font-size:30px;font-weight:700;color:var(--blue);line-height:1">${nbAN}</div>
-        <div style="font-size:11px;color:var(--gray-600);margin-top:4px">${fmtEuro(primeAN)} prime AN</div>
-        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-          <span style="font-size:10px;background:#EFF6FF;color:#003DA5;padding:2px 8px;border-radius:99px;font-weight:600">🔵 ${nbIARD} IARD</span>
-          <span style="font-size:10px;background:#F0FDF4;color:#15803D;padding:2px 8px;border-radius:99px;font-weight:600">🟢 ${nbSante} Santé</span>
-          <span style="font-size:10px;background:#F5F3FF;color:#6D28D9;padding:2px 8px;border-radius:99px;font-weight:600">🟣 ${nbPrev} Prév.</span>
-        </div>
-      </div>
-
-      <!-- Résiliations mois -->
-      <div style="background:${nbResil>0?'#FEF2F2':'var(--green-light)'};border:1px solid ${nbResil>0?'#FCA5A5':'#86EFAC'};border-radius:var(--r);padding:14px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${nbResil>0?'#DC2626':'#16A34A'};margin-bottom:8px">⚠ Résiliations — ${MOIS_FULL[mois]}</div>
-        <div style="font-size:30px;font-weight:700;color:${nbResil>0?'#DC2626':'#16A34A'};line-height:1">${nbResil}</div>
-        <div style="font-size:11px;color:var(--gray-600);margin-top:4px">${nbResil>0?fmtEuro(prResil)+' prime résiliée':'Aucune résiliation 🎉'}</div>
-        ${nbResil>0?`<div style="margin-top:8px;font-size:11px;color:#DC2626;font-weight:600">Impact : -${fmtEuro(prResil)} prime</div>`:''}
-      </div>
-
-      <!-- Solde net mois -->
-      <div style="background:${soldeNb>0?'var(--green-light)':soldeNb===0?'var(--gray-50)':'#FEF2F2'};border:${soldeNb>0?'2px solid #86EFAC':soldeNb===0?'1px solid var(--gray-200)':'2px solid #FCA5A5'};border-radius:var(--r);padding:14px;border-left:4px solid ${soldeNb>0?'#16A34A':soldeNb===0?'var(--gray-400)':'#DC2626'}">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin-bottom:8px">Solde Net — ${MOIS_FULL[mois]}</div>
-        <div style="font-size:30px;font-weight:700;color:${soldeNb>0?'#16A34A':soldeNb===0?'var(--gray-600)':'#DC2626'};line-height:1">${soldeNb>0?'+':''}${soldeNb}</div>
-        <div style="font-size:11px;color:var(--gray-600);margin-top:4px">${soldePrime>0?'+':''}${fmtEuro(soldePrime)} solde prime</div>
-        <div style="margin-top:6px;font-size:12px;font-weight:700;color:${rapColor(rapport)}">${rapport!==null?'Rapport AN/Résil : '+rapport+'%':'Pas de résiliation'}</div>
-      </div>
-
-      <!-- Commission mois — acquises / perdues / solde -->
-      <div style="background:var(--green-light);border:2px solid #A7D9BC;border-radius:var(--r);padding:14px;border-left:4px solid var(--green)">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--green);margin-bottom:10px">💰 Commissions — ${MOIS_FULL[mois]}</div>
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:rgba(255,255,255,.7);border-radius:6px;">
-            <span style="font-size:11px;color:#166534;font-weight:600;">✅ Acquises</span>
-            <span style="font-size:16px;font-weight:800;color:#16a34a;">${fmtEuro(commAN)}</span>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:${commResil>0?'#fef2f2':'rgba(255,255,255,.4)'};border-radius:6px;">
-            <span style="font-size:11px;color:${commResil>0?'#dc2626':'#6b7280'};font-weight:600;">❌ Résiliations</span>
-            <span style="font-size:16px;font-weight:800;color:${commResil>0?'#dc2626':'#9ca3af'};">${commResil>0?'- '+fmtEuro(commResil):'—'}</span>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:6px;margin-top:2px;">
-            <span style="font-size:11px;color:#bfdbfe;font-weight:700;">💎 Solde net</span>
-            <span style="font-size:18px;font-weight:800;color:#fff;">${fmtEuro(commNette)}</span>
-          </div>
-        </div>
-        <div style="margin-top:8px;font-size:10px;color:#166534;text-align:right;">${primeAN>0?Math.round(commAN/primeAN*100)+'% taux moyen':''}</div>
+    <!-- 3. OBJECTIFS ÉQUIPE - Compact white card -->
+    <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+      <div style="font-weight:700;font-size:.95rem;color:#1f2937;margin-bottom:14px;">🎯 Objectifs — ${MOIS_FULL[mois]}</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${collabData.map(cd=>{
+          const objStatus = getObjectifsStatus(cd.name, mois, annee);
+          const commStatus = calcCommissionCollabMensuel(cd.name, mois, annee);
+          const allOK = objStatus.autoOK && objStatus.mrhOK && objStatus.nopOK;
+          const pctAuto = Math.min(100, Math.round(objStatus.nbAuto/10*100));
+          const pctMRH = Math.min(100, Math.round(objStatus.nbMRH/8*100));
+          const pctNOP = Math.min(100, Math.round(objStatus.nbNOP/4*100));
+          return `<div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--gray-50);border-radius:10px;">
+            <div style="width:32px;height:32px;border-radius:50%;background:${cd.color};color:white;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;">${cd.init}</div>
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:.85rem;color:#1f2937;margin-bottom:4px;">${cd.name}</div>
+              <div style="display:flex;gap:8px;font-size:.75rem;">
+                <span style="background:white;padding:2px 8px;border-radius:6px;color:#003DA5;">Auto: ${objStatus.nbAuto}/10</span>
+                <span style="background:white;padding:2px 8px;border-radius:6px;color:#15803D;">MRH: ${objStatus.nbMRH}/8</span>
+                <span style="background:white;padding:2px 8px;border-radius:6px;color:#6D28D9;">NOP: ${objStatus.nbNOP}/4</span>
+              </div>
+            </div>
+            <div style="text-align:right;font-weight:700;font-size:.85rem;padding:6px 12px;border-radius:8px;${allOK?'background:#f0fdf4;color:#15803d;':'background:white;color:#6b7280;'}">${allOK?'✅ Comm.':commStatus>0?fmtEuro(commStatus):'🔒'}</div>
+          </div>`;
+        }).join('')}
       </div>
     </div>
 
-    <!-- ══ CUMUL ANNUEL ══ -->
-    <div style="background:white;border:1px solid var(--gray-100);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--blue);margin-bottom:12px;display:flex;align-items:center;gap:6px">
-        <span>📅</span> Cumul annuel ${annee}
+    <!-- 4. Two-column grid: Tâches widget + Présences équipe -->
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;margin-bottom:12px;">
+      <!-- LEFT: Tâches dashboard -->
+      <div>
+        ${buildDashboardTachesWidget()}
       </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
-        <div style="background:var(--blue-light);border:1px solid var(--gray-200);border-radius:var(--rs);padding:12px">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--blue);margin-bottom:6px">AN cumulés</div>
-          <div style="font-size:26px;font-weight:700;color:var(--blue);line-height:1">${ytdAN}</div>
-          <div style="font-size:10px;color:var(--gray-600);margin-top:3px">${fmtEuro(ytdPrime)}</div>
-          <div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
-            <span style="font-size:9px;background:#EFF6FF;color:#003DA5;padding:1px 6px;border-radius:99px;font-weight:600">🔵 ${ytdIARD} IARD</span>
-            <span style="font-size:9px;background:#F0FDF4;color:#15803D;padding:1px 6px;border-radius:99px;font-weight:600">🟢 ${ytdSante} Santé</span>
-            <span style="font-size:9px;background:#F5F3FF;color:#6D28D9;padding:1px 6px;border-radius:99px;font-weight:600">🟣 ${ytdPrev} Prév.</span>
-          </div>
-        </div>
-        <div style="background:${ytdNbR>0?'#FEF2F2':'var(--green-light)'};border:1px solid ${ytdNbR>0?'#FCA5A5':'#86EFAC'};border-radius:var(--rs);padding:12px">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:${ytdNbR>0?'#DC2626':'#16A34A'};margin-bottom:6px">Résil. cumulées</div>
-          <div style="font-size:26px;font-weight:700;color:${ytdNbR>0?'#DC2626':'#16A34A'};line-height:1">${ytdNbR}</div>
-          <div style="font-size:10px;color:var(--gray-600);margin-top:3px">${ytdNbR>0?fmtEuro(ytdPrR)+' résiliée':'Aucune 🎉'}</div>
-        </div>
-        <div style="background:${ytdSolde>0?'var(--green-light)':'#FEF2F2'};border:1px solid ${ytdSolde>0?'#86EFAC':'#FCA5A5'};border-radius:var(--rs);padding:12px;border-left:3px solid ${ytdSolde>0?'#16A34A':'#DC2626'}">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--gray-600);margin-bottom:6px">Solde net cumulé</div>
-          <div style="font-size:26px;font-weight:700;color:${ytdSolde>0?'#16A34A':'#DC2626'};line-height:1">${ytdSolde>0?'+':''}${ytdSolde}</div>
-          <div style="font-size:10px;color:var(--gray-600);margin-top:3px">${ytdSoldePr>0?'+':''}${fmtEuro(ytdSoldePr)} prime</div>
-          <div style="font-size:10px;font-weight:700;color:${rapColor(ytdRap)};margin-top:3px">${ytdRap!==null?'Rapport : '+ytdRap+'%':'Pas de résil.'}</div>
-        </div>
-        <div style="background:var(--green-light);border:2px solid #A7D9BC;border-radius:var(--rs);padding:12px;border-left:3px solid var(--green)">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--green);margin-bottom:6px">💰 Comm. cumulées</div>
+
+      <!-- RIGHT: Présences équipe -->
+      <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+        <div style="font-weight:700;font-size:.9rem;color:#1f2937;margin-bottom:12px;">👥 Présences équipe</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
           ${(()=>{
-            const cYTD = DB.ventes.filter(v=>v.annee===annee&&v.affaireNouvelle==='Oui').reduce((s,v)=>s+calcCommission(v.produit,v.prime),0);
-            const cRYTD = DB.resiliations.filter(r=>r.annee===annee).reduce((s,r)=>s+calcCommission(r.produit,r.prime)*0.5,0);
-            const cNYTD = cYTD - cRYTD;
-            return '<div style="font-size:11px;color:#166534;font-weight:600">✅ '+fmtEuro(cYTD)+'</div>'
-              +(cRYTD>0?'<div style="font-size:10px;color:#dc2626">❌ -'+fmtEuro(cRYTD)+'</div>':'')
-              +'<div style="font-size:16px;font-weight:800;color:#1e40af;margin-top:4px">💎 '+fmtEuro(cNYTD)+'</div>';
+            const colorsMap = getCollabColors();
+            return getCollabNames().map(function(n){
+              const absent = isAbsent(n);
+              const pl = (DB.leads||[]).filter(function(l){return l.collab===n && ['À contacter','Contacté — en attente'].includes(l.statut);}).length;
+              const pd = (DB.devis||[]).filter(function(d){return d.collab===n && !['Gagné','Perdu','Abandonné'].includes(d.statut);}).length;
+              const tot = pl + pd;
+              const bg  = absent ? '#fef3c7' : '#f0fdf4';
+              const br  = absent ? '#f59e0b' : '#86efac';
+              const btnBg = absent ? '#d97706' : '#16a34a';
+              const btnLbl = absent ? '🏖️' : '✅';
+              const initials = n.slice(0,2).toUpperCase();
+              const col = colorsMap[n] || '#6b7280';
+              return '<div style="display:flex;align-items:center;gap:10px;background:' + bg + ';border:1.5px solid ' + br + ';border-radius:10px;padding:9px 12px;font-size:.78rem;">'
+                + '<div style="width:24px;height:24px;border-radius:50%;background:' + col + ';color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">' + initials + '</div>'
+                + '<div style="flex:1;"><div style="font-weight:600;">' + n + '</div><div style="color:#6b7280;font-size:.7rem;">📞' + pl + ' 📋' + pd + '</div></div>'
+                + '<button onclick="toggleAbsence(\'' + n + '\')" style="background:' + btnBg + ';color:white;border:none;border-radius:6px;padding:3px 8px;font-size:.75rem;font-weight:600;cursor:pointer;">' + btnLbl + '</button>'
+                + '</div>';
+            }).join('');
           })()}
         </div>
       </div>
     </div>
 
-    <!-- ══ CARTES COLLABORATEURS ══ -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+    <!-- 5. CARTES COLLABORATRICES -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
       ${collabData.map(cd=>mkCard(cd)).join('')}
     </div>
 
-    <!-- ══ GRAPHIQUE MENSUEL ══ -->
-    <div style="background:white;border:1px solid var(--gray-100);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+    <!-- 6. CHALLENGE widget -->
+    ${buildChallengeAdminWidget()}
+
+    <!-- 7. GRAPHIQUE MENSUEL -->
+    <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
         <span style="font-size:13px;font-weight:600;color:var(--gray-800)">📊 Activité mensuelle ${annee} — AN vs Résiliations</span>
         <div style="display:flex;gap:12px;font-size:11px;flex-wrap:wrap">
@@ -5715,18 +5615,15 @@ function renderAdminDashboard() {
             const isSel  = r.m===mois;
             const isFut  = r.m>mois;
             return `<div style="flex:1;display:flex;align-items:flex-end;gap:2px;position:relative;justify-content:center;opacity:${isFut?.2:1}">
-              <!-- AN empilé -->
               <div style="width:42%;display:flex;flex-direction:column-reverse;gap:1px;height:100px;justify-content:flex-start;align-items:stretch">
                 ${hIard  ? `<div style="height:${hIard}px;background:#003DA5;border-radius:0"></div>` : ''}
                 ${hSante ? `<div style="height:${hSante}px;background:#16A34A"></div>` : ''}
                 ${hPrev  ? `<div style="height:${hPrev}px;background:#7C3AED"></div>` : ''}
                 ${!r.an  ? `<div style="height:3px;background:var(--gray-100);border-radius:2px"></div>` : ''}
               </div>
-              <!-- Résil -->
               <div style="width:28%;display:flex;flex-direction:column;justify-content:flex-end;height:100px">
                 ${hResil ? `<div style="height:${hResil}px;background:#DC2626;border-radius:2px 2px 0 0;opacity:.75"></div>` : `<div style="height:3px;background:var(--gray-100);border-radius:2px"></div>`}
               </div>
-              <!-- Valeurs -->
               <div style="position:absolute;top:-30px;left:0;right:0;display:flex;justify-content:space-between;font-size:8px;font-weight:700">
                 ${r.an>0?`<span style="color:var(--blue)">${r.an}</span>`:'<span></span>'}
                 ${r.nb>0?`<span style="color:#DC2626">${r.nb}</span>`:'<span></span>'}
@@ -5739,8 +5636,8 @@ function renderAdminDashboard() {
       </div>
     </div>
 
-    <!-- ══ TABLEAU MENSUEL COMPLET ══ -->
-    <div style="background:white;border:1px solid var(--gray-100);border-radius:var(--r);margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden">
+    <!-- 8. TABLEAU MENSUEL COMPLET -->
+    <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden">
       <div style="padding:12px 18px;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between">
         <span style="font-size:13px;font-weight:600;color:var(--gray-800)">Tableau mensuel complet ${annee}</span>
         <span style="font-size:11px;color:var(--gray-400)">AN · par univers · Résiliations · Solde net</span>
@@ -5790,14 +5687,13 @@ function renderAdminDashboard() {
       </div>
     </div>
 
-
-
-    <!-- DEVIS BLOC -->
+    <!-- 8. DEVIS BLOC -->
     <div class="card">
       <div class="card-header"><div class="card-title"><div class="card-icon">📋</div>Devis en cours — Équipe</div></div>
       ${renderAdminDevisBlock()}
     </div>`;
 }
+
 function refreshDashboard() { renderAdminDashboard(); }
 
 
