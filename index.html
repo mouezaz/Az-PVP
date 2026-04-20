@@ -5262,7 +5262,7 @@ function buildDashboardTachesWidget() {
       var assigneur = t.createdBy || t.assignePar || '';
       var color = COLORS[assigneur] || '#7c3aed';
       html += '<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid #ddd6fe;">'
-        +(assigneur?'<div style="width:20px;height:20px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;color:white;font-size:.65rem;font-weight:700;flex-shrink:0;">'+assigneur[0]+'</div>':'<span style="font-size:.8rem;">👑</span>')
+        +(assigneur?'<div style="width:20px;height:20px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;color:white;font-size:.65rem;font-weight:700;flex-shrink:0;">'+assigneur[0]+'</div>':'<span style="font-size:.8rem;color:#7c3aed;font-weight:700;">M</span>')
         +'<span style="font-size:.8rem;color:#1f2937;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+t.titre+'</span>'
         +flag
         +(t.priorite==='haute'?'<span style="color:#ef4444;font-size:.75rem;font-weight:700;">🔴</span>':'')
@@ -10352,7 +10352,7 @@ PAGES['collab-taches'] = function(mc) {
             <div>
               <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Assignée à</label>
               <select id="tm-collab" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
-                <option value="Mouez">👑 Mouez</option>
+                <option value="Mouez">Mouez</option>
                 ${ALL_COLLABS.map(function(n){return '<option value="'+n+'"'+(n===currentUser.name?' selected':'')+'>'+n+'</option>';}).join('')}
               </select>
             </div>
@@ -10658,7 +10658,7 @@ function openTransferModal(id, titre, currentCollab) {
   document.getElementById('transfer-titre').textContent = '"' + titre + '"';
   var sel = document.getElementById('transfer-dest');
   if (sel) {
-    sel.innerHTML = ALL.map(function(n){ return '<option value="'+n+'"'+(n===currentCollab?' selected':'')+'>'+(n==='Mouez'?'👑 ':'')+n+'</option>'; }).join('');
+    sel.innerHTML = ALL.map(function(n){ return '<option value="'+n+'"'+(n===currentCollab?' selected':'+')+'>'+n+'</option>'; }).join('');
   }
   var m = document.getElementById('transfer-modal');
   if (m) m.style.display = 'flex';
@@ -10716,7 +10716,7 @@ PAGES['admin-taches'] = function(mc) {
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <select id="at-filtre-collab" onchange="renderAdminTaches()" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid #e5e7eb;">
             <option value="">Toutes</option>
-            <option value="Mouez">👑 Mouez</option>
+            <option value="Mouez">Mouez</option>
             ${getCollabNames().map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('')}
           </select>
           <select id="at-filtre-statut" onchange="renderAdminTaches()" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid #e5e7eb;">
