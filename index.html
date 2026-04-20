@@ -570,7 +570,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
         </div>
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
-      <button onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
+      <button onclick="showPage('app-guide')" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
       <button onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
@@ -1014,6 +1014,7 @@ function buildCollabSidebar() {
     { id: 'collab-saisir',      icon: '✚',  label: 'Saisir une vente' },
     { id: 'collab-ventes',      icon: '📂', label: 'Mes affaires' },
     { id: 'collab-resil',       icon: '🛡',  label: 'Résiliations' },
+    { id: 'app-guide',          icon: '📖', label: 'Guide opérationnel' },
   ];
   const rh = [
     { id: 'collab-conges',       icon: '🏖️', label: 'Mes congés' },
@@ -1041,6 +1042,7 @@ function buildAdminSidebar() {
     { id: 'admin-import',       icon: '📥', label: 'Import données' },
     { id: 'admin-settings',     icon: '⚙️', label: 'Paramètres & PIN' },
     { id: 'admin-export',       icon: '⬇',  label: 'Export & Impression' },
+    { id: 'app-guide',          icon: '📖', label: 'Guide opérationnel' },
   ];
   const rh = [
     { id: 'admin-rh-conges',      icon: '🏖️', label: 'Congés équipe' },
@@ -1140,7 +1142,12 @@ function nowMois() { const d = new Date(); return d.getMonth()+1; }
 
 const GUIDE_URL_DEFAULT = 'https://drive.google.com/file/d/1ejgKAurx-HBdRtMtElkr-2f_rF2KR0Xu/view';
 function getGuideUrl() { return (DB.settings && DB.settings.guideUrl) || GUIDE_URL_DEFAULT; }
-function openGuide() { window.open(getGuideUrl(), '_blank', 'noopener'); }
+function getGuidePreviewUrl() {
+  var url = getGuideUrl();
+  // Convert Google Drive /view to /preview for iframe embedding
+  return url.replace(/\/view(\?.*)?$/, '/preview');
+}
+function openGuide() { showPage('app-guide'); }
 function nowAnnee() { return new Date().getFullYear(); }
 function fmtMois(m, a) { return MOIS_LABELS[m] + ' ' + a; }
 function fmtEuro(v) { return (parseFloat(v)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €'; }
@@ -2865,7 +2872,7 @@ PAGES['collab-home'] = function(mc) {
       +'</div></div>';
 
     // GUIDE OPÉRATIONNEL
-    html += '<div onclick="openGuide()" style="display:flex;align-items:center;gap:14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-top:14px;cursor:pointer;" onmouseover="this.style.boxShadow=\'0 4px 12px rgba(0,0,0,.1)\'" onmouseout="this.style.boxShadow=\'none\'">'
+    html += '<div onclick="showPage(\'app-guide\')" style="display:flex;align-items:center;gap:14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-top:14px;cursor:pointer;" onmouseover="this.style.boxShadow=\'0 4px 12px rgba(0,0,0,.1)\'" onmouseout="this.style.boxShadow=\'none\'">'
       +'<div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#003DA5,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;">📖</div>'
       +'<div style="flex:1;">'
       +'<div style="font-weight:700;font-size:.9rem;color:#1f2937;">Guide opérationnel agence</div>'
@@ -5609,7 +5616,7 @@ function renderAdminDashboard() {
     </div>
 
     <!-- GUIDE OPÉRATIONNEL -->
-    <div onclick="openGuide()" style="display:flex;align-items:center;gap:14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-bottom:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06);" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.06)'">
+    <div onclick="showPage('app-guide')" style="display:flex;align-items:center;gap:14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-bottom:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06);" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.06)'">
       <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#003DA5,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;">📖</div>
       <div style="flex:1;">
         <div style="font-weight:700;font-size:.92rem;color:#1f2937;">Guide opérationnel agence Essid</div>
@@ -6694,6 +6701,34 @@ function renderPerformanceEquipe() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ---- GUIDE OPÉRATIONNEL (admin + collab) ----
+PAGES['app-guide'] = (mc) => {
+  var guideUrl = getGuideUrl();
+  var isAdmin = currentUser && currentUser.role === 'admin';
+  mc.innerHTML = '<div class="page-header flex-between" style="margin-bottom:12px">'
+    + '<div><h1>📖 Guide opérationnel</h1>'
+    + '<p style="font-size:.82rem;color:#6b7280;margin:2px 0 0">Procédures, produits, tarification, conseils — agence Essid</p></div>'
+    + (isAdmin ? '<button onclick="showPage(\'admin-settings\')" style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:7px;padding:7px 14px;font-size:.8rem;font-weight:600;cursor:pointer;color:#374151;">⚙️ Modifier le lien</button>' : '')
+    + '</div>'
+    + '<div style="display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 200px);">'
+    + '<div style="background:#fff;border-radius:20px;box-shadow:0 4px 24px rgba(0,0,0,.1);padding:48px 40px;max-width:520px;width:100%;text-align:center;">'
+    + '<div style="width:80px;height:80px;border-radius:20px;background:linear-gradient(135deg,#003DA5,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:2.4rem;margin:0 auto 24px;">📖</div>'
+    + '<h2 style="font-size:1.25rem;font-weight:800;color:#1f2937;margin:0 0 8px;">Guide opérationnel agence Essid</h2>'
+    + '<p style="font-size:.87rem;color:#6b7280;margin:0 0 32px;line-height:1.6;">Retrouvez toutes les procédures, produits, tarification et conseils pour la gestion quotidienne de l\'agence.</p>'
+    + '<a href="' + guideUrl + '" target="_blank" rel="noreferrer" '
+    + 'style="display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#003DA5,#1d4ed8);color:#fff;font-weight:700;font-size:1rem;padding:16px 36px;border-radius:12px;text-decoration:none;box-shadow:0 4px 14px rgba(0,61,165,.35);" '
+    + 'onmouseover="this.style.opacity=\'0.9\'" onmouseout="this.style.opacity=\'1\'">'
+    + '📄 Ouvrir le guide'
+    + '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>'
+    + '</a>'
+    + '<p style="font-size:.75rem;color:#9ca3af;margin-top:20px;">S\'ouvre dans un nouvel onglet</p>'
+    + (isAdmin ? '<div style="margin-top:28px;padding-top:24px;border-top:1px solid #f3f4f6;text-align:left">'
+      + '<p style="font-size:.78rem;color:#6b7280;margin:0 0 8px;font-weight:600;">🔗 Lien actuel :</p>'
+      + '<p style="font-size:.73rem;color:#9ca3af;word-break:break-all;margin:0;font-family:monospace;">' + guideUrl + '</p>'
+      + '</div>' : '')
+    + '</div></div>';
+};
 
 PAGES['admin-resil'] = (mc) => {
   const mois = nowMois(), annee = nowAnnee();
@@ -7980,7 +8015,7 @@ PAGES['admin-settings'] = (mc) => {
   + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
   + '<input id="guide-url-input" type="url" placeholder="https://drive.google.com/file/d/..." value="'+(DB.settings && DB.settings.guideUrl ? DB.settings.guideUrl : GUIDE_URL_DEFAULT)+'" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #d1d5db;border-radius:6px;font-size:.84rem;">'
   + '<button onclick="saveGuideUrl()" style="background:#C8960C;color:white;border:none;border-radius:6px;padding:8px 16px;font-size:.83rem;font-weight:700;cursor:pointer;">💾 Enregistrer</button>'
-  + '<button onclick="openGuide()" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:8px 12px;font-size:.83rem;font-weight:600;cursor:pointer;">📖 Tester</button>'
+  + '<button onclick="showPage(\'app-guide\')" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:8px 12px;font-size:.83rem;font-weight:600;cursor:pointer;">📖 Aperçu</button>'
   + '</div>'
   + '<div style="font-size:.75rem;color:#9ca3af;margin-top:6px;">✅ Le lien est partagé via Firebase — une seule mise à jour suffit pour tous les appareils.</div>'
   + '</div></div>'
@@ -8004,7 +8039,9 @@ function saveGuideUrl() {
   if (!DB.settings) DB.settings = {};
   DB.settings.guideUrl = val;
   saveDB(DB);
-  toast('✅ Lien du guide mis à jour — actif sur tous les appareils', 'success');
+  toast('✅ Lien mis à jour — actif immédiatement sur tous les appareils', 'success');
+  // Si l'utilisateur est sur la page guide, recharger pour prendre la nouvelle URL
+  if (currentPage === 'app-guide') showPage('app-guide');
 }
 
 function saveApiKey() {
