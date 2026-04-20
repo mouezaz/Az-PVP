@@ -10653,12 +10653,12 @@ function confirmDeleteTache(id) {
 }
 
 function openTransferModal(id, titre, currentCollab) {
-  var ALL = getCollabNames();
+  var ALL = ['Mouez'].concat(getCollabNames());
   document.getElementById('transfer-id').value = id;
   document.getElementById('transfer-titre').textContent = '"' + titre + '"';
   var sel = document.getElementById('transfer-dest');
   if (sel) {
-    sel.innerHTML = ALL.map(function(n){ return '<option value="'+n+'"'+(n===currentCollab?' selected':'')+'>'+n+'</option>'; }).join('');
+    sel.innerHTML = ALL.map(function(n){ return '<option value="'+n+'"'+(n===currentCollab?' selected':'')+'>'+(n==='Mouez'?'👑 ':'')+n+'</option>'; }).join('');
   }
   var m = document.getElementById('transfer-modal');
   if (m) m.style.display = 'flex';
