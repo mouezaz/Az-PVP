@@ -1895,22 +1895,13 @@ const LEAD_STATUT_PILLS = {
 
 PAGES['collab-leads'] = (mc) => {
   mc.innerHTML = `
-    <div class="page-header flex-between">
-      <div><h1>📞 Leads & Relances</h1><p>Vos contacts, devis et découvertes</p></div>
-      <button class="btn btn-primary" onclick="openAddLead()">✚ Nouveau lead</button>
-    </div>
-
-    <!-- Onglets de navigation prospection -->
-    <div style="display:flex;gap:8px;margin-bottom:18px;border-bottom:2px solid #e5e7eb;padding-bottom:0;">
-      <button onclick="" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px 8px 0 0;padding:9px 18px;font-size:.88rem;font-weight:700;cursor:default;margin-bottom:-2px;border-bottom:2px solid #1d4ed8;">
-        📞 Leads
-      </button>
-      <button onclick="showPage('collab-prospection')" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px 8px 0 0;padding:9px 18px;font-size:.88rem;font-weight:600;cursor:pointer;margin-bottom:-2px;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
-        📋 Devis & Relances
-      </button>
-      <button onclick="showPage('collab-decouverte')" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px 8px 0 0;padding:9px 18px;font-size:.88rem;font-weight:600;cursor:pointer;margin-bottom:-2px;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
-        🔍 Découverte client
-      </button>
+    <div class="page-header flex-between" style="flex-wrap:wrap;gap:10px;">
+      <div><h1>📞 Leads & Devis</h1><p>Vos contacts commerciaux — leads, devis et relances</p></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" onclick="openAddLead()">✚ Nouveau lead</button>
+        <button class="btn" style="background:#059669;color:white;border-color:#059669;" onclick="openAddDevis()">✚ Nouveau devis</button>
+        <button class="btn btn-ghost" onclick="showPage('collab-decouverte')">🔍 Découverte client</button>
+      </div>
     </div>
 
     <!-- KPIs leads -->
@@ -1958,10 +1949,65 @@ PAGES['collab-leads'] = (mc) => {
 
     <div class="card" style="padding:0">
       <div id="leads-table-zone"></div>
+    </div>
+
+    <!-- SECTION DEVIS & RELANCES -->
+    <div style="margin-top:28px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid #059669;">
+        <div>
+          <h2 style="margin:0;font-size:1.1rem;font-weight:800;color:#065f46;">📋 Devis & Relances</h2>
+          <p style="margin:2px 0 0;font-size:.8rem;color:#6b7280;">Tous les devis de l'équipe — relances et suivi</p>
+        </div>
+      </div>
+      <div id="prosp-kpis" class="sep16"></div>
+      <div id="prosp-alertes"></div>
+      <div class="card" style="padding:12px 16px;margin-bottom:14px">
+        <div class="flex-gap" style="flex-wrap:wrap;gap:10px">
+          <div class="form-group" style="min-width:150px">
+            <label class="fl">Statut</label>
+            <select id="df-statut" onchange="renderDevisList()">
+              <option value="">Actifs uniquement</option>
+              <option value="all">Tous les devis</option>
+              ${DEVIS_STATUTS.map(s=>`<option value="${s}">${s}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="min-width:140px">
+            <label class="fl">Collaborateur</label>
+            <select id="df-collab" onchange="renderDevisList()">
+              <option value="">Toute l'équipe</option>
+              ${getCollabNames().map(n=>`<option value="${n}">${n}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="min-width:140px">
+            <label class="fl">Produit</label>
+            <select id="df-produit" onchange="renderDevisList()">
+              <option value="">Tous</option>
+              ${buildProduitOptions()}
+            </select>
+          </div>
+          <div class="form-group" style="min-width:130px">
+            <label class="fl">Urgence</label>
+            <select id="df-urgence" onchange="renderDevisList()">
+              <option value="">Toutes</option>
+              <option value="retard">En retard</option>
+              <option value="aujourd-hui">Aujourd'hui</option>
+              <option value="semaine">Cette semaine</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;min-width:180px">
+            <label class="fl">Recherche</label>
+            <input type="text" id="df-search" placeholder="Nom, tel…" oninput="renderDevisList()">
+          </div>
+        </div>
+      </div>
+      <div id="devis-liste"></div>
     </div>`;
 
   renderLeadsKpis();
   renderLeadsTable();
+  renderProspKpis();
+  renderProspAlertes();
+  renderDevisList();
 };
 
 function getMyLeads() {
@@ -2792,99 +2838,136 @@ PAGES['collab-home'] = function(mc) {
       +tile("showPage('collab-saisir')",'linear-gradient(135deg,#0891b2,#0e7490)','✚','Vente','Saisir une vente')
       +'</div>';
 
-    // 2 COL: Relances | Succès
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;">';
+    // ═══════════════════════════════════════════════════════
+    // BLOC COMMERCIAL
+    // ═══════════════════════════════════════════════════════
+    html += '<div style="border-left:4px solid #1d4ed8;padding-left:14px;margin-bottom:8px;">'
+      +'<div style="font-size:.72rem;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.08em;">📈 Activité commerciale</div>'
+      +'</div>';
+
+    // Relances du jour (leads + prospects combinés)
+    var relancesLeads = (DB.leads||[]).filter(function(l){
+      return l.collab===collab && l.rappel && l.rappel<=today && !['Contrat signé','Sans suite'].includes(l.statut);
+    });
+    var toutesRelances = relances.concat(relancesLeads).sort(function(a,b){ return (a.rappel||'')>(b.rappel||'')?1:-1; });
+    // dédoublonner si même client
+    var totalRelances = toutesRelances.length;
+
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">';
     // Relances
-    html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:16px;">'
-      +'<div style="font-weight:700;font-size:.95rem;color:#1f2937;margin-bottom:12px;">📞 Relances du jour'
-      +(relances.length>0?' <span style="display:inline-block;background:#ef4444;color:#fff;border-radius:20px;font-size:.7rem;padding:1px 8px;margin-left:4px;">'+relances.length+'</span>':'')+'</div>';
-    if (relances.length===0) {
+    html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #fca5a5;padding:16px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'
+      +'<span style="font-weight:700;font-size:.95rem;color:#1f2937;">📞 Relances du jour</span>'
+      +(totalRelances>0?'<span style="background:#ef4444;color:#fff;border-radius:20px;font-size:.72rem;padding:2px 9px;font-weight:700;">'+totalRelances+'</span>':'')
+      +'</div>';
+    if (totalRelances===0) {
       html += '<div style="text-align:center;padding:20px;color:#6b7280;font-size:.88rem;"><div style="font-size:1.8rem;margin-bottom:8px;">✅</div>Aucune relance aujourd\'hui</div>';
     } else {
-      html += relances.slice(0,5).map(function(p){
+      html += toutesRelances.slice(0,6).map(function(p){
         var d=Math.floor((new Date(p.rappel)-new Date(today))/(1000*3600*24));
         var col=d<0?'#ef4444':d===0?'#f97316':'#3b82f6';
-        var lbl=d<0?'Retard '+Math.abs(d)+'j':d===0?"Aujourd'hui":'Dans '+d+'j';
+        var lbl=d<0?'⚠ '+Math.abs(d)+'j':d===0?"Auj.":'J+'+d;
+        var type=p.statut&&['À contacter','Contacté — en attente','Devis envoyé','Contrat signé'].includes(p.statut)?'Lead':'Devis';
+        var typeBg=type==='Lead'?'#dbeafe':'#dcfce7';
+        var typeCol=type==='Lead'?'#1d4ed8':'#15803d';
         return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f1f5f9;">'
-          +'<div style="flex:1;font-size:.84rem;color:#1f2937;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(p.prenom||'')+' '+(p.nom||p.client||'Prospect')+'</div>'
+          +'<span style="font-size:.65rem;background:'+typeBg+';color:'+typeCol+';padding:1px 6px;border-radius:6px;font-weight:700;flex-shrink:0;">'+type+'</span>'
+          +'<div style="flex:1;font-size:.84rem;color:#1f2937;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(p.prenom||'')+' '+(p.nom||p.client||'Contact')+'</div>'
           +'<span style="font-size:.72rem;font-weight:700;color:'+col+';background:'+col+'18;padding:2px 7px;border-radius:20px;white-space:nowrap;">'+lbl+'</span></div>';
       }).join('');
-      if (relances.length>5) html += '<div style="font-size:.75rem;color:#6b7280;text-align:center;padding:5px;">+'+(relances.length-5)+' autres</div>';
+      if (totalRelances>6) html += '<div style="font-size:.75rem;color:#6b7280;text-align:center;padding:5px;">+'+(totalRelances-6)+' autres</div>';
     }
-    html += '<button onclick="showPage(\'collab-leads\')" style="margin-top:10px;width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px;font-size:.8rem;font-weight:600;color:#374151;cursor:pointer;">Voir tous les leads →</button></div>';
-    // Succès
-    html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:16px;">'
+    html += '<button onclick="showPage(\'collab-leads\')" style="margin-top:10px;width:100%;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px;font-size:.8rem;font-weight:600;color:#1d4ed8;cursor:pointer;">Voir leads & devis →</button></div>';
+
+    // Succès du mois
+    var prodKeys=Object.keys(byProd);
+    html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #bbf7d0;padding:16px;">'
       +'<div style="font-weight:700;font-size:.95rem;color:#1f2937;margin-bottom:8px;">🏆 Succès — '+MOIS_FULL[mois]+'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">'
       +'<div style="background:#f0fdf4;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:1.5rem;font-weight:800;color:#15803d;">'+nbVentes+'</div><div style="font-size:.72rem;color:#166534;">contrats</div></div>'
       +'<div style="background:#eff6ff;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:1rem;font-weight:800;color:#1d4ed8;">'+fmtEuro(primeTotal)+'</div><div style="font-size:.72rem;color:#1e40af;">primes</div></div></div>';
-    var prodKeys=Object.keys(byProd);
     if (prodKeys.length===0) {
-      html += '<div style="text-align:center;padding:16px;color:#9ca3af;font-size:.84rem;"><div style="font-size:1.5rem;margin-bottom:6px;">🌱</div>Votre premier succès arrive !</div>';
+      html += '<div style="text-align:center;padding:12px;color:#9ca3af;font-size:.84rem;"><div style="font-size:1.5rem;margin-bottom:6px;">🌱</div>Votre premier succès arrive !</div>';
     } else {
-      html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(75px,1fr));gap:5px;">'
-        +prodKeys.map(function(p){ return '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:7px;text-align:center;">'
-          +'<div style="font-size:1.1rem;">'+(PROD_ICON[p]||'📄')+'</div>'
-          +'<div style="font-weight:700;font-size:1rem;color:#15803d;">'+byProd[p]+'</div>'
-          +'<div style="font-size:.65rem;color:#166534;">'+p+'</div></div>'; }).join('')+'</div>';
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:5px;">'
+        +prodKeys.map(function(p){ return '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:6px;text-align:center;">'
+          +'<div style="font-size:1rem;">'+(PROD_ICON[p]||'📄')+'</div>'
+          +'<div style="font-weight:700;font-size:.95rem;color:#15803d;">'+byProd[p]+'</div>'
+          +'<div style="font-size:.62rem;color:#166534;">'+p+'</div></div>'; }).join('')+'</div>';
     }
-    html += '<button onclick="showPage(\'collab-suivi\')" style="margin-top:10px;width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px;font-size:.8rem;font-weight:600;color:#374151;cursor:pointer;">Voir mes objectifs →</button></div>';
-    html += '</div>'; // fin 2-col
+    html += '<button onclick="showPage(\'collab-suivi\')" style="margin-top:10px;width:100%;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px;font-size:.8rem;font-weight:600;color:#15803d;cursor:pointer;">Voir mes objectifs →</button></div>';
+    html += '</div>'; // fin 2-col commercial
 
-    // TÂCHES LEADS+DEVIS
+    // Leads + Devis actifs résumé
     var totalTasks = myLeads.length+myDevis.length;
-    html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:16px;margin-bottom:16px;">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
-      +'<div style="font-weight:700;font-size:.95rem;color:#1f2937;">📌 Tâches en attente'
-      +(totalTasks>0?' <span style="display:inline-block;background:#3b82f6;color:#fff;border-radius:20px;font-size:.7rem;padding:1px 8px;margin-left:4px;">'+totalTasks+'</span>':'')+'</div>'
-      +'<div style="display:flex;gap:6px;"><button onclick="showPage(\'collab-leads\')" style="font-size:.75rem;background:#eff6ff;color:#1d4ed8;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-weight:600;">Leads</button>'
-      +'<button onclick="showPage(\'collab-prospection\')" style="font-size:.75rem;background:#f0fdf4;color:#15803d;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-weight:600;">Devis</button></div></div>';
-    if (totalTasks===0) {
-      html += '<div style="text-align:center;padding:16px;color:#6b7280;font-size:.88rem;"><div style="font-size:1.5rem;margin-bottom:6px;">✅</div>Aucune tâche en attente !</div>';
-    } else {
-      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
-        +'<div><div style="font-size:.75rem;font-weight:700;color:#1d4ed8;text-transform:uppercase;margin-bottom:6px;">📞 Leads ('+myLeads.length+')</div>'
-        +(myLeads.length===0?'<div style="font-size:.8rem;color:#9ca3af;">Aucun lead actif</div>'
-          :myLeads.slice(0,4).map(function(l){ return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 10px;margin-bottom:5px;"><div style="font-weight:600;font-size:.82rem;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(l.nom||l.client||'Lead')+'</div><div style="color:#6b7280;font-size:.75rem;">'+l.statut+'</div></div>'; }).join('')
-          +(myLeads.length>4?'<div style="font-size:.75rem;color:#6b7280;text-align:center;">+'+(myLeads.length-4)+' autres</div>':''))
+    if (totalTasks>0) {
+      html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #dbeafe;padding:16px;margin-bottom:20px;">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+        +'<span style="font-weight:700;font-size:.9rem;color:#1d4ed8;">📌 En cours de traitement</span>'
+        +'<span style="background:#3b82f6;color:#fff;border-radius:20px;font-size:.7rem;padding:1px 9px;font-weight:700;">'+totalTasks+'</span>'
         +'</div>'
-        +'<div><div style="font-size:.75rem;font-weight:700;color:#059669;text-transform:uppercase;margin-bottom:6px;">📋 Devis ('+myDevis.length+')</div>'
-        +(myDevis.length===0?'<div style="font-size:.8rem;color:#9ca3af;">Aucun devis actif</div>'
-          :myDevis.slice(0,4).map(function(d){ return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 10px;margin-bottom:5px;"><div style="font-weight:600;font-size:.82rem;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(d.client||d.nom||'Devis')+'</div><div style="color:#6b7280;font-size:.75rem;">'+d.statut+'</div></div>'; }).join('')
-          +(myDevis.length>4?'<div style="font-size:.75rem;color:#6b7280;text-align:center;">+'+(myDevis.length-4)+' autres</div>':''))
-        +'</div></div>';
-    }
-    if (mesTaches.length>0) {
-      html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;">'
-        +'<div style="font-size:.75rem;font-weight:700;color:#4f46e5;text-transform:uppercase;margin-bottom:6px;">✅ Mémos admin ('+mesTaches.length+')'+(tachesRetard.length>0?' <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:.68rem;">'+tachesRetard.length+' retard</span>':'')+'</div>'
-        +mesTaches.slice(0,4).map(function(t){
-          var pc='#6b7280'; try{pc=tachePrioriteColor(t.priorite);}catch(e){}
-          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f8fafc;">'
-            +'<span style="width:8px;height:8px;border-radius:50%;background:'+pc+';flex-shrink:0;display:inline-block;"></span>'
-            +'<span style="font-size:.82rem;flex:1;color:#1f2937;">'+t.titre+'</span>'
-            +(t.echeance?'<span style="font-size:.72rem;color:#6b7280;">'+new Date(t.echeance).toLocaleDateString('fr-FR')+'</span>':'')
-            +'</div>';
-        }).join('')
-        +(mesTaches.length>4?'<button onclick="showPage(\'collab-taches\')" style="margin-top:6px;width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:6px;font-size:.78rem;font-weight:600;color:#4f46e5;cursor:pointer;">Voir toutes mes tâches →</button>':'')
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+        +'<div><div style="font-size:.72rem;font-weight:700;color:#1d4ed8;margin-bottom:5px;">📞 LEADS ('+myLeads.length+')</div>'
+        +(myLeads.length===0?'<div style="font-size:.8rem;color:#9ca3af;">Aucun</div>'
+          :myLeads.slice(0,3).map(function(l){ return '<div style="background:#eff6ff;border-radius:7px;padding:7px 10px;margin-bottom:4px;font-size:.82rem;font-weight:600;color:#1e40af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(l.nom||l.client||'Lead')+'<div style="font-weight:400;font-size:.72rem;color:#6b7280;">'+l.statut+'</div></div>'; }).join('')
+          +(myLeads.length>3?'<div style="font-size:.73rem;color:#6b7280;text-align:center;">+'+(myLeads.length-3)+' autres</div>':''))
+        +'</div>'
+        +'<div><div style="font-size:.72rem;font-weight:700;color:#059669;margin-bottom:5px;">📋 DEVIS ('+myDevis.length+')</div>'
+        +(myDevis.length===0?'<div style="font-size:.8rem;color:#9ca3af;">Aucun</div>'
+          :myDevis.slice(0,3).map(function(d){ return '<div style="background:#f0fdf4;border-radius:7px;padding:7px 10px;margin-bottom:4px;font-size:.82rem;font-weight:600;color:#065f46;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(d.client||d.nom||'Devis')+'<div style="font-weight:400;font-size:.72rem;color:#6b7280;">'+d.statut+'</div></div>'; }).join('')
+          +(myDevis.length>3?'<div style="font-size:.73rem;color:#6b7280;text-align:center;">+'+(myDevis.length-3)+' autres</div>':''))
+        +'</div></div>'
+        +'<button onclick="showPage(\'collab-leads\')" style="margin-top:10px;width:100%;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px;font-size:.8rem;font-weight:600;color:#1d4ed8;cursor:pointer;">Gérer leads & devis →</button>'
         +'</div>';
     }
-    html += '</div>'; // fin tâches card
 
-    // VUE ÉQUIPE
-    html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #e5e7eb;padding:16px;">'
-      +'<div style="font-weight:700;font-size:.95rem;color:#1f2937;margin-bottom:12px;">👥 Vue équipe</div>'
-      +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+    // ═══════════════════════════════════════════════════════
+    // BLOC ADMINISTRATIF
+    // ═══════════════════════════════════════════════════════
+    html += '<div style="border-left:4px solid #7c3aed;padding-left:14px;margin-bottom:8px;margin-top:4px;">'
+      +'<div style="font-size:.72rem;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.08em;">🗂 Administratif & organisation</div>'
+      +'</div>';
+
+    // Tâches
+    html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #ddd6fe;padding:16px;margin-bottom:14px;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+      +'<span style="font-weight:700;font-size:.95rem;color:#5b21b6;">✅ Mes tâches'
+      +(mesTaches.length>0?' <span style="background:#7c3aed;color:#fff;border-radius:20px;font-size:.7rem;padding:1px 8px;margin-left:4px;">'+mesTaches.length+'</span>':'')
+      +(tachesRetard.length>0?' <span style="background:#ef4444;color:#fff;border-radius:20px;font-size:.7rem;padding:1px 8px;margin-left:4px;">'+tachesRetard.length+' retard</span>':'')
+      +'</span>'
+      +'<button onclick="showPage(\'collab-taches\')" style="font-size:.75rem;background:#f5f3ff;color:#7c3aed;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:600;">Gérer →</button>'
+      +'</div>';
+    if (mesTaches.length===0) {
+      html += '<div style="text-align:center;padding:14px;color:#9ca3af;font-size:.85rem;">Aucune tâche en cours ✅</div>';
+    } else {
+      html += mesTaches.slice(0,5).map(function(t){
+        var pc='#7c3aed'; try{pc=tachePrioriteColor(t.priorite);}catch(e){}
+        var retard=t.echeance&&new Date(t.echeance)<new Date();
+        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f5f3ff;">'
+          +'<span style="width:9px;height:9px;border-radius:50%;background:'+pc+';flex-shrink:0;display:inline-block;"></span>'
+          +'<span style="font-size:.84rem;flex:1;color:#1f2937;'+(retard?'font-weight:600;':'')+'">'+(retard?'⚠ ':'')+t.titre+'</span>'
+          +(t.echeance?'<span style="font-size:.72rem;color:'+(retard?'#ef4444':'#6b7280')+';">'+new Date(t.echeance).toLocaleDateString('fr-FR')+'</span>':'')
+          +'</div>';
+      }).join('');
+      if (mesTaches.length>5) html += '<div style="font-size:.75rem;color:#7c3aed;text-align:center;padding:5px;cursor:pointer;" onclick="showPage(\'collab-taches\')">Voir '+(mesTaches.length-5)+' autres →</div>';
+    }
+    html += '</div>';
+
+    // Vue équipe (compact)
+    html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #e2e8f0;padding:14px;margin-bottom:14px;">'
+      +'<div style="font-weight:700;font-size:.9rem;color:#374151;margin-bottom:10px;">👥 Vue équipe</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;">'
       +getCollabs().map(function(c){
         var cl=(DB.leads||[]).filter(function(l){return l.collab===c.name&&['À contacter','Contacté — en attente'].includes(l.statut);}).length;
         var cd=(DB.devis||[]).filter(function(d){return d.collab===c.name&&!['Gagné','Perdu','Abandonné'].includes(d.statut);}).length;
         var me=c.name===collab;
-        return '<div style="flex:1;min-width:120px;background:'+(me?'#eff6ff':'#f8fafc')+';border:1.5px solid '+(me?'#3b82f6':'#e2e8f0')+';border-radius:10px;padding:10px;">'
-          +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;">'
-          +'<div style="width:26px;height:26px;border-radius:50%;background:'+c.color+';color:#fff;font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;">'+c.init+'</div>'
-          +'<div style="font-weight:600;font-size:.83rem;color:#1f2937;">'+c.name+(me?' <span style="font-size:.68rem;color:#3b82f6;">(moi)</span>':'')+'</div></div>'
-          +'<div style="display:flex;gap:5px;flex-wrap:wrap;">'
-          +'<span style="font-size:.7rem;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:10px;">📞 '+cl+'</span>'
-          +'<span style="font-size:.7rem;background:#dcfce7;color:#15803d;padding:2px 7px;border-radius:10px;">📋 '+cd+'</span>'
+        return '<div style="flex:1;min-width:100px;background:'+(me?'#eff6ff':'#f8fafc')+';border:1.5px solid '+(me?'#3b82f6':'#e2e8f0')+';border-radius:10px;padding:9px;">'
+          +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'
+          +'<div style="width:22px;height:22px;border-radius:50%;background:'+c.color+';color:#fff;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;">'+c.init+'</div>'
+          +'<div style="font-weight:600;font-size:.8rem;color:#1f2937;">'+c.name+(me?' <span style="font-size:.65rem;color:#3b82f6;">(moi)</span>':'')+'</div></div>'
+          +'<div style="display:flex;gap:4px;">'
+          +'<span style="font-size:.68rem;background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:8px;">📞 '+cl+'</span>'
+          +'<span style="font-size:.68rem;background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:8px;">📋 '+cd+'</span>'
           +'</div></div>';
       }).join('')
       +'</div></div>';
@@ -3388,28 +3471,9 @@ function deleteFormation(id) {
 }
 
 
-PAGES['collab-prospection'] = (mc) => {
-  mc.innerHTML = `
-    <div class="page-header flex-between">
-      <div>
-        <h1>📋 Devis & Relances — Équipe</h1>
-        <p>Tous les devis de l'équipe — visibles et réassignables</p>
-      </div>
-      <button class="btn btn-primary" onclick="openAddDevis()">✚ Nouveau devis</button>
-    </div>
-
-    <!-- Onglets de navigation prospection -->
+PAGES['collab-prospection'] = (mc) => { showPage('collab-leads'); return;
+  mc.innerHTML = `<!-- redirected -->
     <div style="display:flex;gap:8px;margin-bottom:18px;border-bottom:2px solid #e5e7eb;padding-bottom:0;">
-      <button onclick="showPage('collab-leads')" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px 8px 0 0;padding:9px 18px;font-size:.88rem;font-weight:600;cursor:pointer;margin-bottom:-2px;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
-        📞 Leads
-      </button>
-      <button onclick="" style="background:#059669;color:#fff;border:none;border-radius:8px 8px 0 0;padding:9px 18px;font-size:.88rem;font-weight:700;cursor:default;margin-bottom:-2px;border-bottom:2px solid #059669;">
-        📋 Devis & Relances
-      </button>
-      <button onclick="showPage('collab-decouverte')" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px 8px 0 0;padding:9px 18px;font-size:.88rem;font-weight:600;cursor:pointer;margin-bottom:-2px;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
-        🔍 Découverte client
-      </button>
-    </div>
 
     <!-- KPIs -->
     <div id="prosp-kpis" class="sep16"></div>
@@ -11022,26 +11086,42 @@ function renderAdminTaches() {
   }
   zone.innerHTML='<div style="background:white;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;">'
     +taches.map(function(t){
-      var color=COLORS[t.collab]||'#6b7280';
+      var color=COLORS[t.collab]||'#7c3aed';
       var pc=tachePrioriteColor(t.priorite),sc=tacheStatutColor(t.statut);
       var retardFlag=false,echeanceStr='—';
       if(t.echeance){var de=new Date(t.echeance);de.setHours(0,0,0,0);var diff=Math.round((de-today)/86400000);if(t.statut!=='Terminé'){retardFlag=diff<0;echeanceStr=diff<0?'<span style="color:#ef4444;font-weight:700;">⚠ J'+diff+'</span>':diff===0?'<span style="color:#f59e0b;font-weight:700;">Auj.</span>':'J+'+diff;}else{echeanceStr=t.echeance;}}
       var transferInfo=t.transferePar?' <span style="font-size:.68rem;color:#9ca3af;">(↩ de '+t.transferePar+')</span>':'';
+      var isMouez=t.collab==='Mouez';
       return '<div style="padding:11px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px;flex-wrap:wrap;'+(retardFlag?'background:#fff5f5;':'')+(t.statut==='Terminé'?'opacity:.6':'')+';">'
-        +'<div style="width:30px;height:30px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:.78rem;flex-shrink:0;">'+t.collab[0]+'</div>'
+        +(isMouez
+          ? '<button onclick="toggleAdminTacheTermineEquipe(\''+t.id+'\')" style="flex-shrink:0;width:22px;height:22px;border-radius:50%;border:2px solid '+sc+';background:'+(t.statut==='Terminé'?sc:'white')+';cursor:pointer;display:flex;align-items:center;justify-content:center;">'+(t.statut==='Terminé'?'<span style="color:white;font-size:.65rem;">✓</span>':'')+'</button>'
+          : '<div style="width:22px;height:22px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:.78rem;flex-shrink:0;">'+t.collab[0]+'</div>')
         +'<div style="flex:1;min-width:120px;">'
           +'<div style="font-weight:600;font-size:.87rem;color:'+(t.statut==='Terminé'?'#9ca3af':'#111')+';'+(t.statut==='Terminé'?'text-decoration:line-through':'')+';">'+t.titre+transferInfo+'</div>'
           +(t.description?'<div style="font-size:.74rem;color:#6b7280;margin-top:2px;">'+t.description+'</div>':'')
+          +(t.createdBy&&isMouez?'<div style="font-size:.7rem;color:#7c3aed;margin-top:2px;">Assignée par '+t.createdBy+'</div>':'')
         +'</div>'
         +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0;">'
           +'<span style="font-size:.7rem;color:'+color+';font-weight:700;">'+t.collab+'</span>'
           +'<span style="font-size:.7rem;background:'+pc+'18;color:'+pc+';padding:2px 7px;border-radius:99px;font-weight:600;">'+tachePrioriteLabel(t.priorite)+'</span>'
           +'<span style="font-size:.7rem;background:'+sc+'18;color:'+sc+';padding:2px 7px;border-radius:99px;">'+t.statut+'</span>'
           +'<span style="font-size:.73rem;">'+echeanceStr+'</span>'
+          +(isMouez?'<button onclick="openTacheModal(\''+t.id+'\')" style="background:#f1f5f9;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">✏️</button>':'')
         +'</div>'
         +'</div>';
     }).join('')
     +'</div>';
+}
+
+function toggleAdminTacheTermineEquipe(id) {
+  var t=(DB.taches||[]).find(function(x){return x.id===id;});
+  if(!t) return;
+  t.statut=(t.statut==='Terminé')?'À faire':'Terminé';
+  if(t.statut==='Terminé') t.completedAt=Date.now();
+  saveTache(t);
+  renderAdminTaches();
+  if(currentPage==='admin-dashboard') renderAdminDashboard();
+  toast(t.statut==='Terminé'?'✅ Tâche terminée':'↺ Tâche réouverte','success');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
