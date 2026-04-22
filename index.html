@@ -1025,7 +1025,7 @@ function buildCollabSidebar() {
     { label: '📈 Commercial & Gestion', items: commercial },
     { label: '👥 Ressources Humaines',  items: rh },
   ]);
-  showPage('collab-home');
+  showPage('collab-ventes');
 }
 
 function buildAdminSidebar() {
@@ -1944,6 +1944,12 @@ PAGES['collab-leads'] = (mc) => {
           <label class="fl">Recherche client</label>
           <input type="text" id="lead-filter-search" placeholder="Nom du contact..." oninput="renderLeadsTable()">
         </div>
+        <div class="form-group" style="align-self:flex-end;padding-bottom:2px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:#6b7280;cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" id="lead-show-sanssuite" onchange="renderLeadsTable()" style="width:15px;height:15px;">
+            Afficher sans suite
+          </label>
+        </div>
       </div>
     </div>
 
@@ -2051,8 +2057,16 @@ function renderLeadsTable() {
   const filtProduit = document.getElementById('lead-filter-produit')?.value || '';
   const filtPrio = document.getElementById('lead-filter-prio')?.value || '';
   const filtSearch = document.getElementById('lead-filter-search')?.value.toLowerCase() || '';
+  const showSansSuite = document.getElementById('lead-show-sanssuite')?.checked || false;
 
-  if (filtStatut) leads = leads.filter(l => l.statut === filtStatut);
+  // Masquer "Sans suite" par défaut
+  if (filtStatut === 'Sans suite') {
+    leads = leads.filter(l => l.statut === 'Sans suite');
+  } else if (filtStatut) {
+    leads = leads.filter(l => l.statut === filtStatut);
+  } else if (!showSansSuite) {
+    leads = leads.filter(l => l.statut !== 'Sans suite');
+  }
   if (filtProduit) leads = leads.filter(l => l.produit === filtProduit);
   if (filtPrio) leads = leads.filter(l => l.priorite === filtPrio);
   if (filtSearch) leads = leads.filter(l => l.client.toLowerCase().includes(filtSearch) || (l.telephone||'').includes(filtSearch));
@@ -2090,6 +2104,7 @@ function renderLeadsTable() {
     <thead><tr>
       <th>Contact</th><th>Téléphone</th><th>Collaborateur</th><th>Produit visé</th>
       <th>Progression</th><th>Priorité</th><th>Prochain rappel</th>
+      <th>📅 Saisie</th><th>🔁 Relances</th>
       <th>Origine</th><th>Actions</th>
     </tr></thead>
     <tbody>${leads.map(l => {
@@ -2106,10 +2121,15 @@ function renderLeadsTable() {
         <td><span class="pill ${pillCls}" style="font-size:.7rem;">${l.statut}</span>${leadPipelineHTML(l.statut)}</td>
         <td>${l.priorite||'—'}</td>
         <td ${rappelCls}>${l.rappel ? new Date(l.rappel).toLocaleDateString('fr-FR') : '—'}</td>
+        <td class="muted" style="font-size:11px">${l.createdAt?new Date(l.createdAt).toLocaleDateString('fr-FR'):'—'}</td>
+        <td style="text-align:center;">
+          ${(l.relanceCount||0)>0?`<span style="display:inline-block;background:#dbeafe;color:#1d4ed8;border-radius:99px;font-size:.72rem;padding:2px 9px;font-weight:700;">N°${l.relanceCount||0}</span>`:'<span style="color:#9ca3af;font-size:.75rem;">—</span>'}
+        </td>
         <td class="muted" style="font-size:12px">${l.origine||'—'}</td>
         <td>
           <div class="flex-gap">
             <button class="btn btn-ghost btn-sm" onclick="openEditLead('${l.id}')">Modifier</button>
+            <button class="btn btn-sm" style="background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;font-size:11px;" onclick="logRelanceLead('${l.id}')">📞 +Relance</button>
             <select class="btn btn-ghost btn-sm" style="padding:5px 8px;font-size:11px" onchange="changeLeadStatut('${l.id}',this.value)">
               ${LEAD_STATUTS.map(s=>`<option${s===l.statut?' selected':''}>${s}</option>`).join('')}
             </select>
@@ -2142,6 +2162,24 @@ function changeLeadStatut(id, statut) {
   } else {
     toast('Statut mis à jour', 'success');
   }
+}
+
+function logRelanceLead(id) {
+  var lead = (DB.leads||[]).find(l=>l.id===id);
+  if (!lead) return;
+  var newRappel = prompt('Date du prochain rappel (JJ/MM/AAAA) — laisser vide pour aucun :');
+  var rappelISO = null;
+  if (newRappel && newRappel.trim()) {
+    var parts = newRappel.trim().split('/');
+    if (parts.length===3) rappelISO = parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0');
+  }
+  lead.relanceCount = (lead.relanceCount||0) + 1;
+  lead.relanceDate = new Date().toISOString();
+  if (rappelISO) lead.rappel = rappelISO;
+  lead.updatedAt = new Date().toISOString();
+  saveDB(DB);
+  renderLeadsTable();
+  toast('📞 Relance N°'+lead.relanceCount+' enregistrée'+(rappelISO?' · prochain rappel '+newRappel:''), 'success');
 }
 
 function reassignLead(id, newCollab) {
@@ -2387,7 +2425,7 @@ function saveConvertLead(leadId) {
 const COLLABS_DEFAULT = [
   {name:'Dorina', init:'DS', color:'#7B2D8B'},
   {name:'Rihem',  init:'RF', color:'#003DA5'},
-  {name:'Mael',   init:'ML', color:'#0F7B7B'},
+  {name:'Mael',   init:'ML', color:'#0F7B7B', avatarOnly:true},
 ];
 function getCollabs() {
   var stored = DB && DB.settings && DB.settings.collabs;
@@ -3244,6 +3282,87 @@ PAGES['collab-suivi'] = (mc) => {
     </table>
     </div>
   </div>
+
+  <!-- ══ STATS HEBDO & MENSUEL ══ -->
+  ${(()=>{
+    const now2 = new Date();
+    // Début semaine (lundi)
+    const dayOfWeek = now2.getDay() === 0 ? 6 : now2.getDay() - 1;
+    const mondayTs = new Date(now2); mondayTs.setDate(now2.getDate() - dayOfWeek); mondayTs.setHours(0,0,0,0);
+    const sundayTs = new Date(mondayTs); sundayTs.setDate(mondayTs.getDate() + 6); sundayTs.setHours(23,59,59,999);
+
+    // Contacts = leads créés (new leads) OU relancés cette semaine/mois
+    const allLeads = (DB.leads||[]).filter(l => l.collab === collab);
+    const allVentes = (DB.ventes||[]).filter(v => v.collab === collab && v.affaireNouvelle === 'Oui');
+    const allDevis = (DB.devis||[]).filter(d => d.collab === collab);
+
+    function inWeek(isoStr) {
+      if (!isoStr) return false;
+      const d = new Date(isoStr);
+      return d >= mondayTs && d <= sundayTs;
+    }
+    function inMonth(isoStr) {
+      if (!isoStr) return false;
+      const d = new Date(isoStr);
+      return d.getMonth()+1 === mois && d.getFullYear() === annee;
+    }
+
+    // Contacts semaine : leads créés ou relancés cette semaine
+    const wLeadsNew = allLeads.filter(l => inWeek(l.createdAt)).length;
+    const wLeadsRel = allLeads.filter(l => inWeek(l.relanceDate)).length;
+    const wContacts = wLeadsNew + wLeadsRel;
+    const wContrats = allVentes.filter(v => { const d = new Date(); return inWeek(v.createdAt||v.date||''); }).length;
+    const wDevis    = allDevis.filter(d => inWeek(d.dateDevis||d.createdAt||'')).length;
+
+    // Contacts mois : leads créés ou relancés ce mois
+    const mLeadsNew = allLeads.filter(l => inMonth(l.createdAt)).length;
+    const mLeadsRel = allLeads.filter(l => inMonth(l.relanceDate)).length;
+    const mContacts = mLeadsNew + mLeadsRel;
+    const mContrats = allVentes.filter(v => inMonth(v.createdAt||v.date||'')).length;
+    const mDevis    = allDevis.filter(d => inMonth(d.dateDevis||d.createdAt||'')).length;
+
+    const mondayLabel = mondayTs.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+    const sundayLabel = sundayTs.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+
+    function statBox(icon, label, val, sub, color) {
+      return `<div style="background:#fff;border:1.5px solid ${color}33;border-radius:12px;padding:14px 16px;text-align:center;min-width:90px;">
+        <div style="font-size:1.3rem;margin-bottom:4px;">${icon}</div>
+        <div style="font-size:1.4rem;font-weight:800;color:${color};">${val}</div>
+        <div style="font-size:.72rem;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.05em;margin-top:2px;">${label}</div>
+        ${sub ? `<div style="font-size:.68rem;color:#94a3b8;margin-top:2px;">${sub}</div>` : ''}
+      </div>`;
+    }
+
+    return `
+  <div style="margin-top:20px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-400)">📊 Mes stats d'activité</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+      <!-- Semaine -->
+      <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #7dd3fc;border-radius:14px;padding:16px;">
+        <div style="font-weight:700;font-size:.88rem;color:#0369a1;margin-bottom:12px;">📅 Cette semaine <span style="font-weight:400;font-size:.75rem;opacity:.8;">${mondayLabel} → ${sundayLabel}</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+          ${statBox('📞','Contacts',wContacts,'Leads + relances','#0369a1')}
+          ${statBox('📄','Devis',wDevis,'','#0891b2')}
+          ${statBox('🏆','Contrats',wContrats,'Affaires nouvelles','#15803d')}
+        </div>
+      </div>
+
+      <!-- Mois -->
+      <div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1.5px solid #a78bfa;border-radius:14px;padding:16px;">
+        <div style="font-weight:700;font-size:.88rem;color:#6d28d9;margin-bottom:12px;">📆 ${MOIS_FULL[mois]} ${annee}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+          ${statBox('📞','Contacts',mContacts,'Leads + relances','#6d28d9')}
+          ${statBox('📄','Devis',mDevis,'','#7c3aed')}
+          ${statBox('🏆','Contrats',mContrats,'Affaires nouvelles','#15803d')}
+        </div>
+      </div>
+
+    </div>
+  </div>`;
+  })()}
 
 </div>`;
 }
@@ -10005,11 +10124,153 @@ PAGES['admin-rh-primes'] = function(mc) {
     // Historique par collab
     + '<div id="primes-history" style="margin-top:24px;"></div>'
 
+    // Rapport comptable
+    + '<div id="comptable-report-zone" style="margin-top:4px;"></div>'
+
     + '</div>';
 
   // Render history charts
   renderPrimesHistory(collabs, colorsMap, annee);
+
+  // Render accountant report (20th of month)
+  renderComptableReport(annee);
 };
+
+function renderComptableReport(annee) {
+  var zone = document.getElementById('comptable-report-zone');
+  if (!zone) return;
+
+  // Collabs hors avatarOnly (ex: Mael)
+  var collabsFull = getCollabs().filter(function(c){ return !c.avatarOnly; }).map(function(c){ return c.name; });
+  var colorsMap   = getCollabColors();
+
+  // Sélecteurs mois/annee
+  var selMois  = document.getElementById('comptable-mois');
+  var selAnnee = document.getElementById('comptable-annee');
+  var repMois  = selMois  ? parseInt(selMois.value)  : nowMois();
+  var repAnnee = selAnnee ? parseInt(selAnnee.value) : nowAnnee();
+
+  // Jours ouvrés du mois (hors samedi, dimanche, fériés)
+  function joursOuvresMois(m, y) {
+    var count = 0;
+    var chomes = getJoursFeresChomesSet();
+    var daysInMonth = new Date(y, m, 0).getDate();
+    for (var d = 1; d <= daysInMonth; d++) {
+      var iso = y + '-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      var dow = new Date(iso + 'T12:00:00').getDay();
+      if (dow !== 0 && dow !== 6 && !chomes.has(iso)) count++;
+    }
+    return count;
+  }
+
+  // Congés approuvés d'un collab qui chevauchent le mois donné
+  function congesMois(collab, m, y) {
+    var firstDay = y + '-' + String(m).padStart(2,'0') + '-01';
+    var lastDay  = y + '-' + String(m).padStart(2,'0') + '-' + String(new Date(y,m,0).getDate()).padStart(2,'0');
+    return (DB.conges || []).filter(function(c) {
+      return c.collab === collab && c.statut === 'Approuvé'
+        && c.dateDebut <= lastDay && c.dateFin >= firstDay;
+    });
+  }
+
+  // Compter jours de congés qui tombent DANS le mois donné
+  function joursCongesMois(collab, m, y) {
+    var firstDay = y + '-' + String(m).padStart(2,'0') + '-01';
+    var lastDay  = y + '-' + String(m).padStart(2,'0') + '-' + String(new Date(y,m,0).getDate()).padStart(2,'0');
+    var total = 0;
+    congesMois(collab, m, y).forEach(function(c) {
+      // Clip à la plage du mois
+      var debut = c.dateDebut < firstDay ? firstDay : c.dateDebut;
+      var fin   = c.dateFin   > lastDay  ? lastDay  : c.dateFin;
+      total += countJoursOuvrables(debut, fin);
+    });
+    return total;
+  }
+
+  var totalJoursOuvres = joursOuvresMois(repMois, repAnnee);
+
+  // Lignes par collab
+  var rows = collabsFull.map(function(collab) {
+    var col          = colorsMap[collab] || '#6b7280';
+    var joursConges  = joursCongesMois(collab, repMois, repAnnee);
+    var joursTravail = Math.max(0, totalJoursOuvres - joursConges);
+    var prime        = getPrimeEffective(collab, repMois, repAnnee);
+    var tickets      = joursTravail; // 1 ticket = 1 jour complet travaillé
+
+    return { collab: collab, col: col, joursConges: joursConges, joursTravail: joursTravail, prime: prime, tickets: tickets };
+  });
+
+  // Texte copiable
+  var copyText = 'Rapport comptable — ' + MOIS_FULL[repMois] + ' ' + repAnnee + '\n'
+    + 'Jours ouvrés du mois : ' + totalJoursOuvres + '\n\n'
+    + 'Collaboratrice\tCongés (j)\tJours travaillés\tTickets restaurant\tPrime activité\n'
+    + rows.map(function(r){
+        return r.collab + '\t' + r.joursConges + '\t' + r.joursTravail + '\t' + r.tickets + '\t' + (r.prime > 0 ? fmtEuro(r.prime) : '0 €');
+      }).join('\n');
+
+  var moisOpts = [1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
+    return '<option value="'+m+'"'+(m===repMois?' selected':'')+'>'+MOIS_FULL[m]+'</option>';
+  }).join('');
+  var anneeOpts2 = '';
+  for (var y2 = 2024; y2 <= nowAnnee()+1; y2++) {
+    anneeOpts2 += '<option value="'+y2+'"'+(y2===repAnnee?' selected':'')+'>'+y2+'</option>';
+  }
+
+  var tableRows = rows.map(function(r) {
+    return '<tr>'
+      + '<td><div style="display:flex;align-items:center;gap:8px;">'
+        + '<div style="width:26px;height:26px;border-radius:50%;background:'+r.col+';color:#fff;font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+r.collab.slice(0,2).toUpperCase()+'</div>'
+        + '<span style="font-weight:700;">'+r.collab+'</span></div></td>'
+      + '<td style="text-align:center;font-weight:700;color:'+(r.joursConges>0?'#dc2626':'#94a3b8')+';">'+r.joursConges+'</td>'
+      + '<td style="text-align:center;font-weight:700;color:#1d4ed8;">'+r.joursTravail+'</td>'
+      + '<td style="text-align:center;font-weight:700;color:#ca8a04;">'+r.tickets+' 🎫</td>'
+      + '<td style="text-align:right;font-weight:800;color:'+(r.prime>0?'#15803d':'#94a3b8')+';">'+(r.prime>0?fmtEuro(r.prime):'—')+'</td>'
+      + '</tr>';
+  }).join('');
+
+  zone.innerHTML = '<div style="background:#fff;border-radius:14px;border:1.5px solid #e2e8f0;padding:20px;margin-top:24px;">'
+
+    // Header
+    + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
+    + '<div>'
+    + '<div style="font-weight:800;font-size:1rem;color:#0f172a;">📋 Rapport comptable mensuel</div>'
+    + '<div style="font-size:.78rem;color:#64748b;margin-top:3px;">Congés · Prime d\'activité · Tickets restaurant — <strong>hors avatars</strong></div>'
+    + '</div>'
+    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+    + '<select id="comptable-mois" onchange="renderComptableReport()" style="padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;">'
+    + moisOpts + '</select>'
+    + '<select id="comptable-annee" onchange="renderComptableReport()" style="padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;">'
+    + anneeOpts2 + '</select>'
+    + '<button onclick="(function(){var ta=document.getElementById(\'comptable-copy-area\');ta.select();document.execCommand(\'copy\');toast(\'Rapport copié dans le presse-papiers ✓\',\'success\');})()" '
+    + 'style="background:linear-gradient(135deg,#0369a1,#0284c7);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:.82rem;font-weight:600;cursor:pointer;">📋 Copier</button>'
+    + '</div></div>'
+
+    // Info jours ouvrés
+    + '<div style="background:#f0f9ff;border:1.5px solid #7dd3fc;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:.82rem;color:#0369a1;">'
+    + '📅 <strong>'+MOIS_FULL[repMois]+' '+repAnnee+'</strong> — '
+    + '<strong>'+totalJoursOuvres+' jours ouvrés</strong> dans le mois (hors samedis, dimanches, jours fériés)'
+    + '</div>'
+
+    // Table
+    + '<div style="overflow-x:auto;">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:.88rem;">'
+    + '<thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
+    + '<th style="padding:10px 12px;text-align:left;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">Collaboratrice</th>'
+    + '<th style="padding:10px 12px;text-align:center;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">🏖 Congés</th>'
+    + '<th style="padding:10px 12px;text-align:center;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">💼 Jours travaillés</th>'
+    + '<th style="padding:10px 12px;text-align:center;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">🎫 Tickets resto</th>'
+    + '<th style="padding:10px 12px;text-align:right;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">🎁 Prime activité</th>'
+    + '</tr></thead>'
+    + '<tbody style="divide-y:#f1f5f9;">'
+    + tableRows
+    + '</tbody></table>'
+    + '</div>'
+
+    // Zone de copie
+    + '<textarea id="comptable-copy-area" readonly style="position:absolute;left:-9999px;top:0;">'+copyText+'</textarea>'
+
+    + '</div>';
+}
 
 function _kpiCard(icon, label, val, bg, color) {
   return '<div style="background:' + bg + ';border-radius:12px;padding:16px 20px;border:1.5px solid ' + color + '22;">'
@@ -11106,11 +11367,26 @@ function renderAdminTaches() {
           +'<span style="font-size:.7rem;background:'+pc+'18;color:'+pc+';padding:2px 7px;border-radius:99px;font-weight:600;">'+tachePrioriteLabel(t.priorite)+'</span>'
           +'<span style="font-size:.7rem;background:'+sc+'18;color:'+sc+';padding:2px 7px;border-radius:99px;">'+t.statut+'</span>'
           +'<span style="font-size:.73rem;">'+echeanceStr+'</span>'
-          +(isMouez?'<button onclick="openTacheModal(\''+t.id+'\')" style="background:#f1f5f9;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">✏️</button>':'')
+          +'<button onclick="openTacheModal(\''+t.id+'\')" style="background:#f1f5f9;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">✏️</button>'
+          +'<select style="font-size:.72rem;padding:3px 6px;border:1px solid #ddd6fe;border-radius:6px;color:#7c3aed;background:white;" onchange="adminReassignTache(\''+t.id+'\',this.value);this.value=\'\'">'
+            +'<option value="">↪</option>'
+            +['Mouez'].concat(getCollabNames()).filter(function(n){return n!==t.collab;}).map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')
+          +'</select>'
         +'</div>'
         +'</div>';
     }).join('')
     +'</div>';
+}
+
+function adminReassignTache(id, dest) {
+  if (!dest) return;
+  var t = (DB.taches||[]).find(function(x){return x.id===id;});
+  if (!t) return;
+  t.collab = dest;
+  t.transferePar = 'Admin';
+  saveTache(t);
+  renderAdminTaches();
+  toast('Tâche réassignée à '+dest+' ✓','success');
 }
 
 function toggleAdminTacheTermineEquipe(id) {
