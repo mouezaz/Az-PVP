@@ -692,7 +692,7 @@ function _fbListen() {
     console.log('🔄 Sync reçue — ventes:', DB.ventes.length, '| devis:', (DB.devis||[]).length);
     var safePages = [
       'collab-home','collab-ventes','collab-saisir','collab-resil',
-      'collab-leads','collab-suivi','collab-prospection','collab-formation',
+      'collab-leads','collab-suivi','collab-stats','collab-prospection','collab-formation',
       'collab-decouverte','collab-conges','collab-taches',
       'admin-dashboard','admin-performance','admin-ventes','admin-resil',
       'admin-prospects','admin-commissions','admin-import','admin-export',
@@ -1013,6 +1013,7 @@ function buildCollabSidebar() {
     { id: 'collab-taches',      icon: '✅',  label: 'Mes tâches' },
     { id: 'collab-saisir',      icon: '✚',  label: 'Saisir une vente' },
     { id: 'collab-ventes',      icon: '📂', label: 'Mes affaires' },
+    { id: 'collab-stats',       icon: '📊', label: 'Mes stats & R/O' },
     { id: 'collab-resil',       icon: '🛡',  label: 'Résiliations' },
   ];
   const rh = [
@@ -1025,7 +1026,7 @@ function buildCollabSidebar() {
     { label: '📈 Commercial & Gestion', items: commercial },
     { label: '👥 Ressources Humaines',  items: rh },
   ]);
-  showPage('collab-ventes');
+  showPage('collab-home');
 }
 
 function buildAdminSidebar() {
@@ -1913,8 +1914,11 @@ PAGES['collab-leads'] = (mc) => {
         <div class="form-group" style="min-width:130px">
           <label class="fl">👤 Collaborateur</label>
           <select id="lead-filter-collab" onchange="renderLeadsTable()">
-            <option value="">Toute l'équipe</option>
-            ${getCollabNames().map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')}
+            <option value=""${currentUser.role==='admin'?' selected':''}>Toute l'équipe</option>
+            ${getCollabNames().map(function(n){
+              var sel = (currentUser.role!=='admin' && currentUser.name===n) ? ' selected' : '';
+              return '<option value="'+n+'"'+sel+'>'+n+'</option>';
+            }).join('')}
           </select>
         </div>
         <div class="form-group" style="min-width:160px">
@@ -2776,6 +2780,163 @@ function deleteLead(id) {
 
 
 
+// ---- PAGE: STATS & TAUX DE CONCRETISATION ----
+PAGES['collab-stats'] = function(mc) {
+  var collab  = currentUser.name;
+  var isAdmin = currentUser.role === 'admin';
+  var mois    = nowMois(), annee = nowAnnee();
+  var colorsMap = getCollabColors();
+
+  // Liste des collabs à afficher : admin voit tout le monde, collab voit juste elle
+  var collabsToShow = isAdmin ? getCollabNames() : [collab];
+
+  // ── Helpers période ──
+  var now2 = new Date();
+  var dayOfWeek = now2.getDay() === 0 ? 6 : now2.getDay() - 1;
+  var mondayTs = new Date(now2); mondayTs.setDate(now2.getDate() - dayOfWeek); mondayTs.setHours(0,0,0,0);
+  var sundayTs = new Date(mondayTs); sundayTs.setDate(mondayTs.getDate() + 6); sundayTs.setHours(23,59,59,999);
+  var mondayLabel = mondayTs.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+  var sundayLabel = sundayTs.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+
+  function inWeek(isoStr) {
+    if (!isoStr) return false;
+    var d = new Date(isoStr);
+    return d >= mondayTs && d <= sundayTs;
+  }
+  function inMonth(isoStr) {
+    if (!isoStr) return false;
+    var d = new Date(isoStr);
+    return d.getMonth()+1 === mois && d.getFullYear() === annee;
+  }
+  function pct(a, b) { return b > 0 ? Math.round(a/b*100) : 0; }
+  function roBadge(ratio) {
+    var color = ratio >= 30 ? '#15803d' : ratio >= 15 ? '#d97706' : '#dc2626';
+    var bg    = ratio >= 30 ? '#f0fdf4' : ratio >= 15 ? '#fffbeb' : '#fef2f2';
+    return '<span style="background:'+bg+';color:'+color+';border:1.5px solid '+color+'33;border-radius:20px;padding:2px 10px;font-size:.8rem;font-weight:800;">R/O '+ratio+'%</span>';
+  }
+
+  function getStats(name) {
+    var allLeads  = (DB.leads||[]).filter(function(l){ return l.collab===name; });
+    var allVentes = (DB.ventes||[]).filter(function(v){ return v.collab===name && v.affaireNouvelle==='Oui'; });
+    var allDevis  = (DB.devis||[]).filter(function(d){ return d.collab===name; });
+
+    // Semaine
+    var wLeadsNew = allLeads.filter(function(l){ return inWeek(l.createdAt); }).length;
+    var wLeadsRel = allLeads.filter(function(l){ return inWeek(l.relanceDate); }).length;
+    var wContacts = wLeadsNew + wLeadsRel;
+    var wDevis    = allDevis.filter(function(d){ return inWeek(d.dateDevis||d.createdAt||''); }).length;
+    var wContrats = allVentes.filter(function(v){ return inWeek(v.createdAt||v.date||''); }).length;
+    var wRO       = pct(wContrats, wContacts);
+
+    // Mois
+    var mLeadsNew = allLeads.filter(function(l){ return inMonth(l.createdAt); }).length;
+    var mLeadsRel = allLeads.filter(function(l){ return inMonth(l.relanceDate); }).length;
+    var mContacts = mLeadsNew + mLeadsRel;
+    var mDevis    = allDevis.filter(function(d){ return inMonth(d.dateDevis||d.createdAt||''); }).length;
+    var mContrats = allVentes.filter(function(v){ return inMonth(v.createdAt||v.date||''); }).length;
+    var mRO       = pct(mContrats, mContacts);
+
+    return { wContacts:wContacts, wDevis:wDevis, wContrats:wContrats, wRO:wRO,
+             mContacts:mContacts, mDevis:mDevis, mContrats:mContrats, mRO:mRO };
+  }
+
+  function statCell(val, sub, color) {
+    return '<div style="text-align:center;padding:10px 6px;">'
+      + '<div style="font-size:1.3rem;font-weight:800;color:'+color+';">'+val+'</div>'
+      + (sub ? '<div style="font-size:.68rem;color:#94a3b8;margin-top:1px;">'+sub+'</div>' : '')
+      + '</div>';
+  }
+
+  // ── Tableau par collab ──
+  var rows = collabsToShow.map(function(name) {
+    var col = colorsMap[name] || '#6b7280';
+    var s   = getStats(name);
+    var isSelf = name === collab;
+    return '<tr style="'+(isSelf?'background:#eff6ff;font-weight:600':'')+'">'
+      + '<td><div style="display:flex;align-items:center;gap:8px;">'
+        + '<div style="width:26px;height:26px;border-radius:50%;background:'+col+';color:#fff;font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;">'+name.slice(0,2).toUpperCase()+'</div>'
+        + '<span style="font-weight:700;">'+name+(isSelf&&isAdmin?' (moi)':'')+'</span></div></td>'
+      // Semaine
+      + '<td>'+statCell(s.wContacts,'leads+relances','#0369a1')+'</td>'
+      + '<td>'+statCell(s.wDevis,'','#0891b2')+'</td>'
+      + '<td>'+statCell(s.wContrats,'AN','#15803d')+'</td>'
+      + '<td style="text-align:center;">'+roBadge(s.wRO)+'</td>'
+      // Mois
+      + '<td>'+statCell(s.mContacts,'leads+relances','#6d28d9')+'</td>'
+      + '<td>'+statCell(s.mDevis,'','#7c3aed')+'</td>'
+      + '<td>'+statCell(s.mContrats,'AN','#15803d')+'</td>'
+      + '<td style="text-align:center;">'+roBadge(s.mRO)+'</td>'
+      + '</tr>';
+  });
+
+  // ── Totaux équipe (si admin ou pour info) ──
+  var teamStats = null;
+  if (isAdmin || collabsToShow.length > 1) {
+    var tWC=0,tWD=0,tWK=0,tMC=0,tMD=0,tMK=0;
+    collabsToShow.forEach(function(name){ var s=getStats(name); tWC+=s.wContacts;tWD+=s.wDevis;tWK+=s.wContrats;tMC+=s.mContacts;tMD+=s.mDevis;tMK+=s.mContrats; });
+    teamStats = { wContacts:tWC, wDevis:tWD, wContrats:tWK, wRO:pct(tWK,tWC), mContacts:tMC, mDevis:tMD, mContrats:tMK, mRO:pct(tMK,tMC) };
+  }
+
+  mc.innerHTML = '<div style="max-width:960px;margin:0 auto;padding:20px;">'
+
+    // Header
+    + '<div style="background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:16px;padding:22px 28px;color:#fff;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+    + '<div><div style="font-size:1.3rem;font-weight:800;">📊 Mes stats & Taux de concrétisation</div>'
+    + '<div style="opacity:.8;font-size:.85rem;margin-top:4px;">Contacts → Devis → Contrats · R/O = contrats / contacts</div></div>'
+    + '<div style="text-align:right;font-size:.8rem;opacity:.7;">Semaine du '+mondayLabel+' → '+sundayLabel+'<br>Mois : '+MOIS_FULL[mois]+' '+annee+'</div>'
+    + '</div>'
+
+    // Légende R/O
+    + '<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 16px;margin-bottom:16px;font-size:.78rem;color:#64748b;">'
+    + '💡 <strong>R/O</strong> = Taux de concrétisation (contrats signés ÷ contacts effectués × 100) — '
+    + '<span style="color:#15803d;font-weight:700;">≥30% excellent</span> · '
+    + '<span style="color:#d97706;font-weight:700;">15–29% correct</span> · '
+    + '<span style="color:#dc2626;font-weight:700;">&lt;15% à améliorer</span>'
+    + '</div>'
+
+    // Tableau
+    + '<div style="background:#fff;border-radius:14px;border:1.5px solid #e2e8f0;overflow:hidden;">'
+    + '<div style="overflow-x:auto;">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:.85rem;">'
+    + '<thead>'
+    + '<tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
+    + '<th rowspan="2" style="padding:10px 14px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase;border-right:2px solid #e2e8f0;">Collaboratrice</th>'
+    + '<th colspan="4" style="padding:8px;text-align:center;font-size:.72rem;color:#0369a1;text-transform:uppercase;border-right:2px solid #bae6fd;background:#f0f9ff;">📅 Semaine '+mondayLabel+'–'+sundayLabel+'</th>'
+    + '<th colspan="4" style="padding:8px;text-align:center;font-size:.72rem;color:#6d28d9;text-transform:uppercase;background:#f5f3ff;">📆 '+MOIS_FULL[mois]+' '+annee+'</th>'
+    + '</tr>'
+    + '<tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
+    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f0f9ff;">📞 Contacts</th>'
+    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f0f9ff;">📄 Devis</th>'
+    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f0f9ff;">🏆 Contrats</th>'
+    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#e0f2fe;border-right:2px solid #bae6fd;">R/O</th>'
+    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f5f3ff;">📞 Contacts</th>'
+    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f5f3ff;">📄 Devis</th>'
+    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f5f3ff;">🏆 Contrats</th>'
+    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#ede9fe;">R/O</th>'
+    + '</tr>'
+    + '</thead>'
+    + '<tbody>'
+    + rows.join('')
+    + (teamStats ? (
+        '<tr style="background:#0f172a;color:#fff;font-weight:700;border-top:2px solid #0f172a;">'
+        + '<td style="padding:10px 14px;font-size:.82rem;">🏢 Total équipe</td>'
+        + '<td>'+statCell(teamStats.wContacts,'','#93c5fd')+'</td>'
+        + '<td>'+statCell(teamStats.wDevis,'','#67e8f9')+'</td>'
+        + '<td>'+statCell(teamStats.wContrats,'','#86efac')+'</td>'
+        + '<td style="text-align:center;"><span style="background:#1e3a5f;color:#93c5fd;border-radius:20px;padding:2px 10px;font-size:.8rem;font-weight:800;">R/O '+teamStats.wRO+'%</span></td>'
+        + '<td>'+statCell(teamStats.mContacts,'','#c4b5fd')+'</td>'
+        + '<td>'+statCell(teamStats.mDevis,'','#a78bfa')+'</td>'
+        + '<td>'+statCell(teamStats.mContrats,'','#86efac')+'</td>'
+        + '<td style="text-align:center;"><span style="background:#3b1f6b;color:#c4b5fd;border-radius:20px;padding:2px 10px;font-size:.8rem;font-weight:800;">R/O '+teamStats.mRO+'%</span></td>'
+        + '</tr>'
+      ) : '')
+    + '</tbody>'
+    + '</table>'
+    + '</div></div>'
+
+    + '</div>';
+};
+
 // ---- PAGE: ACCUEIL COLLABORATEUR (home) ----
 PAGES['collab-home'] = function(mc) {
   try {
@@ -3283,86 +3444,10 @@ PAGES['collab-suivi'] = (mc) => {
     </div>
   </div>
 
-  <!-- ══ STATS HEBDO & MENSUEL ══ -->
-  ${(()=>{
-    const now2 = new Date();
-    // Début semaine (lundi)
-    const dayOfWeek = now2.getDay() === 0 ? 6 : now2.getDay() - 1;
-    const mondayTs = new Date(now2); mondayTs.setDate(now2.getDate() - dayOfWeek); mondayTs.setHours(0,0,0,0);
-    const sundayTs = new Date(mondayTs); sundayTs.setDate(mondayTs.getDate() + 6); sundayTs.setHours(23,59,59,999);
-
-    // Contacts = leads créés (new leads) OU relancés cette semaine/mois
-    const allLeads = (DB.leads||[]).filter(l => l.collab === collab);
-    const allVentes = (DB.ventes||[]).filter(v => v.collab === collab && v.affaireNouvelle === 'Oui');
-    const allDevis = (DB.devis||[]).filter(d => d.collab === collab);
-
-    function inWeek(isoStr) {
-      if (!isoStr) return false;
-      const d = new Date(isoStr);
-      return d >= mondayTs && d <= sundayTs;
-    }
-    function inMonth(isoStr) {
-      if (!isoStr) return false;
-      const d = new Date(isoStr);
-      return d.getMonth()+1 === mois && d.getFullYear() === annee;
-    }
-
-    // Contacts semaine : leads créés ou relancés cette semaine
-    const wLeadsNew = allLeads.filter(l => inWeek(l.createdAt)).length;
-    const wLeadsRel = allLeads.filter(l => inWeek(l.relanceDate)).length;
-    const wContacts = wLeadsNew + wLeadsRel;
-    const wContrats = allVentes.filter(v => { const d = new Date(); return inWeek(v.createdAt||v.date||''); }).length;
-    const wDevis    = allDevis.filter(d => inWeek(d.dateDevis||d.createdAt||'')).length;
-
-    // Contacts mois : leads créés ou relancés ce mois
-    const mLeadsNew = allLeads.filter(l => inMonth(l.createdAt)).length;
-    const mLeadsRel = allLeads.filter(l => inMonth(l.relanceDate)).length;
-    const mContacts = mLeadsNew + mLeadsRel;
-    const mContrats = allVentes.filter(v => inMonth(v.createdAt||v.date||'')).length;
-    const mDevis    = allDevis.filter(d => inMonth(d.dateDevis||d.createdAt||'')).length;
-
-    const mondayLabel = mondayTs.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
-    const sundayLabel = sundayTs.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
-
-    function statBox(icon, label, val, sub, color) {
-      return `<div style="background:#fff;border:1.5px solid ${color}33;border-radius:12px;padding:14px 16px;text-align:center;min-width:90px;">
-        <div style="font-size:1.3rem;margin-bottom:4px;">${icon}</div>
-        <div style="font-size:1.4rem;font-weight:800;color:${color};">${val}</div>
-        <div style="font-size:.72rem;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.05em;margin-top:2px;">${label}</div>
-        ${sub ? `<div style="font-size:.68rem;color:#94a3b8;margin-top:2px;">${sub}</div>` : ''}
-      </div>`;
-    }
-
-    return `
-  <div style="margin-top:20px;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-400)">📊 Mes stats d'activité</span>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-
-      <!-- Semaine -->
-      <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #7dd3fc;border-radius:14px;padding:16px;">
-        <div style="font-weight:700;font-size:.88rem;color:#0369a1;margin-bottom:12px;">📅 Cette semaine <span style="font-weight:400;font-size:.75rem;opacity:.8;">${mondayLabel} → ${sundayLabel}</span></div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
-          ${statBox('📞','Contacts',wContacts,'Leads + relances','#0369a1')}
-          ${statBox('📄','Devis',wDevis,'','#0891b2')}
-          ${statBox('🏆','Contrats',wContrats,'Affaires nouvelles','#15803d')}
-        </div>
-      </div>
-
-      <!-- Mois -->
-      <div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1.5px solid #a78bfa;border-radius:14px;padding:16px;">
-        <div style="font-weight:700;font-size:.88rem;color:#6d28d9;margin-bottom:12px;">📆 ${MOIS_FULL[mois]} ${annee}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
-          ${statBox('📞','Contacts',mContacts,'Leads + relances','#6d28d9')}
-          ${statBox('📄','Devis',mDevis,'','#7c3aed')}
-          ${statBox('🏆','Contrats',mContrats,'Affaires nouvelles','#15803d')}
-        </div>
-      </div>
-
-    </div>
-  </div>`;
-  })()}
+  <!-- Raccourci vers stats -->
+  <div style="margin-top:16px;text-align:center;">
+    <button onclick="showPage('collab-stats')" style="background:linear-gradient(135deg,#1e40af,#3b82f6);color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:.85rem;font-weight:600;cursor:pointer;">📊 Voir mes stats & taux de concrétisation →</button>
+  </div>
 
 </div>`;
 }
@@ -10173,39 +10258,54 @@ function renderComptableReport(annee) {
     });
   }
 
-  // Compter jours de congés qui tombent DANS le mois donné
-  function joursCongesMois(collab, m, y) {
+  // Compter absences AVEC distinction ½ journée (0.5) vs journée entière (1)
+  function joursAbsencesMois(collab, m, y) {
     var firstDay = y + '-' + String(m).padStart(2,'0') + '-01';
     var lastDay  = y + '-' + String(m).padStart(2,'0') + '-' + String(new Date(y,m,0).getDate()).padStart(2,'0');
     var total = 0;
     congesMois(collab, m, y).forEach(function(c) {
-      // Clip à la plage du mois
       var debut = c.dateDebut < firstDay ? firstDay : c.dateDebut;
       var fin   = c.dateFin   > lastDay  ? lastDay  : c.dateFin;
-      total += countJoursOuvrables(debut, fin);
+      var jours = countJoursOuvrables(debut, fin);
+      // ½ journée = 0.5 ticket par jour concerné
+      if (c.type === 'Récupération (½ journée)') {
+        total += jours * 0.5;
+      } else {
+        total += jours;
+      }
     });
     return total;
   }
 
+  // Prime du mois PRÉCÉDENT (c'est ce qui est envoyé au comptable)
+  function moisPrecedent(m, y) {
+    if (m === 1) return { m: 12, y: y - 1 };
+    return { m: m - 1, y: y };
+  }
+
   var totalJoursOuvres = joursOuvresMois(repMois, repAnnee);
+  var prevM = moisPrecedent(repMois, repAnnee);
 
   // Lignes par collab
   var rows = collabsFull.map(function(collab) {
-    var col          = colorsMap[collab] || '#6b7280';
-    var joursConges  = joursCongesMois(collab, repMois, repAnnee);
-    var joursTravail = Math.max(0, totalJoursOuvres - joursConges);
-    var prime        = getPrimeEffective(collab, repMois, repAnnee);
-    var tickets      = joursTravail; // 1 ticket = 1 jour complet travaillé
+    var col           = colorsMap[collab] || '#6b7280';
+    var absences      = joursAbsencesMois(collab, repMois, repAnnee); // peut être .5
+    var joursTravail  = Math.max(0, totalJoursOuvres - Math.floor(absences));
+    var tickets       = Math.max(0, totalJoursOuvres - absences); // tickets = jours ouvrés - absences (½ journée = -0.5 ticket)
+    var ticketsRnd    = Math.floor(tickets); // on ne peut pas avoir demi-ticket
+    var prime         = getPrimeEffective(collab, prevM.m, prevM.y); // prime du mois PRÉCÉDENT
 
-    return { collab: collab, col: col, joursConges: joursConges, joursTravail: joursTravail, prime: prime, tickets: tickets };
+    return { collab: collab, col: col, absences: absences, joursTravail: joursTravail, tickets: ticketsRnd, prime: prime };
   });
 
   // Texte copiable
+  var prevLabel = MOIS_FULL[prevM.m] + ' ' + prevM.y;
   var copyText = 'Rapport comptable — ' + MOIS_FULL[repMois] + ' ' + repAnnee + '\n'
-    + 'Jours ouvrés du mois : ' + totalJoursOuvres + '\n\n'
-    + 'Collaboratrice\tCongés (j)\tJours travaillés\tTickets restaurant\tPrime activité\n'
+    + 'Jours ouvrés du mois : ' + totalJoursOuvres + '\n'
+    + 'Prime = mois précédent (' + prevLabel + ')\n\n'
+    + 'Collaboratrice\tAbsences (j)\tJours travaillés\tTickets restaurant\tPrime activité (' + prevLabel + ')\n'
     + rows.map(function(r){
-        return r.collab + '\t' + r.joursConges + '\t' + r.joursTravail + '\t' + r.tickets + '\t' + (r.prime > 0 ? fmtEuro(r.prime) : '0 €');
+        return r.collab + '\t' + r.absences + '\t' + r.joursTravail + '\t' + r.tickets + '\t' + (r.prime > 0 ? fmtEuro(r.prime) : '0 €');
       }).join('\n');
 
   var moisOpts = [1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
@@ -10221,7 +10321,7 @@ function renderComptableReport(annee) {
       + '<td><div style="display:flex;align-items:center;gap:8px;">'
         + '<div style="width:26px;height:26px;border-radius:50%;background:'+r.col+';color:#fff;font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+r.collab.slice(0,2).toUpperCase()+'</div>'
         + '<span style="font-weight:700;">'+r.collab+'</span></div></td>'
-      + '<td style="text-align:center;font-weight:700;color:'+(r.joursConges>0?'#dc2626':'#94a3b8')+';">'+r.joursConges+'</td>'
+      + '<td style="text-align:center;font-weight:700;color:'+(r.absences>0?'#dc2626':'#94a3b8')+';">'+(r.absences%1===0?r.absences:r.absences.toFixed(1))+'</td>'
       + '<td style="text-align:center;font-weight:700;color:#1d4ed8;">'+r.joursTravail+'</td>'
       + '<td style="text-align:center;font-weight:700;color:#ca8a04;">'+r.tickets+' 🎫</td>'
       + '<td style="text-align:right;font-weight:800;color:'+(r.prime>0?'#15803d':'#94a3b8')+';">'+(r.prime>0?fmtEuro(r.prime):'—')+'</td>'
@@ -10234,7 +10334,7 @@ function renderComptableReport(annee) {
     + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
     + '<div>'
     + '<div style="font-weight:800;font-size:1rem;color:#0f172a;">📋 Rapport comptable mensuel</div>'
-    + '<div style="font-size:.78rem;color:#64748b;margin-top:3px;">Congés · Prime d\'activité · Tickets restaurant — <strong>hors avatars</strong></div>'
+    + '<div style="font-size:.78rem;color:#64748b;margin-top:3px;">Absences · Tickets restaurant · Prime du mois précédent (<strong>'+prevLabel+'</strong>) — hors avatars</div>'
     + '</div>'
     + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
     + '<select id="comptable-mois" onchange="renderComptableReport()" style="padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;">'
@@ -10246,9 +10346,12 @@ function renderComptableReport(annee) {
     + '</div></div>'
 
     // Info jours ouvrés
-    + '<div style="background:#f0f9ff;border:1.5px solid #7dd3fc;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:.82rem;color:#0369a1;">'
+    + '<div style="background:#f0f9ff;border:1.5px solid #7dd3fc;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:.82rem;color:#0369a1;">'
     + '📅 <strong>'+MOIS_FULL[repMois]+' '+repAnnee+'</strong> — '
-    + '<strong>'+totalJoursOuvres+' jours ouvrés</strong> dans le mois (hors samedis, dimanches, jours fériés)'
+    + '<strong>'+totalJoursOuvres+' jours ouvrés</strong> (hors samedis, dimanches, jours fériés) · ½ journée = 0,5 ticket déduit'
+    + '</div>'
+    + '<div style="background:#fefce8;border:1.5px solid #fde047;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:.8rem;color:#a16207;">'
+    + '💡 <strong>Prime envoyée</strong> = prime du mois précédent (<strong>'+prevLabel+'</strong>) · <strong>Tickets</strong> = jours ouvrés − absences (½ journée déduit à 0,5)'
     + '</div>'
 
     // Table
@@ -10256,10 +10359,10 @@ function renderComptableReport(annee) {
     + '<table style="width:100%;border-collapse:collapse;font-size:.88rem;">'
     + '<thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
     + '<th style="padding:10px 12px;text-align:left;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">Collaboratrice</th>'
-    + '<th style="padding:10px 12px;text-align:center;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">🏖 Congés</th>'
+    + '<th style="padding:10px 12px;text-align:center;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">🏖 Absences (j)</th>'
     + '<th style="padding:10px 12px;text-align:center;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">💼 Jours travaillés</th>'
     + '<th style="padding:10px 12px;text-align:center;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">🎫 Tickets resto</th>'
-    + '<th style="padding:10px 12px;text-align:right;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">🎁 Prime activité</th>'
+    + '<th style="padding:10px 12px;text-align:right;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">🎁 Prime ('+prevLabel+')</th>'
     + '</tr></thead>'
     + '<tbody style="divide-y:#f1f5f9;">'
     + tableRows
