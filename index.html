@@ -2364,6 +2364,20 @@ function openContactJourney(unifiedId) {
   var nextStage = nextStepIdx < LEAD_PIPELINE_STAGES.length ? LEAD_PIPELINE_STAGES[nextStepIdx] : null;
   var devisStatutLabel = isDevis ? ' <span style="font-size:.68rem;background:#f5f3ff;border:1px solid #ddd6fe;color:#7c3aed;border-radius:4px;padding:1px 6px;font-weight:600;">Devis · '+src.statut+'</span>' : '';
 
+  // Boutons d'action (variables pour éviter les conflits de quotes dans template literal)
+  var actionsHTML = '';
+  if (canEdit) {
+    var nsm = nextStage ? (LEAD_STATUT_META[nextStage] || {color:'#0ea5e9', label:nextStage}) : null;
+    actionsHTML = '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9;">'
+      + '<button onclick="closeModal();logRelanceLead(' + JSON.stringify(unifiedId) + ')" style="padding:7px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:.82rem;font-weight:600;color:#1d4ed8;cursor:pointer;">📞 Enregistrer une relance</button>'
+      + (nextStage ? '<button onclick="closeModal();moveLeadStage(' + JSON.stringify(unifiedId) + ',1)" style="padding:7px 13px;background:' + nsm.color + '15;border:1px solid ' + nsm.color + '40;border-radius:8px;font-size:.82rem;font-weight:600;color:' + nsm.color + ';cursor:pointer;">→ Avancer : ' + nsm.label + '</button>' : '')
+      + (!isDevis && l.statut === 'Contrat signé' && !l.convertedToAN ? '<button onclick="closeModal();convertLeadToAN(' + JSON.stringify(origId) + ')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>' : '')
+      + (isDevis && l.statut === 'Contrat signé' && !l.convertedToAN ? '<button onclick="closeModal();convertDevisToAN(' + JSON.stringify(origId) + ')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>' : '')
+      + '<button onclick="closeModal();' + (isDevis ? 'openEditDevis(' + JSON.stringify(origId) + ')' : 'openEditLead(' + JSON.stringify(origId) + ')') + '" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;cursor:pointer;">✏️ Modifier</button>'
+      + '<button onclick="closeModal();archiveLead(' + JSON.stringify(unifiedId) + ')" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;color:#6b7280;cursor:pointer;">📦 Archiver</button>'
+      + '</div>';
+  }
+
   openModal(`
     <div class="modal-header" style="border-bottom:1px solid #f1f5f9;padding-bottom:12px;">
       <div>
@@ -2410,14 +2424,7 @@ function openContactJourney(unifiedId) {
       </div>
     </div>
 
-    ${canEdit?`<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9;">
-      <button onclick="closeModal();logRelanceLead('${unifiedId}')" style="padding:7px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:.82rem;font-weight:600;color:#1d4ed8;cursor:pointer;">📞 Enregistrer une relance</button>
-      ${nextStage?'<button onclick="closeModal();moveLeadStage(\''+unifiedId+'\',1)" style="padding:7px 13px;background:'+(LEAD_STATUT_META[nextStage]||{color:\'#0ea5e9\'}).color+'15;border:1px solid '+(LEAD_STATUT_META[nextStage]||{color:\'#0ea5e9\'}).color+'40;border-radius:8px;font-size:.82rem;font-weight:600;color:'+(LEAD_STATUT_META[nextStage]||{color:\'#0ea5e9\'}).color+';cursor:pointer;">→ Avancer : '+(LEAD_STATUT_META[nextStage]||{label:nextStage}).label+'</button>':''}
-      ${!isDevis&&l.statut==='Contrat signé'&&!l.convertedToAN?'<button onclick="closeModal();convertLeadToAN(\''+origId+'\')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>':''}
-      ${isDevis&&l.statut==='Contrat signé'&&!l.convertedToAN?'<button onclick="closeModal();convertDevisToAN(\''+origId+'\')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>':''}
-      <button onclick="closeModal();${isDevis?'openEditDevis(\''+origId+'\')':'openEditLead(\''+origId+'\')' }" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;cursor:pointer;">✏️ Modifier</button>
-      <button onclick="closeModal();archiveLead('${unifiedId}')" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;color:#6b7280;cursor:pointer;">📦 Archiver</button>
-    </div>`:''}
+    ${canEdit ? actionsHTML : ''}
   `);
 }
 
