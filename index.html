@@ -1984,8 +1984,11 @@ PAGES['collab-leads'] = (mc) => {
           <div class="form-group" style="min-width:140px">
             <label class="fl">Collaborateur</label>
             <select id="df-collab" onchange="renderDevisList()">
-              <option value="">Toute l'équipe</option>
-              ${getCollabNames().map(n=>`<option value="${n}">${n}</option>`).join('')}
+              <option value=""${currentUser.role==='admin'?' selected':''}>Toute l'équipe</option>
+              ${getCollabNames().map(function(n){
+                var sel = (currentUser.role!=='admin' && currentUser.name===n) ? ' selected' : '';
+                return '<option value="'+n+'"'+sel+'>'+n+'</option>';
+              }).join('')}
             </select>
           </div>
           <div class="form-group" style="min-width:140px">
@@ -2826,7 +2829,7 @@ PAGES['collab-stats'] = function(mc) {
     var wContacts = wLeadsNew + wLeadsRel;
     var wDevis    = allDevis.filter(function(d){ return inWeek(d.dateDevis||d.createdAt||''); }).length;
     var wContrats = allVentes.filter(function(v){ return inWeek(v.createdAt||v.date||''); }).length;
-    var wRO       = pct(wContrats, wContacts);
+    var wRO       = pct(wContrats, wDevis); // R/O = contrats / devis
 
     // Mois
     var mLeadsNew = allLeads.filter(function(l){ return inMonth(l.createdAt); }).length;
@@ -2834,7 +2837,7 @@ PAGES['collab-stats'] = function(mc) {
     var mContacts = mLeadsNew + mLeadsRel;
     var mDevis    = allDevis.filter(function(d){ return inMonth(d.dateDevis||d.createdAt||''); }).length;
     var mContrats = allVentes.filter(function(v){ return inMonth(v.createdAt||v.date||''); }).length;
-    var mRO       = pct(mContrats, mContacts);
+    var mRO       = pct(mContrats, mDevis); // R/O = contrats / devis
 
     return { wContacts:wContacts, wDevis:wDevis, wContrats:wContrats, wRO:wRO,
              mContacts:mContacts, mDevis:mDevis, mContrats:mContrats, mRO:mRO };
@@ -2888,7 +2891,7 @@ PAGES['collab-stats'] = function(mc) {
 
     // Légende R/O
     + '<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 16px;margin-bottom:16px;font-size:.78rem;color:#64748b;">'
-    + '💡 <strong>R/O</strong> = Taux de concrétisation (contrats signés ÷ contacts effectués × 100) — '
+    + '💡 <strong>R/O</strong> = Taux de concrétisation (contrats signés ÷ devis transmis × 100) — '
     + '<span style="color:#15803d;font-weight:700;">≥30% excellent</span> · '
     + '<span style="color:#d97706;font-weight:700;">15–29% correct</span> · '
     + '<span style="color:#dc2626;font-weight:700;">&lt;15% à améliorer</span>'
@@ -3719,8 +3722,11 @@ PAGES['collab-prospection'] = (mc) => { showPage('collab-leads'); return;
         <div class="form-group" style="min-width:130px">
           <label class="fl">👤 Collaborateur</label>
           <select id="df-collab" onchange="renderDevisList()">
-            <option value="">Toute l'équipe</option>
-            ${getCollabNames().map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')}
+            <option value=""${currentUser.role==='admin'?' selected':''}>Toute l'équipe</option>
+            ${getCollabNames().map(function(n){
+              var sel = (currentUser.role!=='admin' && currentUser.name===n) ? ' selected' : '';
+              return '<option value="'+n+'"'+sel+'>'+n+'</option>';
+            }).join('')}
           </select>
         </div>
       </div>
@@ -3749,13 +3755,16 @@ function renderProspKpis() {
   var scopeActifs = scope.filter(function(d){ return !['Gagné','Perdu','Abandonné'].includes(d.statut); });
   if (fStatut && fStatut!=='all') scopeActifs = scope.filter(function(d){ return d.statut===fStatut; });
 
-  var gagnes = scope.filter(function(d){ return d.statut==='Gagné'; });
-  var perdus  = scope.filter(function(d){ return d.statut==='Perdu'; });
-  var actifs  = scope.filter(function(d){ return !['Gagné','Perdu','Abandonné'].includes(d.statut); });
-  var enRetard = actifs.filter(function(d){ return joursRestants(d.prochainContact)<0; });
+  var gagnes    = scope.filter(function(d){ return d.statut==='Gagné'; });
+  var perdus    = scope.filter(function(d){ return d.statut==='Perdu'; });
+  var abandonnes= scope.filter(function(d){ return d.statut==='Abandonné'; });
+  var actifs    = scope.filter(function(d){ return !['Gagné','Perdu','Abandonné'].includes(d.statut); });
+  var enRetard  = actifs.filter(function(d){ return joursRestants(d.prochainContact)<0; });
   var primeActifs = actifs.reduce(function(s,d){ return s+(parseFloat(d.primeEstimee)||0); },0);
   var primeGagnee = gagnes.reduce(function(s,d){ return s+(parseFloat(d.primeEstimee)||0); },0);
-  var tx = (gagnes.length+perdus.length)>0 ? Math.round(gagnes.length/(gagnes.length+perdus.length)*100) : 0;
+  // R/O = gagnés / (gagnés + perdus + abandonnés) — sans suite comptent dans la base de calcul
+  var totalCloses = gagnes.length + perdus.length + abandonnes.length;
+  var tx = totalCloses>0 ? Math.round(gagnes.length/totalCloses*100) : 0;
 
   // Par produit (actifs)
   var byProdActif = {};
@@ -3780,7 +3789,7 @@ function renderProspKpis() {
     +'<div class="kpi"><div class="kpi-val">'+actifs.length+'</div><div class="kpi-lbl">En cours</div><div class="kpi-sub">'+fmtEuro(primeActifs)+' potentiel</div></div>'
     +'<div class="kpi '+(enRetard.length>0?'danger':'good')+'"><div class="kpi-val">'+enRetard.length+'</div><div class="kpi-lbl">Relances en retard</div></div>'
     +'<div class="kpi good"><div class="kpi-val">'+gagnes.length+'</div><div class="kpi-lbl">Devis gagnés</div><div class="kpi-sub">'+fmtEuro(primeGagnee)+' prime</div></div>'
-    +'<div class="kpi gold"><div class="kpi-val">'+tx+'%</div><div class="kpi-lbl">Taux de transfo.</div><div class="kpi-sub">'+gagnes.length+' gagnés / '+perdus.length+' perdus</div></div>'
+    +'<div class="kpi gold"><div class="kpi-val">'+tx+'%</div><div class="kpi-lbl">R/O devis</div><div class="kpi-sub">'+gagnes.length+' gagnés · '+perdus.length+' perdus · '+abandonnes.length+' sans suite</div></div>'
     +'</div>';
 
   // Badges collaboratrices
@@ -5653,7 +5662,7 @@ function renderAdminDashboard() {
   const commAN    = ventesM.reduce((s,v)=>s+calcCommission(v.produit,v.prime),0);
   const nbResil   = resilM.length;
   const prResil   = resilM.reduce((s,r)=>s+(parseFloat(r.prime)||0),0);
-  const commResil = resilM.reduce((s,r)=>s+calcCommission(r.produit,r.prime),0);
+  const commResil = resilM.reduce((s,r)=>s+calcCommission(r.produit,r.prime)*0.5,0); // 50% récupéré sur résil (harmonisé avec commissions détaillées)
   const commNette = commAN - commResil;
 
   // Soldes nets
@@ -5690,8 +5699,9 @@ function renderAdminDashboard() {
     const san = vC.filter(v=>SANT_P.includes(v.produit)).length;
     const pre = vC.filter(v=>PREV_P.includes(v.produit)).length;
     const pr  = vC.reduce((s,v)=>s+(parseFloat(v.prime)||0),0);
-    const comm= vC.reduce((s,v)=>s+calcCommission(v.produit,v.prime),0);
-    return {...cd, an, iard, san, pre, pr, comm};
+    const commAgence = vC.reduce((s,v)=>s+calcCommission(v.produit,v.prime),0); // commission agence
+    const commCollab = calcCommissionCollabMensuel(cd.name, mois, annee); // commission perçue par la collaboratrice
+    return {...cd, an, iard, san, pre, pr, comm: commAgence, commCollab};
   });
 
   // ── Historique mensuel pour graphique ──
@@ -5739,7 +5749,8 @@ function renderAdminDashboard() {
         <div style="text-align:right">
           <div style="font-size:34px;font-weight:700;line-height:1;letter-spacing:-2px">${cd.an}</div>
           <div style="font-size:11px;opacity:.8">${pctAN}% obj.</div>
-          <div style="font-size:11px;opacity:.9;margin-top:2px;background:rgba(255,255,255,.18);border-radius:6px;padding:2px 6px;">💰 ${fmtEuro(cd.comm)}</div>
+          <div style="font-size:10px;opacity:.9;margin-top:2px;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 6px;">🏦 Agence : ${fmtEuro(cd.comm)}</div>
+          <div style="font-size:10px;opacity:.9;margin-top:2px;background:rgba(255,255,255,.25);border-radius:6px;padding:2px 6px;">💰 Collab : ${fmtEuro(cd.commCollab)}</div>
         </div>
       </div>
       <!-- Barre globale -->
@@ -5833,7 +5844,8 @@ function renderAdminDashboard() {
           <div style="font-size:.8rem;color:#374151;margin-top:6px;font-weight:600;">${soldePrime>=0?'+':''}${fmtEuro(soldePrime)} prime</div>
           <div style="margin-top:8px;">
             ${nbResil>0?`<div style="font-size:.72rem;font-weight:700;color:${rapColor(rapport)};">Taux de perte : ${Math.round(nbResil/nbAN*100)}%</div>`:''}
-            <div style="font-size:.78rem;font-weight:800;color:#1d4ed8;margin-top:4px;">Comm. nette : ${fmtEuro(commNette)}</div>
+            <div style="font-size:.78rem;font-weight:800;color:#1d4ed8;margin-top:4px;">🏦 Comm. agence nette : ${fmtEuro(commNette)}</div>
+            <div style="font-size:.78rem;font-weight:800;color:#15803d;margin-top:3px;">💰 Comm. équipe : ${fmtEuro(collabData.reduce((s,cd)=>s+cd.commCollab,0))}</div>
           </div>
         </div>
       </div>
@@ -10135,7 +10147,7 @@ PAGES['admin-rh-primes'] = function(mc) {
       var bgCol     = isManual ? '#f0fdf4' : (val > 0 ? '#eff6ff' : '#f8fafc');
       var titleTxt  = isManual
         ? 'Montant personnalisé — cliquez ↺ pour revenir au calcul auto'
-        : (val > 0 ? 'Calculé automatiquement depuis les commissions' : 'Aucune commission ce mois');
+        : (val > 0 ? getPrimeBreakdown(collab, m, ann) : 'Aucune vente saisie ce mois — prime = 0');
       return '<div style="position:relative;background:' + bgCol + ';border:1.5px solid ' + (isCur?col:borderCol) + ';border-radius:10px;padding:8px 6px;text-align:center;' + (isCur?'box-shadow:0 0 0 3px '+col+'22;':'') + '">'
         // Mois label
         + '<div style="font-size:.68rem;font-weight:700;color:' + (isCur?col:'#94a3b8') + ';margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;">' + MOIS_LABELS[m] + '</div>'
@@ -10381,6 +10393,48 @@ function _kpiCard(icon, label, val, bg, color) {
     + '<div style="font-size:.75rem;color:' + color + ';font-weight:600;text-transform:uppercase;letter-spacing:.05em;">' + label + '</div>'
     + '<div style="font-size:1.25rem;font-weight:800;color:' + color + ';margin-top:4px;">' + val + '</div>'
     + '</div>';
+}
+
+function getPrimeBreakdown(collab, mois, annee) {
+  // Retourne un texte détaillé du calcul de prime pour un collab/mois/annee
+  var manual = (DB.primes||[]).find(function(p){ return p.collab===collab && p.mois===mois && p.annee===annee; });
+  if (manual !== undefined) return 'Montant saisi manuellement : ' + fmtEuro(manual.montant||0);
+  var obj = getObjectifsStatus(collab, mois, annee);
+  var ventesM = getVentesMoisCollab(collab, mois, annee);
+  if (!ventesM.length) return 'Aucune vente saisie ce mois';
+  var lines = [];
+  var total = 0;
+  // Grouper par produit
+  var byProd = {};
+  ventesM.forEach(function(v){ if(!byProd[v.produit]) byProd[v.produit]=[]; byProd[v.produit].push(v); });
+  Object.keys(byProd).forEach(function(prod) {
+    var ventes = byProd[prod];
+    var nb = ventes.length;
+    var r = (window.COMM_RATES_COLLAB||{})[prod] || null;
+    if (!r) { lines.push(prod+' ('+nb+') : non rémunéré'); return; }
+    var bloque = false;
+    if (prod==='Auto' && !obj.autoOK) bloque = true;
+    if (prod==='MRH'  && !obj.mrhOK)  bloque = true;
+    if (bloque) {
+      var raison = !obj.nopOK ? 'NOP insuff. ('+obj.nbNOP+'/4)' : (prod==='Auto'?'Auto insuff. ('+obj.nbAuto+'/10)':'MRH insuff. ('+obj.nbMRH+'/8)');
+      lines.push(prod+' ('+nb+') : 🔒 bloqué — '+raison);
+      return;
+    }
+    var montant = 0;
+    if (r.type==='forfait') {
+      montant = nb * r.val;
+      lines.push(prod+' ('+nb+' × '+r.val+'€) = '+fmtEuro(montant));
+    } else {
+      var primeSum = ventes.reduce(function(s,v){ return s+(parseFloat(v.prime)||0); },0);
+      montant = primeSum * r.val;
+      lines.push(prod+' ('+nb+' · prime '+fmtEuro(primeSum)+' × '+(r.val*100)+'%) = '+fmtEuro(montant));
+    }
+    total += montant;
+  });
+  lines.push('─────');
+  lines.push('Total calculé : '+fmtEuro(total));
+  if (!obj.nopOK) lines.push('⚠ NOP = '+obj.nbNOP+'/4 → Auto & MRH bloqués');
+  return lines.join('\n');
 }
 
 function renderPrimesHistory(collabs, colorsMap, annee) {
