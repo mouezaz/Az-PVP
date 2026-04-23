@@ -5662,7 +5662,7 @@ function renderAdminDashboard() {
   const commAN    = ventesM.reduce((s,v)=>s+calcCommission(v.produit,v.prime),0);
   const nbResil   = resilM.length;
   const prResil   = resilM.reduce((s,r)=>s+(parseFloat(r.prime)||0),0);
-  const commResil = resilM.reduce((s,r)=>s+calcCommission(r.produit,r.prime)*0.5,0); // 50% récupéré sur résil (harmonisé avec commissions détaillées)
+  const commResil = resilM.reduce((s,r)=>s+calcCommission(r.produit,r.prime),0); // 100% déduit sur résil
   const commNette = commAN - commResil;
 
   // Soldes nets
@@ -5821,7 +5821,12 @@ function renderAdminDashboard() {
         <div style="background:#eff6ff;padding:16px 14px;border-right:1.5px solid #e2e8f0;">
           <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#1d4ed8;margin-bottom:6px;letter-spacing:.05em;">📈 AN — ${MOIS_FULL[mois]}</div>
           <div style="font-size:2.4rem;font-weight:900;color:#1d4ed8;line-height:1;">${nbAN}</div>
-          <div style="font-size:.8rem;color:#374151;margin-top:6px;font-weight:600;">${fmtEuro(primeAN)}</div>
+          <div style="font-size:.72rem;color:#6b7280;margin-top:6px;">Primes générées</div>
+          <div style="font-size:.92rem;font-weight:700;color:#374151;">${fmtEuro(primeAN)}</div>
+          <div style="margin-top:7px;padding-top:7px;border-top:1px solid #bfdbfe;">
+            <div style="font-size:.72rem;color:#1d4ed8;font-weight:600;">💰 Commissions agence</div>
+            <div style="font-size:1.05rem;font-weight:800;color:#1d4ed8;">${fmtEuro(commAN)}</div>
+          </div>
           <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;">
             <span style="font-size:.68rem;background:#dbeafe;color:#1e40af;padding:2px 7px;border-radius:99px;font-weight:700;">🔵 IARD ${nbIARD}</span>
             <span style="font-size:.68rem;background:#dcfce7;color:#15803d;padding:2px 7px;border-radius:99px;font-weight:700;">🟢 Santé ${nbSante}</span>
@@ -6082,13 +6087,13 @@ PAGES['admin-commissions'] = (mc) => {
   // ── Totaux mois ──
   const commM    = ventesM.reduce((s,v)=>s+calcCommission(v.produit,v.prime),0);
   const primeM   = ventesM.reduce((s,v)=>s+(parseFloat(v.prime)||0),0);
-  const commResM = resilM.reduce((s,r)=>s+calcCommission(r.produit,r.prime)*0.5,0);
+  const commResM = resilM.reduce((s,r)=>s+calcCommission(r.produit,r.prime),0);
   const commNetM = commM - commResM;
 
   // ── YTD ──
   const commYTD    = ventesAN.reduce((s,v)=>s+calcCommission(v.produit,v.prime),0);
   const primeYTD   = ventesAN.reduce((s,v)=>s+(parseFloat(v.prime)||0),0);
-  const commResYTD = resilAN.reduce((s,r)=>s+calcCommission(r.produit,r.prime)*0.5,0);
+  const commResYTD = resilAN.reduce((s,r)=>s+calcCommission(r.produit,r.prime),0);
   const commNetYTD = commYTD - commResYTD;
 
   // ── Projection annuelle (pace mois actuel × 12) ──
@@ -6122,9 +6127,9 @@ PAGES['admin-commissions'] = (mc) => {
     const rM  = resilM.filter(r=>r.collab===name);
     const rAN = resilAN.filter(r=>r.collab===name);
     const commGrossM  = vM.reduce((s,v)=>s+calcCommission(v.produit,v.prime),0);
-    const commResM2   = rM.reduce((s,r)=>s+calcCommission(r.produit,r.prime)*0.5,0);
+    const commResM2   = rM.reduce((s,r)=>s+calcCommission(r.produit,r.prime),0);
     const commGrossAN = vAN.reduce((s,v)=>s+calcCommission(v.produit,v.prime),0);
-    const commResAN   = rAN.reduce((s,r)=>s+calcCommission(r.produit,r.prime)*0.5,0);
+    const commResAN   = rAN.reduce((s,r)=>s+calcCommission(r.produit,r.prime),0);
     const prods = {};
     vM.forEach(v=>{ prods[v.produit]=(prods[v.produit]||0)+calcCommission(v.produit,v.prime); });
     return {
@@ -6143,7 +6148,7 @@ PAGES['admin-commissions'] = (mc) => {
     const vm = ventesAN.filter(v=>v.mois===m);
     const rm = resilAN.filter(r=>r.mois===m);
     const cG = vm.reduce((s,v)=>s+calcCommission(v.produit,v.prime),0);
-    const cR = rm.reduce((s,r)=>s+calcCommission(r.produit,r.prime)*0.5,0);
+    const cR = rm.reduce((s,r)=>s+calcCommission(r.produit,r.prime),0);
     monthlyData.push({m, lbl:MOIS_LABELS[m], gross:cG, resil:cR, net:cG-cR, nb:vm.length});
   }
 
@@ -10147,7 +10152,7 @@ PAGES['admin-rh-primes'] = function(mc) {
       var bgCol     = isManual ? '#f0fdf4' : (val > 0 ? '#eff6ff' : '#f8fafc');
       var titleTxt  = isManual
         ? 'Montant personnalisé — cliquez ↺ pour revenir au calcul auto'
-        : (val > 0 ? getPrimeBreakdown(collab, m, ann) : 'Aucune vente saisie ce mois — prime = 0');
+        : (val > 0 ? getPrimeBreakdown(collab, m, annee) : 'Aucune vente saisie ce mois — prime = 0');
       return '<div style="position:relative;background:' + bgCol + ';border:1.5px solid ' + (isCur?col:borderCol) + ';border-radius:10px;padding:8px 6px;text-align:center;' + (isCur?'box-shadow:0 0 0 3px '+col+'22;':'') + '">'
         // Mois label
         + '<div style="font-size:.68rem;font-weight:700;color:' + (isCur?col:'#94a3b8') + ';margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;">' + MOIS_LABELS[m] + '</div>'
