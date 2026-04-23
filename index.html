@@ -10275,20 +10275,69 @@ function renderComptableReport(annee) {
     });
   }
 
-  // Compter absences AVEC distinction ½ journée (0.5) vs journée entière (1)
-  function joursAbsencesMois(collab, m, y) {
+  // Jours contractuels prévus pour un collab dans le mois (planning A/B alterné + jours fériés)
+  // Retourne un nombre décimal (0.5 pour ½ journée)
+  function joursContractuelsMois(collab, m, y) {
+    var chomes = getJoursFeresChomesSet();
+    var daysInMonth = new Date(y, m, 0).getDate();
+    var total = 0;
+    for (var d = 1; d <= daysInMonth; d++) {
+      var iso  = y + '-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      var date = new Date(iso + 'T12:00:00');
+      var dow  = date.getDay(); // 0=Dim, 1=Lun … 6=Sam
+      if (dow === 0) continue;           // jamais le dimanche
+      if (chomes.has(iso)) continue;     // jour férié
+      var type = getCollabPlanningType(collab, date); // 'A', 'B', ou null
+      if (!type) {
+        // Pas de planning alterné défini → Lun-Ven standard
+        if (dow >= 1 && dow <= 5) total += 1;
+        continue;
+      }
+      var sched = PLANNING_SCHEDULES[type];
+      if (sched.full.indexOf(dow) !== -1) {
+        total += 1;       // jour complet prévu
+      } else if (sched.half === dow) {
+        total += 0.5;     // ½ journée prévue
+      }
+      // sinon : pas de travail prévu ce jour-là (ex: lundi sur planning B)
+    }
+    return total;
+  }
+
+  // Absences réelles sur les jours CONTRACTUELS du collab (½ journée = 0.5)
+  function joursAbsencesSurContrat(collab, m, y) {
+    var chomes   = getJoursFeresChomesSet();
     var firstDay = y + '-' + String(m).padStart(2,'0') + '-01';
     var lastDay  = y + '-' + String(m).padStart(2,'0') + '-' + String(new Date(y,m,0).getDate()).padStart(2,'0');
-    var total = 0;
+    var total    = 0;
     congesMois(collab, m, y).forEach(function(c) {
       var debut = c.dateDebut < firstDay ? firstDay : c.dateDebut;
       var fin   = c.dateFin   > lastDay  ? lastDay  : c.dateFin;
-      var jours = countJoursOuvrables(debut, fin);
-      // ½ journée = 0.5 ticket par jour concerné
-      if (c.type === 'Récupération (½ journée)') {
-        total += jours * 0.5;
-      } else {
-        total += jours;
+      // Parcourir chaque jour de la plage d'absence
+      var cur = new Date(debut + 'T12:00:00');
+      var end = new Date(fin   + 'T12:00:00');
+      while (cur <= end) {
+        var iso  = cur.toISOString().slice(0,10);
+        var dow  = cur.getDay();
+        if (dow !== 0 && !chomes.has(iso)) {
+          var type = getCollabPlanningType(collab, cur);
+          if (!type) {
+            // Standard Lun-Ven
+            if (dow >= 1 && dow <= 5) {
+              total += (c.type === 'Récupération (½ journée)') ? 0.5 : 1;
+            }
+          } else {
+            var sched = PLANNING_SCHEDULES[type];
+            if (sched.full.indexOf(dow) !== -1) {
+              total += (c.type === 'Récupération (½ journée)') ? 0.5 : 1;
+            } else if (sched.half === dow) {
+              // Absence sur la ½ journée contractuelle → 0.5
+              total += 0.5;
+            }
+            // Si absent un jour non travaillé → ne compte pas
+          }
+        }
+        cur.setDate(cur.getDate() + 1);
       }
     });
     return total;
@@ -10300,29 +10349,38 @@ function renderComptableReport(annee) {
     return { m: m - 1, y: y };
   }
 
-  var totalJoursOuvres = joursOuvresMois(repMois, repAnnee);
+  var totalJoursOuvres = joursOuvresMois(repMois, repAnnee); // jours ouvrés théoriques du mois (info générale)
   var prevM = moisPrecedent(repMois, repAnnee);
 
   // Lignes par collab
   var rows = collabsFull.map(function(collab) {
-    var col           = colorsMap[collab] || '#6b7280';
-    var absences      = joursAbsencesMois(collab, repMois, repAnnee); // peut être .5
-    var joursTravail  = Math.max(0, totalJoursOuvres - Math.floor(absences));
-    var tickets       = Math.max(0, totalJoursOuvres - absences); // tickets = jours ouvrés - absences (½ journée = -0.5 ticket)
-    var ticketsRnd    = Math.floor(tickets); // on ne peut pas avoir demi-ticket
-    var prime         = getPrimeEffective(collab, prevM.m, prevM.y); // prime du mois PRÉCÉDENT
+    var col            = colorsMap[collab] || '#6b7280';
+    var contrat        = joursContractuelsMois(collab, repMois, repAnnee); // jours prévus selon planning
+    var absences       = joursAbsencesSurContrat(collab, repMois, repAnnee); // absences sur jours contractuels
+    var joursTravail   = Math.max(0, contrat - absences);
+    var tickets        = Math.floor(joursTravail); // 1 ticket = 1 jour complet travaillé (½j déjà déduit)
+    var prime          = getPrimeEffective(collab, prevM.m, prevM.y); // prime du mois PRÉCÉDENT
 
-    return { collab: collab, col: col, absences: absences, joursTravail: joursTravail, tickets: ticketsRnd, prime: prime };
+    // Libellé planning pour affichage
+    var schedLabel = '';
+    try {
+      var typeA = getCollabPlanningType(collab, new Date(repAnnee+'-'+String(repMois).padStart(2,'0')+'-01T12:00:00'));
+      schedLabel = typeA ? '(planning '+typeA+' sem.1)' : '(Lun-Ven)';
+    } catch(e) {}
+
+    return { collab:collab, col:col, contrat:contrat, absences:absences, joursTravail:joursTravail, tickets:tickets, prime:prime, schedLabel:schedLabel };
   });
 
   // Texte copiable
   var prevLabel = MOIS_FULL[prevM.m] + ' ' + prevM.y;
   var copyText = 'Rapport comptable — ' + MOIS_FULL[repMois] + ' ' + repAnnee + '\n'
-    + 'Jours ouvrés du mois : ' + totalJoursOuvres + '\n'
+    + 'Jours ouvrés calendaire : ' + totalJoursOuvres + '\n'
     + 'Prime = mois précédent (' + prevLabel + ')\n\n'
-    + 'Collaboratrice\tAbsences (j)\tJours travaillés\tTickets restaurant\tPrime activité (' + prevLabel + ')\n'
+    + 'Collaboratrice\tJours contractuels\tAbsences (j)\tJours travaillés\tTickets restaurant\tPrime activité (' + prevLabel + ')\n'
     + rows.map(function(r){
-        return r.collab + '\t' + r.absences + '\t' + r.joursTravail + '\t' + r.tickets + '\t' + (r.prime > 0 ? fmtEuro(r.prime) : '0 €');
+        var cont = r.contrat%1===0 ? r.contrat : r.contrat.toFixed(1);
+        var abs  = r.absences%1===0 ? r.absences : r.absences.toFixed(1);
+        return r.collab + '\t' + cont + '\t' + abs + '\t' + r.joursTravail.toFixed(1) + '\t' + r.tickets + '\t' + (r.prime > 0 ? fmtEuro(r.prime) : '0 €');
       }).join('\n');
 
   var moisOpts = [1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
@@ -10337,9 +10395,12 @@ function renderComptableReport(annee) {
     return '<tr>'
       + '<td><div style="display:flex;align-items:center;gap:8px;">'
         + '<div style="width:26px;height:26px;border-radius:50%;background:'+r.col+';color:#fff;font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+r.collab.slice(0,2).toUpperCase()+'</div>'
-        + '<span style="font-weight:700;">'+r.collab+'</span></div></td>'
+        + '<span style="font-weight:700;">'+r.collab+'</span>'
+        + '<span style="font-size:.72rem;color:#94a3b8;margin-left:4px;">('+r.schedLabel+')</span>'
+        + '</div></td>'
+      + '<td style="text-align:center;font-weight:700;color:#0369a1;">'+(r.contrat%1===0?r.contrat:r.contrat.toFixed(1))+'</td>'
       + '<td style="text-align:center;font-weight:700;color:'+(r.absences>0?'#dc2626':'#94a3b8')+';">'+(r.absences%1===0?r.absences:r.absences.toFixed(1))+'</td>'
-      + '<td style="text-align:center;font-weight:700;color:#1d4ed8;">'+r.joursTravail+'</td>'
+      + '<td style="text-align:center;font-weight:700;color:#1d4ed8;">'+(r.joursTravail%1===0?r.joursTravail:r.joursTravail.toFixed(1))+'</td>'
       + '<td style="text-align:center;font-weight:700;color:#ca8a04;">'+r.tickets+' 🎫</td>'
       + '<td style="text-align:right;font-weight:800;color:'+(r.prime>0?'#15803d':'#94a3b8')+';">'+(r.prime>0?fmtEuro(r.prime):'—')+'</td>'
       + '</tr>';
@@ -10376,6 +10437,7 @@ function renderComptableReport(annee) {
     + '<table style="width:100%;border-collapse:collapse;font-size:.88rem;">'
     + '<thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
     + '<th style="padding:10px 12px;text-align:left;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">Collaboratrice</th>'
+    + '<th style="padding:10px 12px;text-align:center;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">📅 Jours contractuels</th>'
     + '<th style="padding:10px 12px;text-align:center;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">🏖 Absences (j)</th>'
     + '<th style="padding:10px 12px;text-align:center;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">💼 Jours travaillés</th>'
     + '<th style="padding:10px 12px;text-align:center;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">🎫 Tickets resto</th>'
