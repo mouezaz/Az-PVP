@@ -1072,8 +1072,7 @@ function renderMobileNav() {
   } else {
     items = [
       {id:'collab-home',  icon:'🏠', label:'Accueil'},
-      {id:'collab-leads', icon:'📞', label:'Leads'},
-      {id:'collab-devis', icon:'📋', label:'Devis'},
+      {id:'collab-leads', icon:'🎯', label:'Pipeline'},
       {id:'collab-stats', icon:'📊', label:'Stats'},
       {id:'collab-mois',  icon:'🗓️', label:'Mensuel'},
     ];
@@ -1900,12 +1899,17 @@ const LEAD_STATUT_PILLS = Object.fromEntries(Object.entries(LEAD_STATUT_META).ma
 const LEAD_SOURCES_META = {
   'Digital Allianz':       { icon:'🌐', color:'#0369a1' },
   'Recommandation client': { icon:'🤝', color:'#7c3aed' },
+  'Recommandation':        { icon:'🤝', color:'#7c3aed' },
   'Entrant agence':        { icon:'🏢', color:'#0891b2' },
+  'Prospect agence':       { icon:'🏢', color:'#0891b2' },
+  'Passage agence':        { icon:'🏢', color:'#0891b2' },
   'Multi-équipement CRM':  { icon:'🔄', color:'#d97706' },
+  'Multi-équipement':      { icon:'🔄', color:'#d97706' },
   'Appel entrant':         { icon:'📞', color:'#16a34a' },
+  'Renouvellement':        { icon:'♻️', color:'#059669' },
   'Autre':                 { icon:'✨', color:'#6b7280' },
 };
-const LEAD_ORIGINE_OPTIONS = ['Digital Allianz','Recommandation client','Entrant agence','Multi-équipement CRM','Appel entrant','Autre'];
+const LEAD_ORIGINE_OPTIONS = ['Digital Allianz','Appel entrant','Recommandation client','Recommandation','Entrant agence','Prospect agence','Passage agence','Multi-équipement CRM','Multi-équipement','Renouvellement','Autre'];
 
 var _leadView = 'kanban';
 
@@ -1978,16 +1982,67 @@ function setLeadView(v) {
   renderLeadsTable();
 }
 
+// ── FUSION LEADS + DEVIS → contacts unifiés ─────────────────
+function devisStatutToPipeline(statut) {
+  if (!statut) return 'À contacter';
+  if (statut === 'Gagné') return 'Contrat signé';
+  if (statut === 'Perdu' || statut === 'Abandonné') return 'Sans suite';
+  if (['Devis à envoyer','Devis envoyé','Relance 1','Relance 2','Relance 3'].includes(statut)) return 'Devis envoyé';
+  return 'À contacter';
+}
+
+function normalizeDevis(d) {
+  var relN = 0;
+  if (d.statut === 'Relance 1') relN = 1;
+  else if (d.statut === 'Relance 2') relN = 2;
+  else if (d.statut === 'Relance 3') relN = 3;
+  var hist = (d.historique||[]).map(function(h){ return { date:h.date, note:h.texte||'', nextRappel:null, type:'stage' }; });
+  var archived = d.statut === 'Perdu' || d.statut === 'Abandonné';
+  return {
+    _type: 'devis',
+    _origId: d.id,
+    id: 'd:' + d.id,
+    collab: d.collab,
+    client: d.client,
+    telephone: d.telephone || '',
+    produit: d.produit || '',
+    origine: d.origine || '',
+    primeEstimee: d.primeEstimee || 0,
+    statut: devisStatutToPipeline(d.statut),
+    origStatut: d.statut,
+    relanceCount: relN,
+    relanceHistory: hist,
+    rappel: d.prochainContact || '',
+    notes: d.notes || '',
+    priorite: '🟡 Moyenne',
+    createdAt: d.createdAt || d.dateDevis || '',
+    updatedAt: d.updatedAt || '',
+    archived: archived,
+    convertedToAN: d.convertedToAN || false,
+  };
+}
+
+function getAllContacts() {
+  var leads = (DB.leads||[]).map(function(l){
+    return Object.assign({}, l, { _type:'lead', _origId:l.id, id:'l:'+l.id, origStatut:l.statut });
+  });
+  var devis = (DB.devis||[]).map(normalizeDevis);
+  // Dédupliquer : si un lead a été converti en devis via convertedToDevis, ne pas l'afficher en double
+  var devisIds = new Set((DB.leads||[]).filter(function(l){ return l.devisId; }).map(function(l){ return l.devisId; }));
+  devis = devis.filter(function(d){ return !devisIds.has(d._origId); });
+  return leads.concat(devis);
+}
+
 function renderLeadsKpis() {
   var zone = document.getElementById('leads-kpis-zone');
   if (!zone) return;
-  var all = DB.leads || [];
+  var all = getAllContacts();
   var active = all.filter(function(l){ return !l.archived && l.statut !== 'Sans suite'; });
   var today = new Date(); today.setHours(0,0,0,0);
 
   var aContacter = active.filter(function(l){ return l.statut==='À contacter'; }).length;
   var enContact  = active.filter(function(l){ return l.statut==='Contacté — en attente'; }).length;
-  var devis      = active.filter(function(l){ return l.statut==='Devis envoyé'; }).length;
+  var devisN     = active.filter(function(l){ return l.statut==='Devis envoyé'; }).length;
   var signes     = active.filter(function(l){ return l.statut==='Contrat signé'; }).length;
   var enRetard   = active.filter(function(l){ return l.rappel && new Date(l.rappel) < today; }).length;
   var archives   = all.filter(function(l){ return l.archived || l.statut==='Sans suite'; }).length;
@@ -1998,7 +2053,7 @@ function renderLeadsKpis() {
   var kpis = [
     { label:'À contacter',   value:aContacter, icon:'🆕', color:'#ea580c', bg:'#fff7ed' },
     { label:'En contact',    value:enContact,  icon:'💬', color:'#2563eb', bg:'#eff6ff' },
-    { label:'Devis transmis',value:devis,      icon:'📋', color:'#7c3aed', bg:'#f5f3ff' },
+    { label:'Devis transmis',value:devisN,     icon:'📋', color:'#7c3aed', bg:'#f5f3ff' },
     { label:'Signés 🏆',     value:signes,     icon:'🏆', color:'#16a34a', bg:'#f0fdf4' },
     { label:'⚠️ En retard',  value:enRetard,   icon:'⚡', color:'#dc2626', bg:'#fef2f2' },
   ];
@@ -2020,15 +2075,15 @@ function getFilteredLeadsActive() {
   var filtProduit = document.getElementById('lead-filter-produit')?.value || '';
   var filtSearch  = (document.getElementById('lead-filter-search')?.value || '').toLowerCase();
 
-  var leads = (DB.leads||[]).filter(function(l){ return !l.archived && l.statut !== 'Sans suite'; });
-  if (filtCollab)  leads = leads.filter(function(l){ return l.collab  === filtCollab;  });
-  if (filtSource)  leads = leads.filter(function(l){ return l.origine === filtSource;  });
-  if (filtProduit) leads = leads.filter(function(l){ return l.produit === filtProduit; });
-  if (filtSearch)  leads = leads.filter(function(l){
+  var contacts = getAllContacts().filter(function(l){ return !l.archived && l.statut !== 'Sans suite'; });
+  if (filtCollab)  contacts = contacts.filter(function(l){ return l.collab  === filtCollab;  });
+  if (filtSource)  contacts = contacts.filter(function(l){ return l.origine === filtSource;  });
+  if (filtProduit) contacts = contacts.filter(function(l){ return l.produit === filtProduit; });
+  if (filtSearch)  contacts = contacts.filter(function(l){
     return (l.client||'').toLowerCase().includes(filtSearch)
         || (l.telephone||'').includes(filtSearch);
   });
-  return leads;
+  return contacts;
 }
 
 function renderLeadsTable() {
@@ -2258,23 +2313,33 @@ function renderLeadsListe() {
 }
 
 // ── MODAL : PARCOURS COMPLET ─────────────────────────────────
-function openContactJourney(id) {
-  var l = (DB.leads||[]).find(function(x){ return x.id===id; });
-  if (!l) return;
+function openContactJourney(unifiedId) {
+  // Résoudre l'objet source (lead ou devis) depuis l'id unifié
+  var isDevis = String(unifiedId).startsWith('d:');
+  var origId = String(unifiedId).replace(/^[ld]:/, '');
+  var src = isDevis
+    ? (DB.devis||[]).find(function(x){ return x.id===origId; })
+    : (DB.leads||[]).find(function(x){ return x.id===origId; });
+  if (!src) return;
+
+  // Normaliser pour l'affichage
+  var l = isDevis ? normalizeDevis(src) : Object.assign({}, src, { _type:'lead', origStatut:src.statut });
   var meta = LEAD_STATUT_META[l.statut] || LEAD_STATUT_META['À contacter'];
-  var today = new Date(); today.setHours(0,0,0,0);
   var isAdmin = currentUser.role === 'admin';
   var canEdit = isAdmin || l.collab === currentUser.name;
 
+  // Construire la timeline
   var events = [];
   events.push({ date:l.createdAt, type:'create', label:'Prise en charge', icon:'🆕', note:l.notes||'' });
 
   var history = l.relanceHistory || [];
-  history.forEach(function(r, i) {
-    events.push({ date:r.date, type:r.type||'relance', label:(r.type==='stage'?'→ Étape : '+r.note:'Relance N°'+(i+1)), icon:(r.type==='stage'?'→':'📞'), note:(r.type==='stage'?'':r.note||''), nextRappel:r.nextRappel||null });
+  var relIdx = 0;
+  history.forEach(function(r) {
+    if (r.type !== 'stage') relIdx++;
+    events.push({ date:r.date, type:r.type||'relance', label:(r.type==='stage'?'→ '+r.note:'Relance N°'+relIdx), icon:(r.type==='stage'?'→':'📞'), note:(r.type==='stage'?'':r.note||''), nextRappel:r.nextRappel||null });
   });
-  if (history.length === 0 && (l.relanceCount||0) > 0 && l.relanceDate) {
-    events.push({ date:l.relanceDate, type:'relance', label:'Relance(s) effectuée(s)', icon:'📞', note:l.relanceCount+' relance(s) enregistrée(s)' });
+  if (!isDevis && history.length === 0 && (src.relanceCount||0) > 0 && src.relanceDate) {
+    events.push({ date:src.relanceDate, type:'relance', label:src.relanceCount+' relance(s)', icon:'📞', note:'Historique non disponible' });
   }
   if (l.statut === 'Contrat signé') {
     events.push({ date:l.updatedAt||l.createdAt, type:'won', label:'🏆 Contrat signé !', icon:'🏆', note:'' });
@@ -2283,7 +2348,7 @@ function openContactJourney(id) {
 
   var timelineHTML = '<div style="position:relative;padding-left:22px;">'
     + '<div style="position:absolute;left:7px;top:0;bottom:0;width:2px;background:#e2e8f0;border-radius:1px;"></div>'
-    + events.map(function(ev) {
+    + (events.length ? events.map(function(ev) {
         var col = ev.type==='create'?'#6b7280':ev.type==='won'?'#16a34a':ev.type==='stage'?'#7c3aed':'#2563eb';
         return '<div style="position:relative;margin-bottom:14px;">'
           + '<div style="position:absolute;left:-19px;top:2px;width:14px;height:14px;border-radius:50%;background:'+col+';border:2px solid #fff;box-shadow:0 0 0 2px '+col+'40;display:flex;align-items:center;justify-content:center;font-size:.5rem;">'+ev.icon+'</div>'
@@ -2292,16 +2357,17 @@ function openContactJourney(id) {
           + (ev.note?'<div style="font-size:.78rem;color:#475569;margin-top:3px;background:#f8fafc;border:1px solid #f1f5f9;border-radius:6px;padding:5px 8px;">'+ev.note+'</div>':'')
           + (ev.nextRappel?'<div style="font-size:.73rem;color:#2563eb;margin-top:3px;">📅 Prochain rappel : '+new Date(ev.nextRappel).toLocaleDateString('fr-FR',{day:'2-digit',month:'long'})+'</div>':'')
           + '</div>';
-      }).join('')
+      }).join('') : '<div style="color:#9ca3af;font-size:.8rem;padding:8px;">Aucune action enregistrée</div>')
     + '</div>';
 
   var nextStepIdx = LEAD_PIPELINE_STAGES.indexOf(l.statut) + 1;
   var nextStage = nextStepIdx < LEAD_PIPELINE_STAGES.length ? LEAD_PIPELINE_STAGES[nextStepIdx] : null;
+  var devisStatutLabel = isDevis ? ' <span style="font-size:.68rem;background:#f5f3ff;border:1px solid #ddd6fe;color:#7c3aed;border-radius:4px;padding:1px 6px;font-weight:600;">Devis · '+src.statut+'</span>' : '';
 
   openModal(`
     <div class="modal-header" style="border-bottom:1px solid #f1f5f9;padding-bottom:12px;">
       <div>
-        <div class="modal-title" style="font-size:1.1rem;">${l.client}</div>
+        <div class="modal-title" style="font-size:1.1rem;">${l.client}${devisStatutLabel}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;">
           <span style="display:inline-flex;align-items:center;gap:3px;background:${meta.bg};border:1px solid ${meta.border};border-radius:6px;padding:2px 8px;font-size:.75rem;font-weight:600;color:${meta.color};">${meta.icon} ${meta.label}</span>
           ${sourceTag(l.origine)}
@@ -2321,9 +2387,7 @@ function openContactJourney(id) {
           var active = i === curStep, done = i < curStep;
           return (i>0?'<div style="flex:1;height:3px;background:'+(i<=curStep?LEAD_STATUT_META[LEAD_PIPELINE_STAGES[i-1]].color:'#e2e8f0')+';margin-top:-26px;"></div>':'')
             + '<div style="text-align:center;flex-shrink:0;">'
-              + '<div style="width:32px;height:32px;border-radius:50%;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:.9rem;background:'+(done?m.color:active?m.color:'#e5e7eb')+';color:'+(done||active?'#fff':'#9ca3af')+';'+(active?'box-shadow:0 0 0 3px '+m.color+'40;':'')+';">'
-                + (done?'✓':m.icon)
-              + '</div>'
+              + '<div style="width:32px;height:32px;border-radius:50%;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:.9rem;background:'+(done?m.color:active?m.color:'#e5e7eb')+';color:'+(done||active?'#fff':'#9ca3af')+';'+(active?'box-shadow:0 0 0 3px '+m.color+'40;':'')+';">'+(done?'✓':m.icon)+'</div>'
               + '<div style="font-size:.67rem;color:'+(active||done?m.color:'#9ca3af')+';font-weight:'+(active?'700':'500')+';white-space:nowrap;max-width:70px;">'+m.label+'</div>'
             + '</div>';
         }).join('')}
@@ -2335,6 +2399,7 @@ function openContactJourney(id) {
         <div style="font-size:.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Informations</div>
         ${l.telephone?'<div style="margin-bottom:6px;"><a href="tel:'+l.telephone+'" style="display:inline-flex;align-items:center;gap:5px;color:#0369a1;font-weight:600;font-size:.88rem;text-decoration:none;">📱 '+l.telephone+'</a></div>':''}
         <div style="font-size:.82rem;color:#475569;margin-bottom:4px;"><strong>Prise en charge :</strong> ${l.createdAt?new Date(l.createdAt).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}):'-'}</div>
+        ${isDevis&&l.primeEstimee?'<div style="font-size:.82rem;color:#475569;margin-bottom:4px;"><strong>Prime estimée :</strong> '+fmtEuro(l.primeEstimee)+'</div>':''}
         ${isAdmin&&l.collab?'<div style="font-size:.82rem;color:#475569;margin-bottom:4px;"><strong>Collaboratrice :</strong> '+l.collab+'</div>':''}
         ${l.rappel?'<div style="margin-top:6px;">'+rappelBadge(l.rappel)+'</div>':''}
         ${l.notes?'<div style="margin-top:8px;font-size:.8rem;color:#475569;background:#f8fafc;border:1px solid #f1f5f9;border-radius:8px;padding:8px;">'+l.notes+'</div>':''}
@@ -2346,38 +2411,60 @@ function openContactJourney(id) {
     </div>
 
     ${canEdit?`<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9;">
-      <button onclick="closeModal();logRelanceLead('${l.id}')" style="padding:7px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:.82rem;font-weight:600;color:#1d4ed8;cursor:pointer;">📞 Enregistrer une relance</button>
-      ${nextStage?'<button onclick="closeModal();moveLeadStage(\''+l.id+'\',1)" style="padding:7px 13px;background:'+(LEAD_STATUT_META[nextStage]||{color:\'#0ea5e9\'}).color+'15;border:1px solid '+(LEAD_STATUT_META[nextStage]||{color:\'#0ea5e9\'}).color+'40;border-radius:8px;font-size:.82rem;font-weight:600;color:'+(LEAD_STATUT_META[nextStage]||{color:\'#0ea5e9\'}).color+';cursor:pointer;">→ Avancer : '+(LEAD_STATUT_META[nextStage]||{label:nextStage}).label+'</button>':''}
-      ${l.statut==='Contrat signé'&&!l.convertedToAN?'<button onclick="closeModal();convertLeadToAN(\''+l.id+'\')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>':''}
-      <button onclick="closeModal();openEditLead('${l.id}')" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;cursor:pointer;">✏️ Modifier</button>
-      <button onclick="closeModal();archiveLead('${l.id}')" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;color:#6b7280;cursor:pointer;">📦 Archiver</button>
+      <button onclick="closeModal();logRelanceLead('${unifiedId}')" style="padding:7px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:.82rem;font-weight:600;color:#1d4ed8;cursor:pointer;">📞 Enregistrer une relance</button>
+      ${nextStage?'<button onclick="closeModal();moveLeadStage(\''+unifiedId+'\',1)" style="padding:7px 13px;background:'+(LEAD_STATUT_META[nextStage]||{color:\'#0ea5e9\'}).color+'15;border:1px solid '+(LEAD_STATUT_META[nextStage]||{color:\'#0ea5e9\'}).color+'40;border-radius:8px;font-size:.82rem;font-weight:600;color:'+(LEAD_STATUT_META[nextStage]||{color:\'#0ea5e9\'}).color+';cursor:pointer;">→ Avancer : '+(LEAD_STATUT_META[nextStage]||{label:nextStage}).label+'</button>':''}
+      ${!isDevis&&l.statut==='Contrat signé'&&!l.convertedToAN?'<button onclick="closeModal();convertLeadToAN(\''+origId+'\')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>':''}
+      ${isDevis&&l.statut==='Contrat signé'&&!l.convertedToAN?'<button onclick="closeModal();convertDevisToAN(\''+origId+'\')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>':''}
+      <button onclick="closeModal();${isDevis?'openEditDevis(\''+origId+'\')':'openEditLead(\''+origId+'\')' }" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;cursor:pointer;">✏️ Modifier</button>
+      <button onclick="closeModal();archiveLead('${unifiedId}')" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;color:#6b7280;cursor:pointer;">📦 Archiver</button>
     </div>`:''}
   `);
 }
 
 // ── DÉPLACER DANS LE PIPELINE ────────────────────────────────
-function moveLeadStage(id, direction) {
-  var l = (DB.leads||[]).find(function(x){ return x.id===id; });
-  if (!l) return;
-  var idx = LEAD_PIPELINE_STAGES.indexOf(l.statut);
+function moveLeadStage(unifiedId, direction) {
+  var isDevis = String(unifiedId).startsWith('d:');
+  var origId = String(unifiedId).replace(/^[ld]:/, '');
+  var src = isDevis
+    ? (DB.devis||[]).find(function(x){ return x.id===origId; })
+    : (DB.leads||[]).find(function(x){ return x.id===origId; });
+  if (!src) return;
+
+  var curPipelineStatut = isDevis ? devisStatutToPipeline(src.statut) : src.statut;
+  var idx = LEAD_PIPELINE_STAGES.indexOf(curPipelineStatut);
   if (idx === -1) return;
   var newIdx = idx + direction;
   if (newIdx < 0 || newIdx >= LEAD_PIPELINE_STAGES.length) return;
-  l.statut = LEAD_PIPELINE_STAGES[newIdx];
-  l.updatedAt = new Date().toISOString();
-  if (!l.relanceHistory) l.relanceHistory = [];
-  l.relanceHistory.push({ date:new Date().toISOString(), note:'Passage à : '+l.statut, nextRappel:null, type:'stage' });
+  var newStatut = LEAD_PIPELINE_STAGES[newIdx];
+
+  if (isDevis) {
+    // Mapper le statut pipeline → statut devis
+    var devisMap = { 'À contacter':'Devis à envoyer', 'Contacté — en attente':'Devis à envoyer', 'Devis envoyé':'Devis envoyé', 'Contrat signé':'Gagné' };
+    src.statut = devisMap[newStatut] || src.statut;
+    if (!src.historique) src.historique = [];
+    src.historique.push({ type:'stage', date:new Date().toISOString(), texte:'Passage à : '+newStatut });
+    src.updatedAt = new Date().toISOString();
+  } else {
+    src.statut = newStatut;
+    if (!src.relanceHistory) src.relanceHistory = [];
+    src.relanceHistory.push({ date:new Date().toISOString(), note:'Passage à : '+newStatut, nextRappel:null, type:'stage' });
+    src.updatedAt = new Date().toISOString();
+  }
   saveDB(DB);
   renderLeadsTable();
-  var newMeta = LEAD_STATUT_META[l.statut]||{};
-  toast((newMeta.icon||'→')+' '+l.client+' → '+(newMeta.label||l.statut), 'success');
-  if (l.statut === 'Contrat signé') setTimeout(function(){ toast('🎉 Bravo ! Ouvrez le parcours pour créer l\'AN.','success'); }, 800);
+  var newMeta = LEAD_STATUT_META[newStatut]||{};
+  toast((newMeta.icon||'→')+' '+src.client+' → '+(newMeta.label||newStatut), 'success');
+  if (newStatut === 'Contrat signé') setTimeout(function(){ toast('🎉 Bravo ! Ouvrez le parcours pour créer l\'AN.','success'); }, 800);
 }
 
 // ── MODAL RELANCE ────────────────────────────────────────────
-function logRelanceLead(id) {
-  var l = (DB.leads||[]).find(function(x){ return x.id===id; });
-  if (!l) return;
+function logRelanceLead(unifiedId) {
+  var isDevis = String(unifiedId).startsWith('d:');
+  var origId = String(unifiedId).replace(/^[ld]:/, '');
+  var l = isDevis
+    ? normalizeDevis((DB.devis||[]).find(function(x){ return x.id===origId; })||{})
+    : (DB.leads||[]).find(function(x){ return x.id===origId; });
+  if (!l || !l.client) return;
   var relanceN = ((l.relanceHistory||[]).filter(function(r){ return r.type!=='stage'; }).length || l.relanceCount||0) + 1;
   var tomorrowISO = new Date(Date.now()+86400000).toISOString().split('T')[0];
   openModal(`
@@ -2402,29 +2489,47 @@ function logRelanceLead(id) {
       </div>
     </div>
     <div class="btn-group">
-      <button class="btn btn-primary" onclick="saveRelanceLead('${id}')">✅ Enregistrer</button>
+      <button class="btn btn-primary" onclick="saveRelanceLead('${unifiedId}')">✅ Enregistrer</button>
       <button class="btn btn-ghost" onclick="closeModal()">Annuler</button>
     </div>
   `);
 }
 
-function saveRelanceLead(id) {
-  var l = (DB.leads||[]).find(function(x){ return x.id===id; });
-  if (!l) return;
+function saveRelanceLead(unifiedId) {
+  var isDevis = String(unifiedId).startsWith('d:');
+  var origId = String(unifiedId).replace(/^[ld]:/, '');
   var note      = document.getElementById('rel-note')?.value.trim() || '';
   var rappel    = document.getElementById('rel-rappel')?.value || '';
   var newStatut = document.getElementById('rel-statut')?.value || '';
-  if (!l.relanceHistory) l.relanceHistory = [];
-  l.relanceHistory.push({ date:new Date().toISOString(), note:note, nextRappel:rappel||null });
-  l.relanceCount = l.relanceHistory.filter(function(r){ return r.type!=='stage'; }).length;
-  l.relanceDate  = new Date().toISOString();
-  if (rappel) l.rappel = rappel;
-  if (newStatut) l.statut = newStatut;
-  l.updatedAt = new Date().toISOString();
+  var n;
+
+  if (isDevis) {
+    var d = (DB.devis||[]).find(function(x){ return x.id===origId; });
+    if (!d) return;
+    if (!d.historique) d.historique = [];
+    d.historique.push({ type:'relance', date:new Date().toISOString(), texte:note });
+    if (rappel) d.prochainContact = rappel;
+    if (newStatut) {
+      var devisMap = { 'À contacter':'Devis à envoyer','Contacté — en attente':'Devis à envoyer','Devis envoyé':'Devis envoyé','Contrat signé':'Gagné','Sans suite':'Perdu' };
+      d.statut = devisMap[newStatut] || d.statut;
+    }
+    d.updatedAt = new Date().toISOString();
+    n = d.historique.filter(function(h){ return h.type==='relance'; }).length;
+  } else {
+    var l = (DB.leads||[]).find(function(x){ return x.id===origId; });
+    if (!l) return;
+    if (!l.relanceHistory) l.relanceHistory = [];
+    l.relanceHistory.push({ date:new Date().toISOString(), note:note, nextRappel:rappel||null });
+    l.relanceCount = l.relanceHistory.filter(function(r){ return r.type!=='stage'; }).length;
+    l.relanceDate  = new Date().toISOString();
+    if (rappel) l.rappel = rappel;
+    if (newStatut) l.statut = newStatut;
+    l.updatedAt = new Date().toISOString();
+    n = l.relanceCount;
+  }
   saveDB(DB);
   closeModal();
   renderLeadsTable();
-  var n = l.relanceCount;
   var msg = '📞 Relance N°'+n+' enregistrée';
   if (n >= 5) msg += ' · 🔥🔥 Quel acharnement !';
   else if (n >= 3) msg += ' · 🔥 Contact chaud !';
@@ -2432,21 +2537,30 @@ function saveRelanceLead(id) {
 }
 
 // ── ARCHIVAGE ────────────────────────────────────────────────
-function archiveLead(id) {
-  var l = (DB.leads||[]).find(function(x){ return x.id===id; });
-  if (!l) return;
-  if (!confirm('Archiver '+l.client+' ?\nLe contact sera conservé pour vos futures campagnes commerciales.')) return;
-  l.archived = true;
-  l.archivedAt = new Date().toISOString();
+function archiveLead(unifiedId) {
+  var isDevis = String(unifiedId).startsWith('d:');
+  var origId = String(unifiedId).replace(/^[ld]:/, '');
+  var src = isDevis
+    ? (DB.devis||[]).find(function(x){ return x.id===origId; })
+    : (DB.leads||[]).find(function(x){ return x.id===origId; });
+  if (!src) return;
+  if (!confirm('Archiver '+src.client+' ?\nLe contact sera conservé pour vos futures campagnes commerciales.')) return;
+  if (isDevis) {
+    src.statut = 'Abandonné';
+  } else {
+    src.archived = true;
+  }
+  src.archivedAt = new Date().toISOString();
   saveDB(DB);
   renderLeadsTable();
-  toast('📦 '+l.client+' archivé · retrouvez-le dans les Archives', 'success');
+  toast('📦 '+src.client+' archivé · retrouvez-le dans les Archives', 'success');
 }
 
 function showArchivesLeads() {
   var isAdmin = currentUser.role === 'admin';
   var filtCollab = getLeadFilterCollab();
-  var archived = (DB.leads||[]).filter(function(l){
+  // Fusionner leads archivés + devis perdu/abandonné
+  var archived = getAllContacts().filter(function(l){
     return l.archived || l.statut === 'Sans suite';
   });
   if (filtCollab) archived = archived.filter(function(l){ return l.collab===filtCollab; });
@@ -2490,7 +2604,7 @@ function showArchivesLeads() {
             + '</div>'
             + '<div style="display:flex;gap:5px;flex-shrink:0;">'
               + '<button onclick="unarchiveLead(\''+l.id+'\')" style="padding:5px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:.72rem;font-weight:600;color:#1d4ed8;cursor:pointer;">♻️ Réactiver</button>'
-              + '<button onclick="if(confirm(\'Supprimer définitivement ?\'))deleteLead(\''+l.id+'\')" style="padding:5px 8px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:.72rem;color:#dc2626;cursor:pointer;">🗑</button>'
+              + (!l._type||l._type==='lead' ? '<button onclick="if(confirm(\'Supprimer définitivement ?\'))deleteLead(\''+l._origId+'\');renderLeadsTable();" style="padding:5px 8px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:.72rem;color:#dc2626;cursor:pointer;">🗑</button>' : '')
             + '</div>'
           + '</div>';
         }).join('')}
@@ -2506,17 +2620,25 @@ function showArchivesLeads() {
   `);
 }
 
-function unarchiveLead(id) {
-  var l = (DB.leads||[]).find(function(x){ return x.id===id; });
-  if (!l) return;
-  l.archived = false;
-  l.archivedAt = null;
-  if (l.statut === 'Sans suite') l.statut = 'À contacter';
-  l.updatedAt = new Date().toISOString();
+function unarchiveLead(unifiedId) {
+  var isDevis = String(unifiedId).startsWith('d:');
+  var origId = String(unifiedId).replace(/^[ld]:/, '');
+  var src = isDevis
+    ? (DB.devis||[]).find(function(x){ return x.id===origId; })
+    : (DB.leads||[]).find(function(x){ return x.id===origId; });
+  if (!src) return;
+  if (isDevis) {
+    src.statut = 'Devis envoyé';
+  } else {
+    src.archived = false;
+    src.archivedAt = null;
+    if (src.statut === 'Sans suite') src.statut = 'À contacter';
+  }
+  src.updatedAt = new Date().toISOString();
   saveDB(DB);
   closeModal();
   renderLeadsTable();
-  toast('♻️ '+l.client+' remis dans le pipeline', 'success');
+  toast('♻️ '+src.client+' remis dans le pipeline', 'success');
 }
 
 function changeLeadStatut(id, statut) {
