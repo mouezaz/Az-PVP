@@ -2036,8 +2036,8 @@ function getAllContacts() {
 function renderLeadsKpis() {
   var zone = document.getElementById('leads-kpis-zone');
   if (!zone) return;
-  var all = getAllContacts();
-  var active = all.filter(function(l){ return !l.archived && l.statut !== 'Sans suite'; });
+  // Utiliser les mêmes filtres que le kanban/liste pour la cohérence
+  var active = getFilteredLeadsActive();
   var today = new Date(); today.setHours(0,0,0,0);
 
   var aContacter = active.filter(function(l){ return l.statut==='À contacter'; }).length;
@@ -2045,7 +2045,14 @@ function renderLeadsKpis() {
   var devisN     = active.filter(function(l){ return l.statut==='Devis envoyé'; }).length;
   var signes     = active.filter(function(l){ return l.statut==='Contrat signé'; }).length;
   var enRetard   = active.filter(function(l){ return l.rappel && new Date(l.rappel) < today; }).length;
-  var archives   = all.filter(function(l){ return l.archived || l.statut==='Sans suite'; }).length;
+
+  // Archives : filtrées sur le collab seulement (pas source/produit/search)
+  var filtCollab = getLeadFilterCollab();
+  var allContacts = getAllContacts();
+  var archives = allContacts.filter(function(l){
+    if (filtCollab && l.collab !== filtCollab) return false;
+    return l.archived || l.statut === 'Sans suite';
+  }).length;
 
   var badge = document.getElementById('leads-archive-count');
   if (badge) badge.textContent = archives > 0 ? archives : '';
