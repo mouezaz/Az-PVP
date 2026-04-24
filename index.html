@@ -2058,11 +2058,11 @@ function renderLeadsKpis() {
   if (badge) badge.textContent = archives > 0 ? archives : '';
 
   var kpis = [
+    { label:'⚠️ En retard',  value:enRetard,   icon:'⚡', color:'#dc2626', bg:'#fef2f2' },
     { label:'À contacter',   value:aContacter, icon:'🆕', color:'#ea580c', bg:'#fff7ed' },
     { label:'En contact',    value:enContact,  icon:'💬', color:'#2563eb', bg:'#eff6ff' },
     { label:'Devis transmis',value:devisN,     icon:'📋', color:'#7c3aed', bg:'#f5f3ff' },
     { label:'Signés 🏆',     value:signes,     icon:'🏆', color:'#16a34a', bg:'#f0fdf4' },
-    { label:'⚠️ En retard',  value:enRetard,   icon:'⚡', color:'#dc2626', bg:'#fef2f2' },
   ];
 
   zone.innerHTML = '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">'
