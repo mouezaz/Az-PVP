@@ -2158,6 +2158,28 @@ function relanceCountBadge(l) {
   return '<span style="display:inline-block;background:#dbeafe;color:#1d4ed8;border-radius:99px;font-size:.72rem;padding:2px 9px;font-weight:700;">'+n+'× relance'+flame+'</span>';
 }
 
+// ── TRI PAR URGENCE ─────────────────────────────────────────
+// Ordre : retard → aujourd'hui → jours suivants (date croissante) → sans rappel
+function sortByUrgence(a, b, today) {
+  function urgPriority(l) {
+    if (!l.rappel) return 3; // sans rappel : en dernier
+    var d = new Date(l.rappel); d.setHours(0,0,0,0);
+    var diff = Math.round((d - today) / 86400000);
+    if (diff < 0)  return 0; // retard
+    if (diff === 0) return 1; // aujourd'hui
+    return 2; // jours suivants
+  }
+  var pa = urgPriority(a), pb = urgPriority(b);
+  if (pa !== pb) return pa - pb;
+  // À priorité égale : trier par date de rappel croissante (sauf sans rappel)
+  if (pa < 3) {
+    var da = new Date(a.rappel), db = new Date(b.rappel);
+    return da - db;
+  }
+  // Sans rappel : les plus récents en premier
+  return (b.createdAt||'').localeCompare(a.createdAt||'');
+}
+
 // ── VUE KANBAN ───────────────────────────────────────────────
 function renderLeadsKanban() {
   var zone = document.getElementById('leads-content-zone');
@@ -2170,10 +2192,7 @@ function renderLeadsKanban() {
     var meta = LEAD_STATUT_META[statut];
     var cards = leads.filter(function(l){ return l.statut === statut; });
     cards.sort(function(a, b) {
-      var aO = a.rappel && new Date(a.rappel) < today ? 1 : 0;
-      var bO = b.rappel && new Date(b.rappel) < today ? 1 : 0;
-      if (aO !== bO) return bO - aO;
-      return (b.createdAt||'').localeCompare(a.createdAt||'');
+      return sortByUrgence(a, b, today);
     });
     return { statut:statut, meta:meta, cards:cards };
   });
@@ -2259,15 +2278,7 @@ function renderLeadsListe() {
   var isAdmin = currentUser.role === 'admin';
   var today = new Date(); today.setHours(0,0,0,0);
 
-  leads.sort(function(a,b){
-    var aO = a.rappel && new Date(a.rappel) < today ? 1 : 0;
-    var bO = b.rappel && new Date(b.rappel) < today ? 1 : 0;
-    if (aO !== bO) return bO - aO;
-    var aS = (LEAD_STATUT_META[a.statut]||{step:0}).step;
-    var bS = (LEAD_STATUT_META[b.statut]||{step:0}).step;
-    if (aS !== bS) return aS - bS;
-    return (b.createdAt||'').localeCompare(a.createdAt||'');
-  });
+  leads.sort(function(a,b){ return sortByUrgence(a, b, today); });
 
   if (!leads.length) {
     zone.innerHTML = '<div style="padding:40px;text-align:center;color:#9ca3af;font-size:.9rem;">Aucun contact actif. <a href="#" onclick="openAddLead();return false;" style="color:#2563eb;">Ajouter un contact →</a></div>';
