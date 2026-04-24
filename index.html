@@ -2159,24 +2159,23 @@ function relanceCountBadge(l) {
 }
 
 // ── TRI PAR URGENCE ─────────────────────────────────────────
-// Ordre : retard → aujourd'hui → jours suivants (date croissante) → sans rappel
+// Retourne { pri: 0-3, ts: timestamp } pour trier et grouper
+function urgenceScore(l, today) {
+  if (!l.rappel) return { pri: 3, ts: 0 };
+  var d = new Date(l.rappel);
+  if (isNaN(d.getTime())) return { pri: 3, ts: 0 };
+  d.setHours(0, 0, 0, 0);
+  var diff = d.getTime() - today.getTime();
+  if (diff < 0)  return { pri: 0, ts: d.getTime() }; // retard : plus ancien = plus urgent
+  if (diff === 0) return { pri: 1, ts: 0 };            // aujourd'hui
+  return          { pri: 2, ts: d.getTime() };          // futur : plus tôt = plus urgent
+}
+
 function sortByUrgence(a, b, today) {
-  function urgPriority(l) {
-    if (!l.rappel) return 3; // sans rappel : en dernier
-    var d = new Date(l.rappel); d.setHours(0,0,0,0);
-    var diff = Math.round((d - today) / 86400000);
-    if (diff < 0)  return 0; // retard
-    if (diff === 0) return 1; // aujourd'hui
-    return 2; // jours suivants
-  }
-  var pa = urgPriority(a), pb = urgPriority(b);
-  if (pa !== pb) return pa - pb;
-  // À priorité égale : trier par date de rappel croissante (sauf sans rappel)
-  if (pa < 3) {
-    var da = new Date(a.rappel), db = new Date(b.rappel);
-    return da - db;
-  }
-  // Sans rappel : les plus récents en premier
+  var sa = urgenceScore(a, today);
+  var sb = urgenceScore(b, today);
+  if (sa.pri !== sb.pri) return sa.pri - sb.pri;
+  if (sa.ts  !== sb.ts)  return sa.ts  - sb.ts;
   return (b.createdAt||'').localeCompare(a.createdAt||'');
 }
 
@@ -2278,12 +2277,7 @@ function renderLeadsKanban() {
 
 // ── VUE LISTE ────────────────────────────────────────────────
 function urgenceGroup(l, today) {
-  if (!l.rappel) return 3;
-  var d = new Date(l.rappel); d.setHours(0,0,0,0);
-  var diff = Math.round((d - today) / 86400000);
-  if (diff < 0)  return 0;
-  if (diff === 0) return 1;
-  return 2;
+  return urgenceScore(l, today).pri;
 }
 
 function renderLeadsListe() {
