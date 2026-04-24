@@ -1944,7 +1944,7 @@ PAGES['collab-leads'] = function(mc) {
       </select>
       <select id="lead-filter-produit" onchange="renderLeadsTable()" style="padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.83rem;background:#fff;">
         <option value="">🏷 Tous produits</option>
-        ${(DB.produits||PRODUITS_DEFAULT||[]).map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('')}
+        ${(DB.produits||PRODUITS||[]).map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('')}
       </select>
       <input type="text" id="lead-filter-search" placeholder="🔍 Rechercher..." oninput="renderLeadsTable()"
         style="padding:7px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.83rem;flex:1;min-width:140px;background:#fff;">
