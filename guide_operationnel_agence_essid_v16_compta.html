@@ -224,6 +224,10 @@
   .reset-btn { font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 8px 16px; background: transparent; border: 1px solid var(--border2); border-radius: var(--radius-sm); color: var(--text2); cursor: pointer; margin: 0 18px 14px; transition: all .15s; }
   .reset-btn:hover { background: var(--surface2); }
 
+  /* ── SIMULATEUR RÉSILIATION ───────────────── */
+  .rsim-btn { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; padding: 9px 16px; background: white; border: 1.5px solid var(--border); border-radius: 8px; color: var(--text); cursor: pointer; transition: all .15s; }
+  .rsim-btn:hover { border-color: #0891b2; color: #0891b2; background: #ecfeff; }
+
   /* ── CRM CALCULATOR ───────────────────────── */
   .crm-section { padding: 14px 18px; border-top: 1px solid var(--border); }
   .crm-section-title { font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 12px; }
@@ -3078,6 +3082,52 @@
       </div>
     </div>
   </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       SIMULATEUR DE DATE DE RÉSILIATION
+  ════════════════════════════════════════════════════ -->
+  <div class="card" style="border-color:#0891b2;">
+    <div class="card-header" style="background:linear-gradient(135deg,#ecfeff,#cffafe);">
+      <span class="card-header-title" style="color:#0e7490;">🗓 Simulateur de date de résiliation — Calcul légal automatique</span>
+    </div>
+    <div style="padding:14px 18px 20px;">
+      <p style="font-size:13px;color:var(--text2);margin:0 0 18px;">Renseignez le type de contrat, le motif et les dates. Le simulateur calcule instantanément la date d'effet légale, le délai limite pour agir et les documents à préparer.</p>
+
+      <!-- ÉTAPE 1 : Type de contrat -->
+      <div style="margin-bottom:18px;">
+        <div style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:8px;">① Type de contrat</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <button class="rsim-btn" id="rsim-c-auto" onclick="rSimContrat('auto',this)">🚗 Auto / Moto</button>
+          <button class="rsim-btn" id="rsim-c-hab" onclick="rSimContrat('hab',this)">🏠 Habitation</button>
+          <button class="rsim-btn" id="rsim-c-sante" onclick="rSimContrat('sante',this)">💊 Santé</button>
+          <button class="rsim-btn" id="rsim-c-pro" onclick="rSimContrat('pro',this)">🏭 Professionnel</button>
+          <button class="rsim-btn" id="rsim-c-autre" onclick="rSimContrat('autre',this)">📄 Autre</button>
+        </div>
+      </div>
+
+      <!-- ÉTAPE 2 : Motif -->
+      <div id="rsim-step2" style="display:none;margin-bottom:18px;">
+        <div style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:8px;">② Motif de résiliation</div>
+        <select id="rsim-motif" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:white;color:var(--text);font-family:'DM Sans',sans-serif;" onchange="rSimMotif(this.value)">
+          <option value="">— Choisir le motif —</option>
+        </select>
+      </div>
+
+      <!-- ÉTAPE 3 : Dates -->
+      <div id="rsim-step3" style="display:none;">
+        <div style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:8px;">③ Date(s) à renseigner</div>
+        <div id="rsim-dates" style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:16px;"></div>
+        <button onclick="rSimCalculer()" style="background:#0891b2;color:white;border:none;border-radius:8px;padding:11px 26px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 2px 6px rgba(8,145,178,.3);">📐 Calculer les dates</button>
+      </div>
+
+      <!-- RÉSULTAT -->
+      <div id="rsim-result" style="display:none;margin-top:20px;"></div>
+
+      <div id="rsim-reset-wrap" style="display:none;margin-top:14px;">
+        <button onclick="rSimReset()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:7px 16px;font-size:12px;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;">↺ Nouveau calcul</button>
+      </div>
+    </div>
+  </div><!-- /simulateur résiliation -->
 
   <div class="card">
     <div class="card-header">
@@ -9026,6 +9076,382 @@ function resilReset() {
   document.querySelectorAll('#panel-resiliation .choice-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('#panel-resiliation .result').forEach(r => r.classList.remove('visible'));
   document.getElementById('resil-reset-wrap').style.display = 'none';
+}
+
+// ── SIMULATEUR DATES RÉSILIATION ─────────────────────────────
+var rSimData = { contrat: null, motif: null };
+
+var rSimMotifs = {
+  auto: [
+    { id: 'echeance',      label: '📅 Résiliation à l\'échéance annuelle (préavis 2 mois)' },
+    { id: 'resil_annuelle',label: '🗓 Résiliation en cours d\'année — après 1 an de contrat' },
+    { id: 'vente_veh',     label: '🚗 Vente / cession du véhicule' },
+    { id: 'vol_veh',       label: '🔓 Vol du véhicule' },
+    { id: 'casse_veh',     label: '🔧 Mise à la casse / destruction totale' },
+    { id: 'sinistre',      label: '💥 Après sinistre (résiliation par l\'assureur)' },
+    { id: 'hamon',         label: '⚖️ Loi Hamon — résiliation via le nouvel assureur' },
+    { id: 'l113',          label: '📋 Changement de situation — L113-16 (mariage, déménagement, retraite…)' },
+    { id: 'hausse',        label: '📈 Augmentation de tarif notifiée par l\'assureur' },
+    { id: 'chatel',        label: '📬 Loi Chatel — notification d\'échéance tardive' },
+    { id: 'nonpaiement',   label: '💳 Non-paiement (mise en demeure envoyée)' }
+  ],
+  hab: [
+    { id: 'echeance',      label: '📅 Résiliation à l\'échéance annuelle (préavis 2 mois)' },
+    { id: 'resil_annuelle',label: '🗓 Résiliation en cours d\'année — après 1 an de contrat' },
+    { id: 'demenagement',  label: '🏠 Déménagement (L113-16)' },
+    { id: 'vente_bien',    label: '🏡 Vente du bien immobilier' },
+    { id: 'sinistre',      label: '💥 Après sinistre (résiliation par l\'assureur)' },
+    { id: 'hamon',         label: '⚖️ Loi Hamon — résiliation via le nouvel assureur' },
+    { id: 'l113',          label: '📋 Autre changement de situation — L113-16' },
+    { id: 'hausse',        label: '📈 Augmentation de tarif notifiée par l\'assureur' },
+    { id: 'chatel',        label: '📬 Loi Chatel — notification d\'échéance tardive' },
+    { id: 'nonpaiement',   label: '💳 Non-paiement (mise en demeure envoyée)' }
+  ],
+  sante: [
+    { id: 'echeance',      label: '📅 Résiliation à l\'échéance annuelle (préavis 2 mois)' },
+    { id: 'resil_annuelle',label: '🗓 Résiliation infra-annuelle — après 1 an de contrat (Décret 2020-1438)' },
+    { id: 'hamon',         label: '⚖️ Loi Hamon — résiliation via le nouvel assureur' },
+    { id: 'l113',          label: '📋 Changement de situation — L113-16 (perte emploi, retraite, mariage…)' },
+    { id: 'hausse',        label: '📈 Augmentation de tarif notifiée par l\'assureur' },
+    { id: 'chatel',        label: '📬 Loi Chatel — notification d\'échéance tardive' },
+    { id: 'nonpaiement',   label: '💳 Non-paiement (mise en demeure envoyée)' }
+  ],
+  pro: [
+    { id: 'echeance',      label: '📅 Résiliation à l\'échéance annuelle (préavis 2 mois)' },
+    { id: 'resil_annuelle',label: '🗓 Résiliation en cours d\'année — après 1 an de contrat' },
+    { id: 'cessation',     label: '🏭 Cessation définitive d\'activité' },
+    { id: 'cession_ent',   label: '🤝 Cession / vente de l\'entreprise' },
+    { id: 'chgt_activite', label: '🔄 Changement d\'activité principale (L113-16)' },
+    { id: 'sinistre',      label: '💥 Après sinistre (résiliation par l\'assureur)' },
+    { id: 'l113',          label: '📋 Autre changement de situation — L113-16' },
+    { id: 'hausse',        label: '📈 Augmentation de tarif notifiée par l\'assureur' },
+    { id: 'chatel',        label: '📬 Loi Chatel — notification d\'échéance tardive' },
+    { id: 'nonpaiement',   label: '💳 Non-paiement (mise en demeure envoyée)' }
+  ],
+  autre: [
+    { id: 'echeance',      label: '📅 Résiliation à l\'échéance annuelle (préavis 2 mois)' },
+    { id: 'resil_annuelle',label: '🗓 Résiliation en cours d\'année — après 1 an de contrat' },
+    { id: 'sinistre',      label: '💥 Après sinistre (résiliation par l\'assureur)' },
+    { id: 'hamon',         label: '⚖️ Loi Hamon — résiliation via le nouvel assureur' },
+    { id: 'l113',          label: '📋 Changement de situation — L113-16' },
+    { id: 'hausse',        label: '📈 Augmentation de tarif notifiée par l\'assureur' },
+    { id: 'chatel',        label: '📬 Loi Chatel — notification d\'échéance tardive' },
+    { id: 'nonpaiement',   label: '💳 Non-paiement (mise en demeure envoyée)' }
+  ]
+};
+
+var rSimDateInputs = {
+  echeance:      [{ id: 'date_ech',        label: 'Date d\'échéance du contrat',                         note: 'Visible sur l\'avis d\'échéance ou dans NOA' }],
+  resil_annuelle:[{ id: 'date_souscription', label: 'Date de souscription du contrat',                   note: 'Visible dans NOA — le droit de résiliation s\'ouvre à la date anniversaire (1 an)' }],
+  vente_veh:     [{ id: 'date_vente',      label: 'Date de cession / vente du véhicule',                 note: 'Date sur le certificat de cession (Cerfa 13754)' }],
+  vol_veh:       [{ id: 'date_vol',        label: 'Date du vol',                                         note: 'Date mentionnée sur la déclaration de vol (police / gendarmerie)' }],
+  casse_veh:     [{ id: 'date_casse',      label: 'Date de destruction / mise à la casse',               note: 'Date sur le PV de destruction ou certificat VHU' }],
+  sinistre:      [{ id: 'date_sin',        label: 'Date du sinistre',                                    note: 'Date de survenance ou de déclaration du sinistre' }],
+  hamon:         [{ id: 'date_sous',       label: 'Date de souscription du nouveau contrat Allianz',     note: 'La résiliation prend effet 30 jours après la notification au précédent assureur' }],
+  l113:          [{ id: 'date_chgt',       label: 'Date du changement de situation',                     note: 'Ex : date de mariage, de déménagement, de licenciement, de mise à la retraite' }],
+  demenagement:  [{ id: 'date_chgt',       label: 'Date du déménagement (remise des clés / état des lieux)', note: 'Justificatif : bail nouveau logement + facture ou attestation EDF/Eau' }],
+  vente_bien:    [{ id: 'date_vente',      label: 'Date de signature de l\'acte authentique de vente',   note: 'Le contrat prend fin de plein droit à la date de vente' }],
+  hausse:        [{ id: 'date_notif',      label: 'Date de réception de la notification de hausse',      note: 'Date du courrier ou de l\'avis reçu par l\'assuré' }],
+  chatel:        [{ id: 'date_avis',       label: 'Date de réception de l\'avis d\'échéance',            note: 'Loi Chatel s\'applique si l\'avis est reçu < 15 j avant l\'échéance ou après' },
+                  { id: 'date_ech_chatel', label: 'Date d\'échéance du contrat',                         note: 'Pour vérifier si l\'avis est arrivé tardivement' }],
+  nonpaiement:   [{ id: 'date_med',        label: 'Date d\'envoi de la mise en demeure (par l\'assureur)', note: 'Date figurant sur le courrier RAR de mise en demeure' }],
+  cessation:     [{ id: 'date_cess',       label: 'Date de cessation d\'activité',                       note: 'Date de radiation Kbis ou de jugement de liquidation' }],
+  cession_ent:   [{ id: 'date_cess',       label: 'Date de cession / acte de vente de l\'entreprise',    note: 'Date de signature de l\'acte de cession' }],
+  chgt_activite: [{ id: 'date_chgt',       label: 'Date du changement d\'activité',                      note: 'Date effective du changement (ex : modification de l\'objet social au Kbis)' }]
+};
+
+function rSimAddDays(d, n)   { var r=new Date(d.getTime()); r.setDate(r.getDate()+n); return r; }
+function rSimAddMonths(d, n) { var r=new Date(d.getTime()); r.setMonth(r.getMonth()+n); return r; }
+function rSimFmt(d)          { return d ? d.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}) : '—'; }
+function rSimFmtS(d)         { return d ? d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}) : '—'; }
+function rSimDiff(a,b)       { return Math.round((b.getTime()-a.getTime())/86400000); }
+
+function rSimContrat(type, btn) {
+  rSimData.contrat = type; rSimData.motif = null;
+  document.querySelectorAll('.rsim-btn').forEach(function(b){ b.style.background=''; b.style.color=''; b.style.borderColor=''; });
+  btn.style.background='#0891b2'; btn.style.color='white'; btn.style.borderColor='#0891b2';
+  var sel = document.getElementById('rsim-motif');
+  sel.innerHTML = '<option value="">— Choisir le motif —</option>';
+  (rSimMotifs[type]||[]).forEach(function(m){ var o=document.createElement('option'); o.value=m.id; o.textContent=m.label; sel.appendChild(o); });
+  document.getElementById('rsim-step2').style.display='block';
+  document.getElementById('rsim-step3').style.display='none';
+  document.getElementById('rsim-result').style.display='none';
+  document.getElementById('rsim-reset-wrap').style.display='none';
+}
+
+function rSimMotif(val) {
+  rSimData.motif = val;
+  var s3 = document.getElementById('rsim-step3');
+  var dw = document.getElementById('rsim-dates');
+  if (!val) { s3.style.display='none'; return; }
+  var inputs = rSimDateInputs[val]||[];
+  dw.innerHTML='';
+  inputs.forEach(function(inp){
+    var div=document.createElement('div');
+    div.style.cssText='flex:1;min-width:220px;';
+    div.innerHTML='<label style="font-size:12px;font-weight:600;color:var(--text);display:block;margin-bottom:4px;">'+inp.label+'</label>'+
+      '<input type="date" id="rsim-d-'+inp.id+'" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">'+
+      '<div style="font-size:11px;color:var(--text2);margin-top:4px;">💡 '+inp.note+'</div>';
+    dw.appendChild(div);
+  });
+  s3.style.display='block';
+  document.getElementById('rsim-result').style.display='none';
+}
+
+function rSimCalculer() {
+  var motif = rSimData.motif;
+  var today = new Date(); today.setHours(0,0,0,0);
+  function gd(id){ var e=document.getElementById('rsim-d-'+id); if(!e||!e.value) return null; var d=new Date(e.value+'T00:00:00'); return d; }
+  var r = null;
+
+  if (motif==='echeance') {
+    var ech=gd('date_ech'); if(!ech){alert('Veuillez renseigner la date d\'échéance.');return;}
+    var dl=rSimAddMonths(ech,-2), passed=today>dl;
+    var nextEch=passed?rSimAddMonths(ech,12):ech, nextDl=passed?rSimAddMonths(nextEch,-2):dl;
+    r={ titre:'Résiliation à l\'échéance annuelle', dateEffet:passed?nextEch:ech, dateLimit:passed?nextDl:dl,
+      warning: passed?'⚠️ Le délai de préavis de 2 mois est dépassé pour l\'échéance du '+rSimFmtS(ech)+'. La résiliation ne peut prendre effet qu\'à la prochaine échéance : '+rSimFmtS(nextEch)+'.':null,
+      green: !passed?'✅ Délai respecté. Il reste '+rSimDiff(today,dl)+' jours pour envoyer le courrier.':null,
+      fond:'Art. L113-12 Code des assurances — préavis minimum 2 mois avant l\'échéance annuelle',
+      proc:'Envoyer une lettre recommandée AR (LRAR) à Allianz avant le '+rSimFmtS(passed?nextDl:dl)+'. Mentionner le numéro de contrat, la date d\'échéance et le motif.',
+      docs:['Lettre de résiliation (LRAR)','Numéro de contrat et coordonnées du souscripteur'],
+      recouv:'Remboursement du prorata de cotisation dans les 30 jours suivant la prise d\'effet.'
+    };
+  }
+  else if (motif==='resil_annuelle') {
+    var ds=gd('date_souscription'); if(!ds){alert('Veuillez renseigner la date de souscription.');return;}
+    var anniversaire=rSimAddMonths(ds,12);
+    var eligible=today>=anniversaire;
+    var joursAvant=rSimDiff(today,anniversaire);
+    var isSante=rSimData.contrat==='sante';
+    var effRA=rSimAddMonths(today,1);
+    var fondRA = isSante
+      ? 'Décret n°2020-1438 du 24 novembre 2020 (art. L221-10-1 Code de la mutualité) — résiliation infra-annuelle complémentaire santé individuelle après 12 mois, préavis 1 mois'
+      : 'Loi n°2019-733 du 14 juillet 2019 (art. L113-15-2 Code des assurances) — résiliation à tout moment après 12 mois de contrat, préavis 1 mois';
+    r={ titre: isSante?'Résiliation infra-annuelle — Santé complémentaire individuelle':'Résiliation en cours d\'année après 1 an de contrat',
+      dateEffet: eligible?effRA:null, dateLimit: null,
+      warning: !eligible?'❌ Le contrat n\'a pas encore 1 an. Ce droit de résiliation n\'est pas encore ouvert. Il le sera à partir du '+rSimFmtS(anniversaire)+' (dans '+joursAvant+' jour(s)).':null,
+      green: eligible?'✅ Le contrat a plus de 1 an (souscrit le '+rSimFmtS(ds)+'). La résiliation est possible à tout moment avec 1 mois de préavis. Prise d\'effet : '+rSimFmtS(effRA)+'.':null,
+      fond: fondRA,
+      proc: eligible
+        ? 'Envoyer une LRAR à Allianz à n\'importe quel moment. La résiliation prend effet 1 mois après la réception du courrier. Aucun motif à justifier. Aucun accord du nouvel assureur requis (contrairement à Loi Hamon).'
+        : 'Résiliation impossible avant la date anniversaire ('+rSimFmtS(anniversaire)+'). En attendant, envisager une résiliation à l\'échéance annuelle (préavis 2 mois avant la date anniversaire) ou une résiliation Loi Hamon via le nouvel assureur.',
+      docs:['Lettre de résiliation LRAR (sans motif à justifier)','Numéro de contrat + coordonnées du souscripteur'],
+      recouv:'Remboursement du prorata de cotisation à compter de la date d\'effet dans les 30 jours.',
+      extra: isSante
+        ? '💊 Spécificité Santé : ce droit s\'applique aux contrats complémentaires santé individuels (hors contrats collectifs obligatoires en entreprise). Depuis le 1er décembre 2020 pour les nouveaux contrats, depuis le 1er décembre 2021 pour tous les contrats existants.'
+        : '⚡ Avantage : le client résilie lui-même, sans attendre l\'échéance ni passer par un nouvel assureur. Applicable à tous les contrats d\'assurance non-professionnels (auto, hab, etc.) souscrits depuis plus de 12 mois.'
+    };
+  }
+  else if (motif==='vente_veh') {
+    var v=gd('date_vente'); if(!v){alert('Veuillez renseigner la date de vente.');return;}
+    var ds=rSimDiff(v,today);
+    r={ titre:'Résiliation pour vente du véhicule', dateEffet:v, dateLimit:null,
+      warning: ds>90?'⚠️ La vente remonte à '+ds+' jours. Agir rapidement — un retard excessif peut compliquer la démarche.':null,
+      green: ds<=90?'✅ Vente récente ('+ds+' j). Résiliation immédiate à la date de vente.':null,
+      fond:'Art. L121-11 Code des assurances — la vente met fin de plein droit au contrat',
+      proc:'Envoyer la demande de résiliation à Allianz dès que possible avec le certificat de cession. La résiliation prend effet à la date de vente.',
+      docs:['Certificat de cession Cerfa 13754*01 (signé vendeur + acheteur)','Carte grise barrée avec la mention "Vendu le [date]"','Lettre de résiliation (LRAR ou en agence)'],
+      recouv:'Remboursement du prorata de cotisation à compter de la date de vente dans les 30 jours.'
+    };
+  }
+  else if (motif==='vol_veh') {
+    var vv=gd('date_vol'); if(!vv){alert('Veuillez renseigner la date du vol.');return;}
+    r={ titre:'Résiliation pour vol du véhicule', dateEffet:vv, dateLimit:null,
+      warning:null, green:'✅ Résiliation possible à la date du vol. Procéder dès réception des documents.',
+      fond:'Art. L121-10 Code des assurances — disparition définitive de la chose assurée',
+      proc:'Fournir la déclaration de vol et demander la résiliation à Allianz. La résiliation prend effet à la date du vol.',
+      docs:['Récépissé de déclaration de vol (police/gendarmerie)','Déclaration de sinistre Allianz','Certificat de non-restitution (si véhicule non retrouvé après 30 j)'],
+      recouv:'Si sinistre vol indemnisé : pas de remboursement de cotisation. Si non indemnisé : prorata à compter de la date du vol.'
+    };
+  }
+  else if (motif==='casse_veh') {
+    var cc=gd('date_casse'); if(!cc){alert('Veuillez renseigner la date de destruction.');return;}
+    r={ titre:'Résiliation pour mise à la casse / destruction totale', dateEffet:cc, dateLimit:null,
+      warning:null, green:'✅ Résiliation immédiate à la date de destruction. Fournir le certificat VHU.',
+      fond:'Art. L121-10 Code des assurances — perte totale de la chose assurée',
+      proc:'Envoyer le certificat de destruction VHU à Allianz avec la demande de résiliation.',
+      docs:['Certificat de destruction VHU (centre agréé)','Lettre de résiliation (LRAR ou en agence)'],
+      recouv:'Remboursement du prorata de cotisation à compter de la date de destruction dans les 30 jours.'
+    };
+  }
+  else if (motif==='sinistre') {
+    var ss2=gd('date_sin'); if(!ss2){alert('Veuillez renseigner la date du sinistre.');return;}
+    var effS=rSimAddDays(today,30);
+    r={ titre:'Résiliation après sinistre (par l\'assureur)', dateEffet:effS, dateLimit:null,
+      warning:null, green:'⚠️ L\'assureur dispose d\'un droit de résiliation après sinistre avec 1 mois de préavis à compter de la notification formelle.',
+      fond:'Art. L113-12 Code des assurances — résiliation après sinistre avec préavis d\'un mois',
+      proc:'L\'assureur envoie une LRAR de résiliation. Le client dispose d\'un mois de préavis pour trouver une nouvelle couverture. Informer immédiatement le client et l\'accompagner dans la recherche d\'une solution.',
+      docs:['Courrier de résiliation Allianz (LRAR)','Relevé d\'information à remettre au client sous 15 jours'],
+      recouv:'Le prorata de cotisation est remboursé si prime annuelle perçue à l\'avance. La franchise reste due.'
+    };
+  }
+  else if (motif==='hamon') {
+    var hs=gd('date_sous'); if(!hs){alert('Veuillez renseigner la date de souscription.');return;}
+    var effH=rSimAddDays(hs,30);
+    r={ titre:'Résiliation Loi Hamon', dateEffet:effH, dateLimit:null,
+      warning:null, green:'✅ La Loi Hamon permet au nouvel assureur de résilier l\'ancien contrat à la place du client, à tout moment après 12 mois d\'ancienneté.',
+      fond:'Art. L113-15-2 Code des assurances (Loi Hamon, n°2014-344 du 17 mars 2014)',
+      proc:'Souscrire le contrat Allianz → Générer IMMÉDIATEMENT la résiliation Hamon dans NOA → Allianz envoie la résiliation à l\'ancien assureur → L\'ancien contrat prend fin 30 jours après la notification. Le client ne paie pas double.',
+      docs:['Attestation de souscription du nouveau contrat Allianz (Allianz envoie la lettre de résiliation au nom du client)'],
+      recouv:'L\'ancien assureur rembourse le prorata entre la date d\'effet et la prochaine échéance dans les 30 jours.',
+      extra:'⚡ Argument commercial : "Vous n\'avez rien à faire, on s\'occupe de tout." — Applicable : Auto, Habitation, Santé individuel (hors collectifs obligatoires).'
+    };
+  }
+  else if (motif==='l113'||motif==='demenagement'||motif==='chgt_activite') {
+    var lc=gd('date_chgt'); if(!lc){alert('Veuillez renseigner la date du changement.');return;}
+    var dl3=rSimAddMonths(lc,3), p3=today>dl3, eff3=rSimAddMonths(today,1), left3=rSimDiff(today,dl3);
+    var tit3 = motif==='demenagement'?'Résiliation pour déménagement (L113-16)':motif==='chgt_activite'?'Résiliation pour changement d\'activité (L113-16)':'Résiliation pour changement de situation (L113-16)';
+    var docs3 = motif==='demenagement'?['Justificatif de nouveau domicile (bail, facture EDF/Eau, attestation hébergement)','Lettre LRAR de résiliation avec date et motif']:
+                motif==='chgt_activite'?['Extrait Kbis modifié ou document officiel de changement d\'activité','Lettre LRAR de résiliation avec date et motif']:
+                ['Justificatif du changement (acte de mariage/divorce, avis de licenciement, notification de retraite, etc.)','Lettre LRAR de résiliation avec date et motif'];
+    r={ titre:tit3, dateEffet:p3?null:eff3, dateLimit:p3?null:dl3,
+      warning: p3?'❌ Le délai de 3 mois pour invoquer le L113-16 est dépassé (changement le '+rSimFmtS(lc)+'). Cette résiliation n\'est plus recevable à ce titre. Envisager une résiliation à l\'échéance annuelle.':null,
+      green: !p3?'✅ Délai L113-16 respecté. Il reste '+left3+' jours pour envoyer la demande de résiliation.':null,
+      fond:'Art. L113-16 Code des assurances — résiliation dans les 3 mois du changement de situation, avec préavis d\'un mois',
+      proc: p3?'Délai dépassé. Se rabattre sur la résiliation à l\'échéance annuelle (préavis 2 mois).':'Envoyer une LRAR à Allianz dans les 3 mois du changement (avant le '+rSimFmtS(dl3)+') avec justificatif. La résiliation prend effet 1 mois après la demande (vers le '+rSimFmtS(eff3)+').',
+      docs:docs3,
+      recouv:'Remboursement du prorata de cotisation dans les 30 jours suivant la prise d\'effet.'
+    };
+  }
+  else if (motif==='vente_bien') {
+    var vb=gd('date_vente'); if(!vb){alert('Veuillez renseigner la date de vente.');return;}
+    r={ titre:'Résiliation pour vente du bien immobilier', dateEffet:vb, dateLimit:null,
+      warning:null, green:'✅ La vente met fin de plein droit au contrat habitation à la date de l\'acte authentique.',
+      fond:'Art. L121-10 Code des assurances — transfert au nouvel acquéreur ou résiliation à la date de vente',
+      proc:'Envoyer l\'acte authentique à Allianz avec la demande de résiliation. Note : l\'acquéreur peut reprendre le contrat pendant 3 mois (délai de résiliation pour l\'acquéreur).',
+      docs:['Acte authentique de vente (ou attestation notariale)','Lettre LRAR de résiliation'],
+      recouv:'Remboursement du prorata à compter de la date de vente dans les 30 jours.'
+    };
+  }
+  else if (motif==='hausse') {
+    var hn=gd('date_notif'); if(!hn){alert('Veuillez renseigner la date de notification.');return;}
+    var dl30=rSimAddDays(hn,30), ph=today>dl30, effH2=rSimAddDays(today,1);
+    r={ titre:'Résiliation suite à augmentation de tarif', dateEffet:ph?null:effH2, dateLimit:ph?null:dl30,
+      warning: ph?'❌ Le délai de 30 jours pour résilier suite à la hausse est dépassé (notification reçue le '+rSimFmtS(hn)+'). Attendre la prochaine échéance annuelle.':null,
+      green: !ph?'✅ Il reste '+rSimDiff(today,dl30)+' jours pour résilier suite à la hausse de tarif.':null,
+      fond:'Art. L113-4 Code des assurances — droit de résiliation dans les 30 jours d\'une hausse de prime non liée à une évolution du risque',
+      proc: ph?'Délai dépassé. Résiliation uniquement à la prochaine échéance (préavis 2 mois).':'Envoyer une LRAR à Allianz dans les 30 jours de la réception, en mentionnant explicitement la hausse comme motif. La résiliation prend effet à réception.',
+      docs:['Copie de la notification de hausse reçue','Lettre LRAR de résiliation avec référence explicite à la hausse de prime'],
+      recouv:'Remboursement du prorata de cotisation à compter de la date d\'effet dans les 30 jours.',
+      extra:'⚠️ Ce droit ne s\'applique pas si la hausse résulte d\'une modification du contrat demandée par l\'assuré, ou d\'une évolution documentée de la sinistralité.'
+    };
+  }
+  else if (motif==='chatel') {
+    var ca=gd('date_avis'), ce=gd('date_ech_chatel');
+    if(!ca||!ce){alert('Veuillez renseigner les deux dates.');return;}
+    var daysBefore=rSimDiff(ca,ce), applicable=daysBefore<15||ca>=ce;
+    var dlC=rSimAddDays(ca,20), passedC=today>dlC, effC=rSimAddMonths(today,1);
+    r={ titre:'Résiliation Loi Chatel (notification tardive)', dateEffet:applicable&&!passedC?effC:null, dateLimit:applicable&&!passedC?dlC:null,
+      warning: !applicable?'⚠️ Loi Chatel non applicable : l\'avis a été reçu '+daysBefore+' jours avant l\'échéance (seuil : < 15 jours). Résiliation normale à l\'échéance.':
+               passedC?'❌ Loi Chatel applicable MAIS le délai de 20 jours pour agir est dépassé. Se rabattre sur la résiliation à l\'échéance.':null,
+      green: applicable&&!passedC?'✅ Loi Chatel applicable ! Avis reçu '+(daysBefore<0?'après l\'échéance':(daysBefore+' jours avant l\'échéance'))+'. Il reste '+rSimDiff(today,dlC)+' jours pour résilier.':null,
+      fond:'Art. L113-15-1 Code des assurances (Loi Chatel) — si avis d\'échéance reçu < 15 j avant la date limite de résiliation ou après échéance, l\'assuré peut résilier dans les 20 jours',
+      proc: applicable&&!passedC?'Envoyer une LRAR de résiliation avant le '+rSimFmtS(dlC)+', en mentionnant explicitement "résiliation sur le fondement de la Loi Chatel". La résiliation prend effet 1 mois après (vers le '+rSimFmtS(effC)+').':'Loi Chatel non applicable ou délai dépassé. Résiliation à la prochaine échéance (préavis 2 mois).',
+      docs:['Copie de l\'avis d\'échéance reçu (conserver l\'enveloppe pour prouver la date de réception)','Lettre LRAR de résiliation avec mention "Loi Chatel"'],
+      recouv:'Remboursement du prorata dans les 30 jours suivant la prise d\'effet.'
+    };
+  }
+  else if (motif==='nonpaiement') {
+    var med=gd('date_med'); if(!med){alert('Veuillez renseigner la date de la mise en demeure.');return;}
+    var susp=rSimAddDays(med,30), resil=rSimAddDays(med,40);
+    var phase = today>=resil?'resilié':today>=susp?'suspendu':'med';
+    r={ titre:'Procédure de résiliation pour non-paiement', dateEffet:resil, dateLimit:null,
+      warning: phase==='resilié'?'🔴 Le contrat est théoriquement résilié depuis le '+rSimFmtS(resil)+' (J+40). Vérifier l\'état dans NOA.':
+               phase==='suspendu'?'🟡 Les garanties sont SUSPENDUES depuis le '+rSimFmtS(susp)+'. Résiliation automatique le '+rSimFmtS(resil)+' si non-règlement.':null,
+      green: phase==='med'?'⏳ MED en cours. Suspension des garanties prévue le '+rSimFmtS(susp)+'. Résiliation automatique le '+rSimFmtS(resil)+' si non-règlement.':null,
+      fond:'Art. L113-3 Code des assurances — MED → suspension à J+30 → résiliation automatique à J+40',
+      proc:'① MED envoyée (J0) → ② Suspension des garanties à J+30 si non-règlement → ③ Résiliation automatique à J+40. Si paiement entre J+30 et J+40 : les garanties reprennent immédiatement.',
+      docs:['Mise en demeure RAR (J0 = '+rSimFmtS(med)+')','Accusé de réception de la MED','Notification de suspension des garanties (J+30 = '+rSimFmtS(susp)+')','Notification de résiliation si nécessaire (J+40 = '+rSimFmtS(resil)+')'],
+      recouv:'Aucun remboursement de cotisation. Les cotisances dues restent exigibles même après résiliation.'
+    };
+  }
+  else if (motif==='cessation') {
+    var cs=gd('date_cess'); if(!cs){alert('Veuillez renseigner la date de cessation.');return;}
+    r={ titre:'Résiliation pour cessation définitive d\'activité', dateEffet:cs, dateLimit:null,
+      warning:null, green:'✅ La cessation définitive d\'activité justifie une résiliation immédiate à la date de cessation.',
+      fond:'Art. L121-10 Code des assurances (disparition du risque) et conditions générales du contrat professionnel',
+      proc:'Envoyer la demande de résiliation à Allianz avec le justificatif de radiation. La résiliation prend effet à la date de cessation.',
+      docs:['Extrait Kbis de radiation (Greffe du Tribunal de Commerce)','Jugement de liquidation judiciaire si applicable','Lettre LRAR de résiliation'],
+      recouv:'Remboursement du prorata de cotisation à compter de la date de cessation dans les 30 jours.'
+    };
+  }
+  else if (motif==='cession_ent') {
+    var ce2=gd('date_cess'); if(!ce2){alert('Veuillez renseigner la date de cession.');return;}
+    r={ titre:'Résiliation pour cession / vente de l\'entreprise', dateEffet:ce2, dateLimit:null,
+      warning:null, green:'✅ La cession permet la résiliation à la date de cession, ou le transfert du contrat au repreneur.',
+      fond:'Art. L121-10 Code des assurances — transfert au repreneur ou résiliation à la date de cession',
+      proc:'Option 1 — Résiliation : envoyer l\'acte de cession à Allianz avec la demande. Option 2 — Transfert au repreneur : accord des deux parties + accord Allianz requis.',
+      docs:['Acte de cession ou de vente des parts / fonds de commerce','Lettre LRAR de résiliation ou demande de transfert au repreneur'],
+      recouv:'Si résiliation : remboursement du prorata dans les 30 jours. Si transfert : le contrat continue avec le repreneur, pas de remboursement.'
+    };
+  }
+
+  if (!r) { alert('Motif non reconnu.'); return; }
+
+  // ── Rendu du résultat ──────────────────────────────────────
+  var h = '<div style="border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">';
+  h += '<div style="background:#0891b2;color:white;padding:14px 18px;font-weight:700;font-size:15px;">📋 '+r.titre+'</div>';
+  if (r.warning) h += '<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:12px 16px;font-size:13px;color:#991b1b;">'+r.warning+'</div>';
+  if (r.green)   h += '<div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:12px 16px;font-size:13px;color:#15803d;">'+r.green+'</div>';
+
+  h += '<div style="display:flex;flex-wrap:wrap;gap:0;">';
+  if (r.dateLimit) {
+    var dl2=rSimDiff(today,r.dateLimit), lc2=dl2<0?'#dc2626':dl2<14?'#d97706':'#0891b2';
+    h += '<div style="flex:1;min-width:200px;padding:14px 18px;border-bottom:1px solid #e2e8f0;">'+
+         '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;font-weight:600;margin-bottom:4px;">⏰ Date limite pour agir</div>'+
+         '<div style="font-size:17px;font-weight:800;color:'+lc2+';">'+rSimFmtS(r.dateLimit)+'</div>'+
+         (dl2>=0?'<div style="font-size:12px;color:'+lc2+';">dans '+dl2+' jour(s)</div>':'<div style="font-size:12px;color:#dc2626;">⚠ dépassé de '+Math.abs(dl2)+' jours</div>')+
+         '</div>';
+  }
+  if (r.dateEffet) {
+    h += '<div style="flex:1;min-width:200px;padding:14px 18px;border-bottom:1px solid #e2e8f0;'+(r.dateLimit?'border-left:1px solid #e2e8f0;':'')+'">'+
+         '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;font-weight:600;margin-bottom:4px;">📅 Date d\'effet de la résiliation</div>'+
+         '<div style="font-size:17px;font-weight:800;color:#1e293b;">'+rSimFmtS(r.dateEffet)+'</div>'+
+         '<div style="font-size:12px;color:#64748b;">'+rSimFmt(r.dateEffet)+'</div>'+
+         '</div>';
+  }
+  h += '</div>';
+
+  h += '<div style="padding:12px 18px;border-bottom:1px solid #e2e8f0;background:#f8fafc;">'+
+       '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;font-weight:600;margin-bottom:4px;">⚖️ Fondement légal</div>'+
+       '<div style="font-size:13px;color:#334155;">'+r.fond+'</div></div>';
+
+  h += '<div style="padding:12px 18px;border-bottom:1px solid #e2e8f0;">'+
+       '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;font-weight:600;margin-bottom:6px;">📋 Procédure</div>'+
+       '<div style="font-size:13px;color:#334155;line-height:1.6;">'+r.proc+'</div></div>';
+
+  if (r.docs && r.docs.length) {
+    h += '<div style="padding:12px 18px;border-bottom:1px solid #e2e8f0;background:#fffbeb;">'+
+         '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#92400e;font-weight:600;margin-bottom:6px;">📁 Documents à réunir</div>';
+    r.docs.forEach(function(d){ h += '<div style="font-size:13px;color:#78350f;padding:2px 0;">• '+d+'</div>'; });
+    h += '</div>';
+  }
+  if (r.recouv) {
+    h += '<div style="padding:12px 18px;border-bottom:1px solid #e2e8f0;">'+
+         '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;font-weight:600;margin-bottom:4px;">💰 Remboursement / prorata</div>'+
+         '<div style="font-size:13px;color:#334155;">'+r.recouv+'</div></div>';
+  }
+  if (r.extra) {
+    h += '<div style="padding:12px 18px;background:#ecfdf5;border-left:4px solid #059669;">'+
+         '<div style="font-size:13px;color:#065f46;">'+r.extra+'</div></div>';
+  }
+  h += '</div>';
+
+  var rd=document.getElementById('rsim-result');
+  rd.innerHTML=h; rd.style.display='block';
+  document.getElementById('rsim-reset-wrap').style.display='block';
+  rd.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function rSimReset() {
+  rSimData={contrat:null,motif:null};
+  document.querySelectorAll('.rsim-btn').forEach(function(b){ b.style.background=''; b.style.color=''; b.style.borderColor=''; });
+  document.getElementById('rsim-step2').style.display='none';
+  document.getElementById('rsim-step3').style.display='none';
+  document.getElementById('rsim-result').style.display='none';
+  document.getElementById('rsim-reset-wrap').style.display='none';
+  document.getElementById('rsim-motif').innerHTML='<option value="">— Choisir le motif —</option>';
+  document.getElementById('rsim-dates').innerHTML='';
 }
 
 // ── AVENANT ─────────────────────────────────────────────────
