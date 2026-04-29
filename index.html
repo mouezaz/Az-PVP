@@ -1261,35 +1261,33 @@ function checkAndNotify() {
   var now = Date.now();
   var todayStr = new Date().toISOString().slice(0, 10);
 
-  // Leads urgents
+  // Leads urgents — uniquement les miens (collab === mon nom)
+  var myName = currentUser.name === 'Admin' ? 'Mouez' : currentUser.name;
   var allContacts = (typeof getAllContacts === 'function') ? getAllContacts() : [];
   var leadsUrgents = allContacts.filter(function(l) {
     if (l.archived || l.statut === 'Sans suite' || l.statut === 'Signé') return false;
     if (!l.rappel) return false;
-    if (currentUser.role !== 'admin' && l.collab !== currentUser.name) return false;
+    if (l.collab !== myName) return false; // seulement mes leads
     return l.rappel <= todayStr;
   });
 
-  // Tâches urgentes
+  // Tâches urgentes — uniquement les miennes
   var taches = DB.taches || [];
   var tachesUrgentes = taches.filter(function(t) {
     if (t.statut === 'Terminé') return false;
-    if (currentUser.role === 'admin') {
-      return (t.collab === 'Mouez' || t.adminOnly) && t.echeance && t.echeance < todayStr;
+    if (t.adminOnly && !t.remontePar) {
+      // Tâches privées admin (toujours les miennes)
+      return t.echeance && t.echeance < todayStr;
     }
-    return t.collab === currentUser.name && ((t.echeance && t.echeance < todayStr) || (t.rappel && t.rappel <= todayStr));
+    if (t.adminOnly && t.remontePar) return false; // remontées exclues des notifs
+    // Tâches équipe assignées à moi
+    return t.collab === myName && ((t.echeance && t.echeance < todayStr) || (t.rappel && t.rappel <= todayStr));
   });
-
-  // Remontées (admin seulement)
-  var remontees = currentUser.role === 'admin'
-    ? taches.filter(function(t){ return t.adminOnly && t.remontePar && t.statut !== 'Terminé'; })
-    : [];
 
   // Construire les messages
   var msgs = [];
   if (leadsUrgents.length > 0) msgs.push(leadsUrgents.length + ' lead(s) à relancer');
   if (tachesUrgentes.length > 0) msgs.push(tachesUrgentes.length + ' tâche(s) en retard');
-  if (remontees.length > 0) msgs.push(remontees.length + ' remontée(s) équipe à traiter');
 
   if (msgs.length > 0) {
     var tag = 'allianz-urgent-' + todayStr;
