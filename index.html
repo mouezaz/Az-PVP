@@ -1258,7 +1258,7 @@ function updateAllBadges() {
   }).length);
 
   // ── Badge total sur dashboard (somme de tout) ────────────────────
-  var totalAdmin = leadsAdminCount + tachesAdminRetard + congesAttente;
+  var totalAdmin = mesLeadsUrgents + mesTachesRetard + congesAttente;
   _setBadge('admin-dashboard', totalAdmin > 0 ? totalAdmin : 0);
 }
 
@@ -11472,7 +11472,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v2.9.0";',
+      'var CACHE="allianz-v3.0.1";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
