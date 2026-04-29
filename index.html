@@ -478,11 +478,18 @@ input[type=number] { font-family: 'DM Mono', monospace; }
   .sidebar { display: none !important; }
   /* No body padding needed — bottom nav is fixed, main-content has its own padding */
 
-  /* ── APP SHELL ─────────────────────────────────────────────── */
-  #app { height: 100vh !important; overflow: hidden; }
+  /* ── APP SHELL — position absolute = 100% fiable sur Chrome mobile ── */
+  #app {
+    position: fixed !important;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #app.visible { display: flex !important; }
 
   /* ── TOPBAR ────────────────────────────────────────────────── */
-  .topbar { padding: 0 10px; height: 48px; }
+  .topbar { padding: 0 10px; height: 48px; flex-shrink: 0; }
   .topbar-logo { width: 28px !important; height: 28px !important; }
   .topbar-title { font-size: 13px; max-width: 140px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .topbar-badge { display: none !important; }
@@ -495,17 +502,19 @@ input[type=number] { font-family: 'DM Mono', monospace; }
 
   /* ── LAYOUT ────────────────────────────────────────────────── */
   .app-body {
-    flex-direction: column;
-    height: calc(100vh - 48px); /* topbar is 48px on mobile */
+    flex: 1;
+    min-height: 0;
+    position: relative;
     overflow: hidden;
+    display: block !important; /* override flex row for mobile */
   }
   .main-content {
-    flex: 1;
-    min-height: 0; /* critical: allows flex child to scroll */
-    overflow-y: auto;
+    position: absolute !important;
+    top: 0; left: 0; right: 0;
+    bottom: calc(58px + env(safe-area-inset-bottom, 0px)); /* room for bottom nav */
+    overflow-y: auto !important;
     overflow-x: hidden;
     padding: 12px 10px;
-    padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); /* room for bottom nav */
     -webkit-overflow-scrolling: touch;
   }
 
@@ -11463,7 +11472,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v2.8.0";',
+      'var CACHE="allianz-v2.9.0";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
