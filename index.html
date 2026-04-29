@@ -169,6 +169,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: var(--gray-50)
   padding: 0 4px;
   box-shadow: 0 0 0 2px white;
   animation: pulse-badge 2s infinite;
+  pointer-events: none; /* ne bloque pas les taps */
 }
 .mob-badge.visible { display: block; }
 @keyframes pulse-badge {
@@ -605,6 +606,11 @@ input[type=number] { font-family: 'DM Mono', monospace; }
     <!-- MAIN -->
     <div class="main-content" id="main-content"></div>
   </div>
+</div>
+
+<!-- BOTTOM MOBILE NAV -->
+<div id="mobile-nav">
+  <div id="mobile-nav-inner"></div>
 </div>
 
 <!-- MODAL -->
@@ -1152,53 +1158,33 @@ function updateAllBadges() {
   var congesAttente = (DB.conges||[]).filter(function(c){ return c.statut==='En attente'; }).length;
   _setBadge('admin-rh-conges', congesAttente);
 
-  // ── Leads / relances en retard ou à traiter aujourd'hui ─────────
+  // ── Mon nom (admin = Mouez, collab = son propre nom) ────────────
+  var myName = (currentUser.role === 'admin') ? 'Mouez' : currentUser.name;
+
+  // ── Leads / relances : uniquement les miens ──────────────────────
   var allContacts = (typeof getAllContacts === 'function') ? getAllContacts() : [];
-  var leadsUrgents = allContacts.filter(function(l) {
+  var mesLeadsUrgents = allContacts.filter(function(l) {
     if (l.archived || l.statut === 'Sans suite' || l.statut === 'Signé') return false;
     if (!l.rappel) return false;
+    if (l.collab !== myName) return false; // seulement les miens
     return l.rappel <= todayStr;
-  });
-  // Admin voit tous les leads
-  var leadsAdminCount = leadsUrgents.length;
-  // Collab voit les siens
-  var leadsCollabCount = leadsUrgents.filter(function(l){
-    return l.collab === currentUser.name;
   }).length;
-  _setBadge('admin-leads',    leadsAdminCount);
-  _setBadge('admin-prospects', leadsAdminCount);
-  _setBadge('collab-leads',   leadsCollabCount);
+  _setBadge('admin-leads',     mesLeadsUrgents);
+  _setBadge('admin-prospects', mesLeadsUrgents);
+  _setBadge('collab-leads',    mesLeadsUrgents);
 
-  // ── Tâches en retard (écheance dépassée) ─────────────────────────
+  // ── Tâches : uniquement les miennes ─────────────────────────────
   var taches = DB.taches || [];
-  // Pour admin : tâches de Mouez (équipe) + tâches privées en retard + remontées non traitées
-  var tachesAdminRetard = taches.filter(function(t) {
+  var mesTachesRetard = taches.filter(function(t) {
     if (t.statut === 'Terminé') return false;
     var enRetard = t.echeance && t.echeance < todayStr;
     var rappelDu = t.rappel && t.rappel <= todayStr;
-    if (t.adminOnly && !t.remontePar) {
-      // Tâche privée admin
-      return enRetard || rappelDu;
-    }
-    if (t.adminOnly && t.remontePar) {
-      // Remontée non traitée — toujours urgente
-      return true;
-    }
-    if (t.collab === 'Mouez') {
-      return enRetard || rappelDu;
-    }
-    return false;
+    if (t.adminOnly && !t.remontePar) return enRetard || rappelDu; // tâches privées admin
+    if (t.adminOnly && t.remontePar)  return false;                // remontées exclues des badges perso
+    return t.collab === myName && (enRetard || rappelDu);
   }).length;
-  _setBadge('admin-taches', tachesAdminRetard);
-
-  // Pour collab : ses tâches en retard
-  var tachesCollabRetard = taches.filter(function(t) {
-    if (t.adminOnly) return false;
-    if (t.statut === 'Terminé') return false;
-    if (t.collab !== currentUser.name) return false;
-    return (t.echeance && t.echeance < todayStr) || (t.rappel && t.rappel <= todayStr);
-  }).length;
-  _setBadge('collab-taches', tachesCollabRetard);
+  _setBadge('admin-taches',  mesTachesRetard);
+  _setBadge('collab-taches', mesTachesRetard);
 
   // ── Résiliations en attente (si applicable) ──────────────────────
   var resilEnAttente = (DB.resiliations||[]).filter(function(r){
