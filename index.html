@@ -11477,7 +11477,7 @@ PAGES['collab-taches'] = function(mc) {
               </select>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
             <div>
               <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Échéance</label>
               <input id="tm-echeance" type="date"
@@ -11491,6 +11491,12 @@ PAGES['collab-taches'] = function(mc) {
                 <option value="Terminé">Terminé</option>
               </select>
             </div>
+          </div>
+          <div style="margin-bottom:14px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">🔔 Rappel / relance</label>
+            <input id="tm-rappel" type="date"
+              style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+            <div style="font-size:.73rem;color:#9ca3af;margin-top:4px;">Date à laquelle vous souhaitez relancer ou reprendre ce dossier.</div>
           </div>
           <div style="margin-bottom:20px;">
             <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">🔁 Périodicité</label>
@@ -11682,6 +11688,7 @@ function openTacheModal(id) {
     document.getElementById('tm-priorite').value = t.priorite||'normale';
     document.getElementById('tm-statut').value      = t.statut||'À faire';
     document.getElementById('tm-periodicite').value = t.periodicite||'';
+    if (document.getElementById('tm-rappel')) document.getElementById('tm-rappel').value = t.rappel||'';
     if (document.getElementById('tm-collab')) document.getElementById('tm-collab').value = t.collab||currentUser.name;
     document.getElementById('tache-modal-title').textContent = 'Modifier la tâche';
   } else {
@@ -11692,6 +11699,7 @@ function openTacheModal(id) {
     document.getElementById('tm-priorite').value     = 'normale';
     document.getElementById('tm-statut').value       = 'À faire';
     document.getElementById('tm-periodicite').value  = '';
+    if (document.getElementById('tm-rappel')) document.getElementById('tm-rappel').value = '';
     if (document.getElementById('tm-collab')) document.getElementById('tm-collab').value = currentUser.name;
     document.getElementById('tache-modal-title').textContent = 'Nouvelle tâche';
   }
@@ -11710,6 +11718,7 @@ function submitTache() {
   var id = existingId || String(Date.now());
   var existing = existingId ? (DB.taches||[]).find(function(t){return t.id===id;}) : null;
   var assignee = document.getElementById('tm-collab')?.value || currentUser.name;
+  var rappelVal = document.getElementById('tm-rappel') ? (document.getElementById('tm-rappel').value || null) : null;
   var tache = {
     id:          id,
     collab:      assignee,
@@ -11719,6 +11728,7 @@ function submitTache() {
     priorite:    document.getElementById('tm-priorite').value || 'normale',
     statut:      document.getElementById('tm-statut').value      || 'À faire',
     periodicite: document.getElementById('tm-periodicite').value || '',
+    rappel:      rappelVal,
     createdAt:   existing ? existing.createdAt || Date.now() : Date.now(),
     createdBy:   existing ? existing.createdBy || currentUser.name : currentUser.name,
     transferePar: existing && existing.collab !== assignee ? currentUser.name : (existing ? existing.transferePar || null : null),
@@ -11726,7 +11736,11 @@ function submitTache() {
   saveTache(tache);
   closeTacheModal();
   toast('Tâche enregistrée ✓', 'success');
-  renderMesTaches();
+  if (typeof renderAdminTaches === 'function' && document.getElementById('admin-equipe-zone')) {
+    renderAdminTaches();
+  } else {
+    renderMesTaches();
+  }
 }
 
 function toggleTacheTermine(id) {
@@ -11861,7 +11875,7 @@ PAGES['admin-taches'] = function(mc) {
             <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Note / mémo</label>
             <textarea id="atm-desc" rows="3" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;resize:vertical;"></textarea>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px;">
             <div>
               <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Échéance</label>
               <input id="atm-echeance" type="date" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.85rem;">
@@ -11883,6 +11897,11 @@ PAGES['admin-taches'] = function(mc) {
               </select>
             </div>
           </div>
+          <div style="margin-bottom:14px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">🔔 Rappel / relance</label>
+            <input id="atm-rappel" type="date" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.85rem;">
+            <div style="font-size:.73rem;color:#9ca3af;margin-top:4px;">Date à laquelle vous souhaitez relancer ou reprendre ce dossier.</div>
+          </div>
           <div style="margin-bottom:20px;">
             <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">🔁 Périodicité</label>
             <select id="atm-periodicite" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.85rem;">
@@ -11893,6 +11912,78 @@ PAGES['admin-taches'] = function(mc) {
           <div style="display:flex;gap:10px;justify-content:flex-end;">
             <button onclick="closeAdminTacheModal()" style="background:white;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 18px;font-size:.88rem;cursor:pointer;">Annuler</button>
             <button onclick="submitAdminTache()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:.88rem;cursor:pointer;">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal édition tâche équipe (admin) -->
+    <div id="tache-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:white;border-radius:16px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+        <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;">
+          <h3 id="tache-modal-title" style="margin:0;font-size:1.05rem;font-weight:700;">Modifier la tâche</h3>
+          <button onclick="closeTacheModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#9ca3af;">×</button>
+        </div>
+        <div style="padding:20px 24px;">
+          <input type="hidden" id="tm-id" value="">
+          <div style="margin-bottom:14px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Titre *</label>
+            <input id="tm-titre" type="text" placeholder="Ex: Envoyer justificatif à préfecture" maxlength="120"
+              style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.9rem;">
+          </div>
+          <div style="margin-bottom:14px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Description / mémo</label>
+            <textarea id="tm-desc" rows="3" placeholder="Détails, contexte, notes…"
+              style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;resize:vertical;"></textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+            <div>
+              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Assignée à</label>
+              <select id="tm-collab" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+                <option value="Mouez">Mouez</option>
+                ${getCollabNames().map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')}
+              </select>
+            </div>
+            <div>
+              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Priorité</label>
+              <select id="tm-priorite" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+                <option value="normale">🟡 Normale</option>
+                <option value="haute">🔴 Haute</option>
+                <option value="basse">🟢 Basse</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+            <div>
+              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Échéance</label>
+              <input id="tm-echeance" type="date"
+                style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+            </div>
+            <div>
+              <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Statut</label>
+              <select id="tm-statut" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+                <option value="À faire">À faire</option>
+                <option value="En cours">En cours</option>
+                <option value="Terminé">Terminé</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-bottom:14px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">🔔 Rappel / relance</label>
+            <input id="tm-rappel" type="date"
+              style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+            <div style="font-size:.73rem;color:#9ca3af;margin-top:4px;">Date à laquelle vous souhaitez relancer ou reprendre ce dossier.</div>
+          </div>
+          <div style="margin-bottom:20px;">
+            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">🔁 Périodicité</label>
+            <select id="tm-periodicite" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;">
+              ${PERIODICITES.map(function(p){ return '<option value="'+p.val+'">'+p.label+'</option>'; }).join('')}
+            </select>
+            <div style="font-size:.73rem;color:#9ca3af;margin-top:4px;">Si une échéance est fixée, la tâche se replanifie automatiquement à l'issue.</div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button onclick="closeTacheModal()" style="background:white;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 18px;font-size:.88rem;cursor:pointer;">Annuler</button>
+            <button onclick="submitTache()" style="background:#4f46e5;color:white;border:none;border-radius:8px;padding:9px 20px;font-weight:600;font-size:.88rem;cursor:pointer;">Enregistrer</button>
           </div>
         </div>
       </div>
@@ -11917,6 +12008,7 @@ function openAdminTacheModal(id) {
     document.getElementById('atm-priorite').value = t.priorite||'normale';
     document.getElementById('atm-statut').value      = t.statut||'À faire';
     document.getElementById('atm-periodicite').value = t.periodicite||'';
+    if (document.getElementById('atm-rappel')) document.getElementById('atm-rappel').value = t.rappel||'';
     document.getElementById('atm-title').textContent = '🔒 Modifier la tâche';
   } else {
     document.getElementById('atm-id').value          = '';
@@ -11926,6 +12018,7 @@ function openAdminTacheModal(id) {
     document.getElementById('atm-priorite').value     = 'normale';
     document.getElementById('atm-statut').value       = 'À faire';
     document.getElementById('atm-periodicite').value  = '';
+    if (document.getElementById('atm-rappel')) document.getElementById('atm-rappel').value = '';
     document.getElementById('atm-title').textContent = '🔒 Nouvelle tâche privée';
   }
   modal.style.display = 'flex';
@@ -11940,6 +12033,7 @@ function submitAdminTache() {
   var existingId = document.getElementById('atm-id').value;
   var id = existingId || String(Date.now());
   var existing = existingId ? (DB.taches||[]).find(function(t){return t.id===id;}) : null;
+  var rappelAtm = document.getElementById('atm-rappel') ? (document.getElementById('atm-rappel').value || null) : null;
   var tache = {
     id:          id,
     collab:      '__admin__',
@@ -11950,6 +12044,7 @@ function submitAdminTache() {
     priorite:    document.getElementById('atm-priorite').value || 'normale',
     statut:      document.getElementById('atm-statut').value      || 'À faire',
     periodicite: document.getElementById('atm-periodicite').value || '',
+    rappel:      rappelAtm,
     createdAt:   existing ? existing.createdAt || Date.now() : Date.now(),
     createdBy:   'admin',
   };
@@ -11981,17 +12076,20 @@ function renderAdminPrivate() {
         var termine=t.statut==='Terminé';
         var flag='';
         if(t.echeance&&!termine){var de=new Date(t.echeance);de.setHours(0,0,0,0);var diff=Math.round((de-today)/86400000);flag=diff<0?'<span style="color:#ef4444;font-size:.72rem;font-weight:700;">⚠ J'+diff+'</span>':diff===0?'<span style="color:#f59e0b;font-size:.72rem;font-weight:700;">Auj.</span>':'<span style="color:#9ca3af;font-size:.72rem;">J+'+diff+'</span>';}
+        var rappelBadge='';
+        if(t.rappel&&!termine){var dr=new Date(t.rappel);dr.setHours(0,0,0,0);var diffR=Math.round((dr-today)/86400000);rappelBadge='<span style="font-size:.7rem;background:#eff6ff;color:#2563eb;padding:2px 7px;border-radius:99px;font-weight:600;">🔔 '+(diffR<0?'Relance dépassée':diffR===0?'Relance auj.':'Relance J+'+(diffR))+'</span>';}
         return '<div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px;'+(t.echeance&&!termine&&Math.round((new Date(t.echeance)-today)/86400000)<0?'background:#fff5f5;':'')+(termine?'opacity:.6':'')+';">'
           +'<button onclick="toggleAdminTacheTermine(\''+t.id+'\')" style="flex-shrink:0;width:20px;height:20px;border-radius:50%;border:2px solid '+sc+';background:'+(termine?sc:'white')+';cursor:pointer;display:flex;align-items:center;justify-content:center;">'+(termine?'<span style="color:white;font-size:.65rem;">✓</span>':'')+'</button>'
           +'<div style="flex:1;min-width:0;">'
             +'<div style="font-weight:600;font-size:.88rem;color:'+(termine?'#9ca3af':'#111')+';'+(termine?'text-decoration:line-through':'')+';">'+t.titre+'</div>'
             +(t.description?'<div style="font-size:.75rem;color:#6b7280;margin-top:2px;">'+t.description+'</div>':'')
           +'</div>'
-          +'<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">'
+          +'<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;">'
             +'<span style="font-size:.72rem;background:'+pc+'18;color:'+pc+';padding:2px 7px;border-radius:99px;font-weight:600;">'+tachePrioriteLabel(t.priorite)+'</span>'
             +'<span style="font-size:.72rem;background:'+sc+'18;color:'+sc+';padding:2px 7px;border-radius:99px;">'+t.statut+'</span>'
             +(t.periodicite?'<span style="font-size:.7rem;background:'+periodiciteColor(t.periodicite)+'18;color:'+periodiciteColor(t.periodicite)+';padding:2px 7px;border-radius:99px;font-weight:600;">'+periodiciteLabel(t.periodicite)+'</span>':'')
             +flag
+            +rappelBadge
             +'<button onclick="openAdminTacheModal(\''+t.id+'\')" style="background:#f1f5f9;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">✏️</button>'
             +'<button onclick="deleteAdminTache(\''+t.id+'\')" style="background:#fef2f2;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">🗑</button>'
           +'</div>'
@@ -12118,6 +12216,8 @@ function renderAdminTaches() {
       var pc=tachePrioriteColor(t.priorite),sc=tacheStatutColor(t.statut);
       var retardFlag=false,echeanceStr='—';
       if(t.echeance){var de=new Date(t.echeance);de.setHours(0,0,0,0);var diff=Math.round((de-today)/86400000);if(t.statut!=='Terminé'){retardFlag=diff<0;echeanceStr=diff<0?'<span style="color:#ef4444;font-weight:700;">⚠ J'+diff+'</span>':diff===0?'<span style="color:#f59e0b;font-weight:700;">Auj.</span>':'J+'+diff;}else{echeanceStr=t.echeance;}}
+      var rappelBadgeT='';
+      if(t.rappel&&t.statut!=='Terminé'){var drT=new Date(t.rappel);drT.setHours(0,0,0,0);var diffRT=Math.round((drT-today)/86400000);rappelBadgeT='<span style="font-size:.69rem;background:#eff6ff;color:#2563eb;padding:2px 6px;border-radius:99px;font-weight:600;">🔔 '+(diffRT<0?'Relance dépassée':diffRT===0?'Relance auj.':'Relance J+'+diffRT)+'</span>';}
       var transferInfo=t.transferePar?' <span style="font-size:.68rem;color:#9ca3af;">(↩ de '+t.transferePar+')</span>':'';
       var isMouez=t.collab==='Mouez';
       return '<div style="padding:11px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px;flex-wrap:wrap;'+(retardFlag?'background:#fff5f5;':'')+(t.statut==='Terminé'?'opacity:.6':'')+';">'
@@ -12134,6 +12234,7 @@ function renderAdminTaches() {
           +'<span style="font-size:.7rem;background:'+pc+'18;color:'+pc+';padding:2px 7px;border-radius:99px;font-weight:600;">'+tachePrioriteLabel(t.priorite)+'</span>'
           +'<span style="font-size:.7rem;background:'+sc+'18;color:'+sc+';padding:2px 7px;border-radius:99px;">'+t.statut+'</span>'
           +'<span style="font-size:.73rem;">'+echeanceStr+'</span>'
+          +rappelBadgeT
           +'<button onclick="openTacheModal(\''+t.id+'\')" style="background:#f1f5f9;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">✏️</button>'
           +'<select style="font-size:.72rem;padding:3px 6px;border:1px solid #ddd6fe;border-radius:6px;color:#7c3aed;background:white;" onchange="adminReassignTache(\''+t.id+'\',this.value);this.value=\'\'">'
             +'<option value="">↪</option>'
