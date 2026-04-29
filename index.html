@@ -149,8 +149,32 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: var(--gray-50)
 .nav-item:hover { background: var(--gray-50); color: var(--gray-800); }
 .nav-item.active { background: var(--blue-light); color: var(--blue); font-weight: 600; }
 .nav-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
-.nav-badge { margin-left: auto; background: var(--red); color: white; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 99px; }
+.nav-badge { margin-left: auto; background: var(--red); color: white; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 99px; min-width: 18px; text-align: center; }
 .nav-badge-green { background: var(--green); }
+/* Mobile badge — pastille sur icône du bas */
+.mob-nav-btn { position: relative; }
+.mob-badge {
+  display: none;
+  position: absolute;
+  top: 4px; right: calc(50% - 18px);
+  background: var(--red);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  border-radius: 99px;
+  text-align: center;
+  padding: 0 4px;
+  box-shadow: 0 0 0 2px white;
+  animation: pulse-badge 2s infinite;
+}
+.mob-badge.visible { display: block; }
+@keyframes pulse-badge {
+  0%,100% { box-shadow: 0 0 0 2px white, 0 0 0 3px rgba(220,38,38,.3); }
+  50%      { box-shadow: 0 0 0 2px white, 0 0 0 5px rgba(220,38,38,.0); }
+}
 
 /* MAIN CONTENT */
 .main-content { flex: 1; overflow-y: auto; padding: 24px; }
@@ -1000,6 +1024,8 @@ function initApp() {
   if (u.role === 'admin') buildAdminSidebar();
   else buildCollabSidebar();
   renderMobileNav();
+  // Notifications (demande permission au premier lancement)
+  try { initNotifications(); } catch(e) {}
 }
 
 // ============================================================
@@ -1063,26 +1089,28 @@ function renderMobileNav() {
   var items;
   if (u && u.role === 'admin') {
     items = [
-      {id:'admin-dashboard', icon:'📊', label:'Tableau'},
-      {id:'admin-leads',     icon:'📞', label:'Leads'},
-      {id:'admin-devis',     icon:'📋', label:'Devis'},
-      {id:'admin-import',    icon:'📥', label:'Import'},
-      {id:'admin-settings',  icon:'⚙️', label:'Config'},
+      {id:'admin-dashboard',  icon:'📊', label:'Tableau'},
+      {id:'admin-prospects',  icon:'📞', label:'Leads'},
+      {id:'admin-taches',     icon:'✅', label:'Tâches'},
+      {id:'admin-rh-conges',  icon:'🏖️', label:'Congés'},
+      {id:'admin-settings',   icon:'⚙️', label:'Config'},
     ];
   } else {
     items = [
-      {id:'collab-home',  icon:'🏠', label:'Accueil'},
-      {id:'collab-leads', icon:'🎯', label:'Pipeline'},
-      {id:'collab-stats', icon:'📊', label:'Stats'},
-      {id:'collab-mois',  icon:'🗓️', label:'Mensuel'},
+      {id:'collab-home',   icon:'🏠', label:'Accueil'},
+      {id:'collab-leads',  icon:'🎯', label:'Pipeline'},
+      {id:'collab-taches', icon:'✅', label:'Tâches'},
+      {id:'collab-stats',  icon:'📊', label:'Stats'},
     ];
   }
   nav.innerHTML = items.map(function(it) {
     return '<button class="mob-nav-btn" id="mob-'+it.id+'" onclick="showPage(\''+it.id+'\')">'
+      + '<span class="mob-badge" id="mob-badge-'+it.id+'"></span>'
       + '<span class="mob-icon">'+it.icon+'</span>'
       + '<span>'+it.label+'</span>'
       + '</button>';
   }).join('');
+  updateAllBadges();
 }
 
 function renderSidebar(sections) {
@@ -1092,19 +1120,183 @@ function renderSidebar(sections) {
       <div class="sidebar-label">${s.label}</div>
       ${s.items.map(it => `<button class="nav-item" id="nav-${it.id}" onclick="showPage('${it.id}')" style="display:flex;align-items:center;justify-content:space-between">
         <span><span class="nav-icon">${it.icon}</span>${it.label}</span>
-        ${it.id==='admin-rh-conges' ? '<span id="conge-badge" style="display:none;background:#dc2626;color:white;border-radius:10px;padding:1px 7px;font-size:.65rem;font-weight:700;min-width:18px;text-align:center"></span>' : ''}
+        <span class="nav-badge" id="nav-badge-${it.id}" style="display:none;"></span>
       </button>`).join('')}
     </div>`).join('');
-  updateCongeBadge();
+  updateAllBadges();
 }
 
-function updateCongeBadge() {
-  var count = (DB.conges||[]).filter(function(c){ return c.statut==='En attente'; }).length;
-  var badge = document.getElementById('conge-badge');
-  if (!badge) return;
-  if (count === 0) { badge.style.display='none'; return; }
-  badge.style.display='inline-block';
-  badge.textContent = count;
+function updateCongeBadge() { updateAllBadges(); } // compatibilité
+
+function _setBadge(navId, count) {
+  // Sidebar badge
+  var sb = document.getElementById('nav-badge-' + navId);
+  if (sb) {
+    if (count > 0) { sb.textContent = count; sb.style.display = 'inline-block'; }
+    else { sb.style.display = 'none'; }
+  }
+  // Mobile badge
+  var mb = document.getElementById('mob-badge-' + navId);
+  if (mb) {
+    if (count > 0) { mb.textContent = count > 9 ? '9+' : count; mb.classList.add('visible'); }
+    else { mb.classList.remove('visible'); }
+  }
+}
+
+function updateAllBadges() {
+  if (!DB || !currentUser) return;
+  var todayStr = new Date().toISOString().slice(0, 10);
+  var today = new Date(); today.setHours(0,0,0,0);
+
+  // ── Congés en attente ───────────────────────────────────────────
+  var congesAttente = (DB.conges||[]).filter(function(c){ return c.statut==='En attente'; }).length;
+  _setBadge('admin-rh-conges', congesAttente);
+
+  // ── Leads / relances en retard ou à traiter aujourd'hui ─────────
+  var allContacts = (typeof getAllContacts === 'function') ? getAllContacts() : [];
+  var leadsUrgents = allContacts.filter(function(l) {
+    if (l.archived || l.statut === 'Sans suite' || l.statut === 'Signé') return false;
+    if (!l.rappel) return false;
+    return l.rappel <= todayStr;
+  });
+  // Admin voit tous les leads
+  var leadsAdminCount = leadsUrgents.length;
+  // Collab voit les siens
+  var leadsCollabCount = leadsUrgents.filter(function(l){
+    return l.collab === currentUser.name;
+  }).length;
+  _setBadge('admin-leads',    leadsAdminCount);
+  _setBadge('admin-prospects', leadsAdminCount);
+  _setBadge('collab-leads',   leadsCollabCount);
+
+  // ── Tâches en retard (écheance dépassée) ─────────────────────────
+  var taches = DB.taches || [];
+  // Pour admin : tâches de Mouez (équipe) + tâches privées en retard + remontées non traitées
+  var tachesAdminRetard = taches.filter(function(t) {
+    if (t.statut === 'Terminé') return false;
+    var enRetard = t.echeance && t.echeance < todayStr;
+    var rappelDu = t.rappel && t.rappel <= todayStr;
+    if (t.adminOnly && !t.remontePar) {
+      // Tâche privée admin
+      return enRetard || rappelDu;
+    }
+    if (t.adminOnly && t.remontePar) {
+      // Remontée non traitée — toujours urgente
+      return true;
+    }
+    if (t.collab === 'Mouez') {
+      return enRetard || rappelDu;
+    }
+    return false;
+  }).length;
+  _setBadge('admin-taches', tachesAdminRetard);
+
+  // Pour collab : ses tâches en retard
+  var tachesCollabRetard = taches.filter(function(t) {
+    if (t.adminOnly) return false;
+    if (t.statut === 'Terminé') return false;
+    if (t.collab !== currentUser.name) return false;
+    return (t.echeance && t.echeance < todayStr) || (t.rappel && t.rappel <= todayStr);
+  }).length;
+  _setBadge('collab-taches', tachesCollabRetard);
+
+  // ── Résiliations en attente (si applicable) ──────────────────────
+  var resilEnAttente = (DB.resiliations||[]).filter(function(r){
+    return r.statut === 'En attente' || r.statut === 'À traiter';
+  }).length;
+  _setBadge('admin-resil', resilEnAttente);
+  _setBadge('collab-resil', (DB.resiliations||[]).filter(function(r){
+    return (r.statut === 'En attente' || r.statut === 'À traiter') && r.collab === currentUser.name;
+  }).length);
+
+  // ── Badge total sur dashboard (somme de tout) ────────────────────
+  var totalAdmin = leadsAdminCount + tachesAdminRetard + congesAttente;
+  _setBadge('admin-dashboard', totalAdmin > 0 ? totalAdmin : 0);
+}
+
+// ============================================================
+// NOTIFICATIONS WEB
+// ============================================================
+var _notifLastCheck = 0;
+var _notifLastIds = {};  // évite de re-notifier la même alerte
+
+function initNotifications() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    // Demande après 3s pour ne pas bloquer le démarrage
+    setTimeout(function() {
+      Notification.requestPermission().then(function(perm) {
+        if (perm === 'granted') {
+          sendNotif('🔔 Allianz Perf', 'Les notifications sont activées. Vous serez alerté des relances et tâches urgentes.');
+          scheduleNotifCheck();
+        }
+      });
+    }, 3000);
+  } else if (Notification.permission === 'granted') {
+    scheduleNotifCheck();
+  }
+}
+
+function scheduleNotifCheck() {
+  // Premier check dans 5 secondes, puis toutes les 15 minutes
+  setTimeout(checkAndNotify, 5000);
+  setInterval(checkAndNotify, 15 * 60 * 1000);
+}
+
+function sendNotif(title, body, tag) {
+  if (Notification.permission !== 'granted') return;
+  try {
+    new Notification(title, {
+      body: body,
+      icon: 'https://mouezaz.github.io/Az-PVP/icon-192.png',
+      badge: 'https://mouezaz.github.io/Az-PVP/icon-192.png',
+      tag: tag || 'allianz-notif',
+      silent: false,
+    });
+  } catch(e) {}
+}
+
+function checkAndNotify() {
+  if (!currentUser || !DB) return;
+  var now = Date.now();
+  var todayStr = new Date().toISOString().slice(0, 10);
+
+  // Leads urgents
+  var allContacts = (typeof getAllContacts === 'function') ? getAllContacts() : [];
+  var leadsUrgents = allContacts.filter(function(l) {
+    if (l.archived || l.statut === 'Sans suite' || l.statut === 'Signé') return false;
+    if (!l.rappel) return false;
+    if (currentUser.role !== 'admin' && l.collab !== currentUser.name) return false;
+    return l.rappel <= todayStr;
+  });
+
+  // Tâches urgentes
+  var taches = DB.taches || [];
+  var tachesUrgentes = taches.filter(function(t) {
+    if (t.statut === 'Terminé') return false;
+    if (currentUser.role === 'admin') {
+      return (t.collab === 'Mouez' || t.adminOnly) && t.echeance && t.echeance < todayStr;
+    }
+    return t.collab === currentUser.name && ((t.echeance && t.echeance < todayStr) || (t.rappel && t.rappel <= todayStr));
+  });
+
+  // Remontées (admin seulement)
+  var remontees = currentUser.role === 'admin'
+    ? taches.filter(function(t){ return t.adminOnly && t.remontePar && t.statut !== 'Terminé'; })
+    : [];
+
+  // Construire les messages
+  var msgs = [];
+  if (leadsUrgents.length > 0) msgs.push(leadsUrgents.length + ' lead(s) à relancer');
+  if (tachesUrgentes.length > 0) msgs.push(tachesUrgentes.length + ' tâche(s) en retard');
+  if (remontees.length > 0) msgs.push(remontees.length + ' remontée(s) équipe à traiter');
+
+  if (msgs.length > 0) {
+    var tag = 'allianz-urgent-' + todayStr;
+    if (_notifLastIds[tag]) return; // déjà notifié aujourd'hui
+    _notifLastIds[tag] = true;
+    sendNotif('⚠️ Allianz Perf — Action requise', msgs.join(' · '), tag);
+  }
 }
 
 function showPage(id) {
@@ -2598,6 +2790,7 @@ function saveRelanceLead(unifiedId) {
   saveDB(DB);
   closeModal();
   renderLeadsTable();
+  try { updateAllBadges(); } catch(e) {}
   var msg = '📞 Relance N°'+n+' enregistrée';
   if (n >= 5) msg += ' · 🔥🔥 Quel acharnement !';
   else if (n >= 3) msg += ' · 🔥 Contact chaud !';
@@ -2621,6 +2814,7 @@ function archiveLead(unifiedId) {
   src.archivedAt = new Date().toISOString();
   saveDB(DB);
   renderLeadsTable();
+  try { updateAllBadges(); } catch(e) {}
   toast('📦 '+src.client+' archivé · retrouvez-le dans les Archives', 'success');
 }
 
@@ -3244,6 +3438,7 @@ function saveLead() {
   toast('🎯 Contact ajouté au pipeline !', 'success');
   renderLeadsKpis();
   renderLeadsTable();
+  try { updateAllBadges(); } catch(e) {}
 }
 
 function openEditLead(id) {
@@ -11356,12 +11551,14 @@ function saveTache(tache) {
   if (idx >= 0) DB.taches[idx] = tache;
   else DB.taches.push(tache);
   saveDB(DB);
+  try { updateAllBadges(); } catch(e) {}
 }
 
 function deleteTache(id) {
   if (!DB.taches) DB.taches = [];
   DB.taches = DB.taches.filter(function(t){ return t.id !== id; });
   saveDB(DB);
+  try { updateAllBadges(); } catch(e) {}
 }
 
 function tachePrioriteColor(p) {
