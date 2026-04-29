@@ -2159,13 +2159,19 @@ function relanceCountBadge(l) {
 }
 
 // ── TRI PAR URGENCE ─────────────────────────────────────────
+// Parse YYYY-MM-DD en date locale (évite le décalage UTC)
+function parseRappelLocal(str) {
+  var s = (str||'').substring(0, 10);
+  var p = s.split('-');
+  if (p.length !== 3) return null;
+  var d = new Date(+p[0], +p[1]-1, +p[2]);
+  return isNaN(d.getTime()) ? null : d;
+}
 // Retourne { pri: 0-3, ts: timestamp } pour trier et grouper
 function urgenceScore(l, today) {
-  if (!l.rappel) return { pri: 3, ts: 0 };
-  var d = new Date(l.rappel);
-  if (isNaN(d.getTime())) return { pri: 3, ts: 0 };
-  d.setHours(0, 0, 0, 0);
-  var diff = d.getTime() - today.getTime();
+  var d = parseRappelLocal(l.rappel);
+  if (!d) return { pri: 3, ts: 0 };
+  var diff = d.getTime() - today.getTime(); // both at local midnight
   if (diff < 0)  return { pri: 0, ts: d.getTime() }; // retard : plus ancien = plus urgent
   if (diff === 0) return { pri: 1, ts: 0 };            // aujourd'hui
   return          { pri: 2, ts: d.getTime() };          // futur : plus tôt = plus urgent
@@ -2261,7 +2267,9 @@ function renderLeadsKanban() {
                             ? '<button onclick="moveLeadStage(\''+l.id+'\',1)" style="flex:1;padding:5px 2px;background:'+col.meta.color+'15;border:1px solid '+col.meta.color+'35;border-radius:6px;font-size:.72rem;font-weight:600;color:'+col.meta.color+';cursor:pointer;">Avancer →</button>'
                             : (l.convertedToAN
                                 ? '<span style="flex:1;text-align:center;font-size:.7rem;color:#16a34a;font-weight:600;padding:5px 2px;">✅ AN créée</span>'
-                                : '<button onclick="convertLeadToAN(\''+l.id+'\')" style="flex:1;padding:5px 2px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;font-size:.72rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer AN</button>'))
+                                : (l._type==='devis'
+                                    ? '<button onclick="convertDevisToAN(\''+l._origId+'\')" style="flex:1;padding:5px 2px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;font-size:.72rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer AN</button>'
+                                    : '<button onclick="convertLeadToAN(\''+l._origId+'\')" style="flex:1;padding:5px 2px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;font-size:.72rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer AN</button>')))
                         + '<button onclick="openContactJourney(\''+l.id+'\')" style="padding:5px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:.75rem;cursor:pointer;" title="Parcours complet">···</button>'
                       + '</div>'
                     + '</div>';
@@ -2415,17 +2423,19 @@ function openContactJourney(unifiedId) {
   var nextStage = nextStepIdx < LEAD_PIPELINE_STAGES.length ? LEAD_PIPELINE_STAGES[nextStepIdx] : null;
   var devisStatutLabel = isDevis ? ' <span style="font-size:.68rem;background:#f5f3ff;border:1px solid #ddd6fe;color:#7c3aed;border-radius:4px;padding:1px 6px;font-weight:600;">Devis · '+src.statut+'</span>' : '';
 
-  // Boutons d'action (variables pour éviter les conflits de quotes dans template literal)
+  // Boutons d'action — single quotes dans onclick pour éviter la rupture de l'attribut HTML
+  var qU = "'" + unifiedId + "'";
+  var qO = "'" + origId + "'";
   var actionsHTML = '';
   if (canEdit) {
     var nsm = nextStage ? (LEAD_STATUT_META[nextStage] || {color:'#0ea5e9', label:nextStage}) : null;
     actionsHTML = '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9;">'
-      + '<button onclick="closeModal();logRelanceLead(' + JSON.stringify(unifiedId) + ')" style="padding:7px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:.82rem;font-weight:600;color:#1d4ed8;cursor:pointer;">📞 Enregistrer une relance</button>'
-      + (nextStage ? '<button onclick="closeModal();moveLeadStage(' + JSON.stringify(unifiedId) + ',1)" style="padding:7px 13px;background:' + nsm.color + '15;border:1px solid ' + nsm.color + '40;border-radius:8px;font-size:.82rem;font-weight:600;color:' + nsm.color + ';cursor:pointer;">→ Avancer : ' + nsm.label + '</button>' : '')
-      + (!isDevis && l.statut === 'Contrat signé' && !l.convertedToAN ? '<button onclick="closeModal();convertLeadToAN(' + JSON.stringify(origId) + ')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>' : '')
-      + (isDevis && l.statut === 'Contrat signé' && !l.convertedToAN ? '<button onclick="closeModal();convertDevisToAN(' + JSON.stringify(origId) + ')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>' : '')
-      + '<button onclick="closeModal();' + (isDevis ? 'openEditDevis(' + JSON.stringify(origId) + ')' : 'openEditLead(' + JSON.stringify(origId) + ')') + '" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;cursor:pointer;">✏️ Modifier</button>'
-      + '<button onclick="closeModal();archiveLead(' + JSON.stringify(unifiedId) + ')" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;color:#6b7280;cursor:pointer;">📦 Archiver</button>'
+      + '<button onclick="closeModal();logRelanceLead(' + qU + ')" style="padding:7px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:.82rem;font-weight:600;color:#1d4ed8;cursor:pointer;">📞 Enregistrer une relance</button>'
+      + (nextStage ? '<button onclick="closeModal();moveLeadStage(' + qU + ',1)" style="padding:7px 13px;background:' + nsm.color + '15;border:1px solid ' + nsm.color + '40;border-radius:8px;font-size:.82rem;font-weight:600;color:' + nsm.color + ';cursor:pointer;">→ Avancer : ' + nsm.label + '</button>' : '')
+      + (!isDevis && l.statut === 'Contrat signé' && !l.convertedToAN ? '<button onclick="closeModal();convertLeadToAN(' + qO + ')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>' : '')
+      + (isDevis && l.statut === 'Contrat signé' && !l.convertedToAN ? '<button onclick="closeModal();convertDevisToAN(' + qO + ')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>' : '')
+      + '<button onclick="closeModal();' + (isDevis ? 'openEditDevis(' + qO + ')' : 'openEditLead(' + qO + ')') + '" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;cursor:pointer;">✏️ Modifier</button>'
+      + '<button onclick="closeModal();archiveLead(' + qU + ')" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;color:#6b7280;cursor:pointer;">📦 Sans suite / Archiver</button>'
       + '</div>';
   }
 
@@ -2662,6 +2672,7 @@ function showArchivesLeads() {
             + '</div>'
             + '<div style="display:flex;gap:5px;flex-shrink:0;">'
               + '<button onclick="unarchiveLead(\''+l.id+'\')" style="padding:5px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:.72rem;font-weight:600;color:#1d4ed8;cursor:pointer;">♻️ Réactiver</button>'
+              + (l.statut==='Sans suite' && !l.archived ? '<button onclick="archiveLead(\''+l.id+'\');closeModal();setTimeout(function(){showArchivesLeads();},200);" style="padding:5px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:.72rem;color:#6b7280;cursor:pointer;">📦 Archiver</button>' : '')
               + (!l._type||l._type==='lead' ? '<button onclick="if(confirm(\'Supprimer définitivement ?\'))deleteLead(\''+l._origId+'\');renderLeadsTable();" style="padding:5px 8px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:.72rem;color:#dc2626;cursor:pointer;">🗑</button>' : '')
             + '</div>'
           + '</div>';
