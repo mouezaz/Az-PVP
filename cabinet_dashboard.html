@@ -72,10 +72,10 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .gc .v{font-size:13px;font-weight:500;color:#374151;display:block}
 .gc.hv .v{color:#1e293b;font-weight:700}
 .gc.empty .v{color:#c9d5e0;font-size:12px}
-.gc.fut{background:#fafafa !important;cursor:default}
-.gc.fut .v{color:#dde3ea}
+.gc.fut{background:#f0f5ff !important;cursor:pointer}
+.gc.fut .v{color:#93a8d4;font-style:italic}
 .gc .ei{position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:9px;color:#93c5fd;opacity:0;pointer-events:none;transition:opacity .1s}
-.gc:not(.fut):hover .ei{opacity:1}
+.gc:hover .ei{opacity:1}
 /* Section headers */
 .g-sec td{background:#f8fafc !important;padding:8px 12px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#64748b;border-bottom:1px solid #e2e8f0 !important;border-right:none !important}
 .g-sec .g-lbl{background:#f0f4f8 !important}
@@ -563,9 +563,14 @@ function monthChg(yr,mo){return CHG_CATS.reduce((s,c)=>s+catTotal(yr,c,mo),0);}
 function monthSolde(yr,mo){return monthComm(yr,mo)-monthChg(yr,mo);}
 
 function completedIdx(yr){
-  // Pour les graphiques/analyses : mois avec données réelles
+  // Pour les graphiques/analyses : uniquement les mois ≤ mois courant (date du jour)
+  // Les mois saisis en avance (prévision) ne faussent pas les totaux affichés
   if(yr===CURRENT_YEAR){
-    let n=0; for(let i=0;i<12;i++){if(monthComm(yr,i)>0) n=i+1;} return Array.from({length:n||1},(_,i)=>i);
+    const idxs=[];
+    for(let i=0;i<CURRENT_MONTH;i++){ // CURRENT_MONTH=4 → i = 0(Jan),1(Fév),2(Mar),3(Avr)
+      if(monthComm(yr,i)>0||monthChg(yr,i)>0) idxs.push(i);
+    }
+    return idxs.length?idxs:[0];
   }
   return Array.from({length:COMPLETED_MONTHS[yr]||0},(_,i)=>i);
 }
@@ -708,10 +713,13 @@ function renderGrille(){
   const tbl=document.getElementById('gTbl');
   if(!tbl) return;
 
-  // Build header
+  // Build header — distinguer mois réels vs prévision
   let html=`<thead><tr>
     <th class="th-lbl">Catégorie / Poste</th>
-    ${MO.map((m,i)=>`<th>${m.substring(0,3)}</th>`).join('')}
+    ${MO.map((m,i)=>{
+      const isPrev=yr===CURRENT_YEAR&&i>=CURRENT_MONTH;
+      return `<th style="${isPrev?'color:#93c5fd;font-style:italic':''}" title="${isPrev?'Mois en prévision':''}">${m.substring(0,3)}${isPrev?' ✦':''}</th>`;
+    }).join('')}
     <th class="th-tot">Total</th>
   </tr></thead><tbody>`;
 
@@ -747,9 +755,8 @@ function gRow(cat,yr,showN1,prev){
     const fut=isFuture(yr,mo);
     const hasVal=val>0;
     let cls='gc'+(isRev?' rev-cell':' chg-cell')+(hasVal?' hv':' empty')+(fut?' fut':'');
-    const onclick=fut?'':`onclick="openDrawer('${cat}',${yr},${mo})"`;
     const display=hasVal?fmtN(Math.round(val)):'—';
-    row+=`<td class="${cls}" ${onclick}><span class="v">${display}</span><span class="ei">✏</span></td>`;
+    row+=`<td class="${cls}" onclick="openDrawer('${cat}',${yr},${mo})"><span class="v">${display}</span><span class="ei">✏</span></td>`;
   }
   row+=`<td class="tc" style="text-align:right;padding:0 10px;font-size:13px;font-weight:800;color:${isRev?'#1d4ed8':'#c2410c'};vertical-align:middle">${total>0?fmtN(Math.round(total)):'—'}</td></tr>`;
 
@@ -1307,8 +1314,7 @@ go('dashboard');
 function exportData(){
   const data=localStorage.getItem('cab_v1')||'{}';
   document.getElementById('exp-txt').value=data;
-  const m=document.getElementById('exp-modal');
-  m.style.display='flex';
+  document.getElementById('exp-modal').style.display='flex';
 }
 function copyExport(){
   const txt=document.getElementById('exp-txt');
