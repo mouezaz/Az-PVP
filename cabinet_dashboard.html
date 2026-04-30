@@ -529,7 +529,7 @@ let USER={}, USER_FD={}, USER_RD={}, TRESO={};
 const LS_KEY='cab_v1';
 function saveLocal(){
   try{
-    localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO}));
+    localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,_ts:Date.now()}));
   }catch(e){}
   cloudSave();
 }
@@ -1339,14 +1339,14 @@ function getSyncId(){return localStorage.getItem(SYNC_KEY);}
 
 async function cloudSave(){
   const id=getSyncId(); if(!id) return;
-  const content=JSON.stringify({USER,USER_FD,USER_RD,TRESO});
+  const content=JSON.stringify({USER,USER_FD,USER_RD,TRESO,_ts:Date.now()});
   try{
-    await fetch(`https://api.github.com/gists/${id}`,{
+    const r=await fetch(`https://api.github.com/gists/${id}`,{
       method:'PATCH',
       headers:{'Authorization':`Bearer ${GH_TOKEN()}`,'Content-Type':'application/json'},
       body:JSON.stringify({files:{[GH_FILE]:{content}}})
     });
-    updateSyncStatus(true);
+    if(r.ok) updateSyncStatus(true); else updateSyncStatus(false);
   }catch(e){updateSyncStatus(false);}
 }
 
@@ -1354,15 +1354,21 @@ async function cloudLoad(){
   const id=getSyncId(); if(!id) return false;
   try{
     const r=await fetch(`https://api.github.com/gists/${id}`,{headers:{'Authorization':`Bearer ${GH_TOKEN()}`}});
+    if(!r.ok) return false;
     const d=await r.json();
     const content=d.files?.[GH_FILE]?.content;
     if(!content) return false;
     const data=JSON.parse(content);
+    // Ne jamais écraser des données locales plus récentes
+    const localRaw=localStorage.getItem(LS_KEY);
+    const localTs=localRaw?JSON.parse(localRaw)._ts||0:0;
+    const cloudTs=data._ts||0;
+    if(localTs>cloudTs){updateSyncStatus(true);return true;}// local plus récent, on garde
     if(data.USER) USER=data.USER;
     if(data.USER_FD) USER_FD=data.USER_FD;
     if(data.USER_RD) USER_RD=data.USER_RD;
     if(data.TRESO) TRESO=data.TRESO;
-    localStorage.setItem('cab_v1',JSON.stringify({USER,USER_FD,USER_RD,TRESO}));
+    localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,_ts:cloudTs}));
     YRS.forEach(yr=>{Object.keys(BASE[yr]||{}).forEach(cat=>{for(let mo=0;mo<12;mo++){const v=catTotalFromUser(yr,cat,mo);if(v!==null) BASE[yr][cat][mo]=v;}});});
     return true;
   }catch(e){return false;}
