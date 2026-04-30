@@ -1189,6 +1189,33 @@ function openSyncModal(){
 }
 function closeSyncModal(){document.getElementById('sync-modal').style.display='none';}
 
+// Polling automatique toutes les 60s
+async function pollCloud(){
+  if(!getSyncId()) return;
+  try{
+    const r=await fetch(`https://api.github.com/gists/${getSyncId()}`,{headers:{'Authorization':`Bearer ${GH_TOKEN()}`}});
+    if(!r.ok) return;
+    const d=await r.json();
+    const content=d.files?.[GH_FILE]?.content;
+    if(!content) return;
+    const data=JSON.parse(content);
+    const localRaw=localStorage.getItem(LS_KEY);
+    const localTs=localRaw?JSON.parse(localRaw)._ts||0:0;
+    const cloudTs=data._ts||0;
+    if(cloudTs>localTs){
+      if(data.USER) USER=data.USER;
+      if(data.USER_FD) USER_FD=data.USER_FD;
+      if(data.USER_RD) USER_RD=data.USER_RD;
+      if(data.TRESO) TRESO=data.TRESO;
+      localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,_ts:cloudTs}));
+      YRS.forEach(yr=>{Object.keys(BASE[yr]||{}).forEach(cat=>{for(let mo=0;mo<12;mo++){const v=catTotalFromUser(yr,cat,mo);if(v!==null) BASE[yr][cat][mo]=v;}});});
+      updateSyncStatusTop(true);
+      showNotif('☁️ Données synchronisées');
+      go('bord');
+    }
+  }catch(e){}
+}
+
 // Init avec chargement cloud
 async function initApp(){
   loadLocal();
@@ -1199,6 +1226,7 @@ async function initApp(){
   }
   setupPWA();
   go('bord');
+  if(getSyncId()) setInterval(pollCloud,60000);
 }
 initApp();
 </script>
