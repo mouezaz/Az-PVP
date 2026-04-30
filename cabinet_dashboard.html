@@ -531,6 +531,7 @@ function saveLocal(){
   try{
     localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO}));
   }catch(e){}
+  cloudSave();
 }
 function loadLocal(){
   try{
@@ -1447,9 +1448,7 @@ function openSyncModal(){
 }
 function closeSyncModal(){document.getElementById('sync-modal').style.display='none';}
 
-// Wrap saveLocal pour aussi sauvegarder dans le cloud
-const _origSaveLocal=saveLocal;
-function saveLocal(){_origSaveLocal();cloudSave();}
+// cloudSave est appelé directement dans saveLocal (voir définition plus haut)
 
 // Init avec chargement cloud
 async function initApp(){

@@ -423,6 +423,7 @@ const LS_KEY='cab_v1';
 
 function saveLocal(){
   try{localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO}));}catch(e){}
+  if(typeof cloudSave==='function') cloudSave();
 }
 function loadLocal(){
   try{
@@ -1097,6 +1098,19 @@ const GH_FILE='cab_data.json';
 const SYNC_KEY='cab_sync_id';
 
 function getSyncId(){return localStorage.getItem(SYNC_KEY);}
+
+async function cloudSave(){
+  const id=getSyncId(); if(!id) return;
+  const content=JSON.stringify({USER,USER_FD,USER_RD,TRESO});
+  try{
+    await fetch(`https://api.github.com/gists/${id}`,{
+      method:'PATCH',
+      headers:{'Authorization':`Bearer ${GH_TOKEN()}`,'Content-Type':'application/json'},
+      body:JSON.stringify({files:{[GH_FILE]:{content}}})
+    });
+    updateSyncStatusTop(true);
+  }catch(e){updateSyncStatusTop(false);}
+}
 
 async function cloudLoad(){
   const id=getSyncId(); if(!id) return false;
