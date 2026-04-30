@@ -243,20 +243,40 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
   <div class="sb-info">
     <span class="sb-badge">📅 Avril 2026</span>
     <small>Jan–Mar saisis · 3 mois</small>
-    <button onclick="exportData()" style="margin-top:10px;width:100%;background:#1d4ed8;color:white;border:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📤 Exporter mes données</button>
+    <div id="sync-status" style="margin-top:8px;font-size:11px;color:#64748b">☁️ Sync non configuré</div>
+    <button onclick="openSyncModal()" style="margin-top:6px;width:100%;background:#0f172a;color:white;border:1px solid #334155;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">⚙️ Configurer la sync</button>
   </div>
 </div>
 
-<!-- MODAL EXPORT -->
-<div id="exp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:white;border-radius:16px;padding:24px;max-width:500px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-    <h3 style="margin:0 0 8px;font-size:16px">📤 Exporter mes données</h3>
-    <p style="margin:0 0 12px;font-size:13px;color:#475569">Copie ce code et colle-le dans le bouton "📥 Sync" de la version mobile.</p>
-    <textarea id="exp-txt" readonly style="width:100%;height:120px;font-size:11px;font-family:monospace;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px;resize:none;box-sizing:border-box"></textarea>
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button onclick="copyExport()" style="flex:1;background:#1d4ed8;color:white;border:none;padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer" id="exp-copy-btn">📋 Copier</button>
-      <button onclick="closeExport()" style="flex:1;background:#f1f5f9;color:#334155;border:none;padding:10px;border-radius:8px;font-size:13px;cursor:pointer">Fermer</button>
+<!-- MODAL SYNC -->
+<div id="sync-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:16px;padding:24px;max-width:460px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <h3 style="margin:0 0 6px;font-size:16px">☁️ Synchronisation automatique</h3>
+    <p style="margin:0 0 16px;font-size:12px;color:#475569">Tes données se sauvegardent dans le cloud et se chargent sur tous tes appareils.</p>
+    <div id="sync-setup" style="display:none">
+      <p style="font-size:12px;color:#0f172a;margin:0 0 4px;font-weight:600">Token GitHub :</p>
+      <input id="gh-token-input" type="password" placeholder="ghp_..." style="width:100%;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-family:monospace;box-sizing:border-box;margin-bottom:10px">
+      <p style="font-size:12px;color:#0f172a;margin:0 0 6px;font-weight:600">1️⃣ Première fois — crée un espace de sync</p>
+      <button onclick="createSync()" id="btn-create-sync" style="width:100%;background:#1d4ed8;color:white;border:none;padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px">🆕 Créer mon espace de sync</button>
+      <p style="font-size:12px;color:#0f172a;margin:0 0 6px;font-weight:600">2️⃣ Ou entre le code reçu depuis un autre appareil</p>
+      <input id="sync-code-input" placeholder="Code de sync..." style="width:100%;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-family:monospace;box-sizing:border-box;margin-bottom:8px">
+      <button onclick="enterSyncCode()" style="width:100%;background:#059669;color:white;border:none;padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">✅ Activer ce code</button>
     </div>
+    <div id="sync-active" style="display:none">
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:13px;font-weight:700;color:#065f46">✅ Sync activée</div>
+        <div style="font-size:11px;color:#047857;margin-top:4px">Données sauvegardées automatiquement dans le cloud</div>
+      </div>
+      <p style="font-size:12px;color:#475569;margin:0 0 6px">Code à entrer sur tes autres appareils :</p>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="sync-code-display" readonly style="flex:1;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;font-family:monospace;background:#f8fafc;box-sizing:border-box">
+        <button onclick="copySyncCode()" id="btn-copy-code" style="background:#1d4ed8;color:white;border:none;padding:9px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📋 Copier</button>
+      </div>
+      <button onclick="forceSyncNow()" style="width:100%;margin-top:10px;background:#f1f5f9;color:#334155;border:none;padding:9px;border-radius:8px;font-size:12px;cursor:pointer">🔄 Forcer la synchronisation</button>
+      <button onclick="resetSync()" style="width:100%;margin-top:6px;background:#fff;color:#dc2626;border:1px solid #fca5a5;padding:8px;border-radius:8px;font-size:11px;cursor:pointer">🗑 Réinitialiser la sync</button>
+    </div>
+    <p id="sync-msg" style="margin:10px 0 0;font-size:12px;text-align:center;min-height:18px"></p>
+    <button onclick="closeSyncModal()" style="width:100%;margin-top:10px;background:#f1f5f9;color:#334155;border:none;padding:10px;border-radius:8px;font-size:13px;cursor:pointer">Fermer</button>
   </div>
 </div>
 
@@ -1307,24 +1327,142 @@ function setupPWA(){
   }
 }
 
-loadLocal();
-setupPWA();
-go('dashboard');
+// ================================================================
+// CLOUD SYNC (GitHub Gist)
+// ================================================================
+const GH_TOKEN=()=>localStorage.getItem('cab_gh_tok')||'';
+const GH_FILE='cab_data.json';
+const SYNC_KEY='cab_sync_id';
 
-function exportData(){
-  const data=localStorage.getItem('cab_v1')||'{}';
-  document.getElementById('exp-txt').value=data;
-  document.getElementById('exp-modal').style.display='flex';
+function getSyncId(){return localStorage.getItem(SYNC_KEY);}
+
+async function cloudSave(){
+  const id=getSyncId(); if(!id) return;
+  const content=JSON.stringify({USER,USER_FD,USER_RD,TRESO});
+  try{
+    await fetch(`https://api.github.com/gists/${id}`,{
+      method:'PATCH',
+      headers:{'Authorization':`Bearer ${GH_TOKEN()}`,'Content-Type':'application/json'},
+      body:JSON.stringify({files:{[GH_FILE]:{content}}})
+    });
+    updateSyncStatus(true);
+  }catch(e){updateSyncStatus(false);}
 }
-function copyExport(){
-  const txt=document.getElementById('exp-txt');
-  txt.select();
-  document.execCommand('copy');
-  const btn=document.getElementById('exp-copy-btn');
-  btn.textContent='✅ Copié !';
-  setTimeout(()=>btn.textContent='📋 Copier',2000);
+
+async function cloudLoad(){
+  const id=getSyncId(); if(!id) return false;
+  try{
+    const r=await fetch(`https://api.github.com/gists/${id}`,{headers:{'Authorization':`Bearer ${GH_TOKEN()}`}});
+    const d=await r.json();
+    const content=d.files?.[GH_FILE]?.content;
+    if(!content) return false;
+    const data=JSON.parse(content);
+    if(data.USER) USER=data.USER;
+    if(data.USER_FD) USER_FD=data.USER_FD;
+    if(data.USER_RD) USER_RD=data.USER_RD;
+    if(data.TRESO) TRESO=data.TRESO;
+    localStorage.setItem('cab_v1',JSON.stringify({USER,USER_FD,USER_RD,TRESO}));
+    YRS.forEach(yr=>{Object.keys(BASE[yr]||{}).forEach(cat=>{for(let mo=0;mo<12;mo++){const v=catTotalFromUser(yr,cat,mo);if(v!==null) BASE[yr][cat][mo]=v;}});});
+    return true;
+  }catch(e){return false;}
 }
-function closeExport(){document.getElementById('exp-modal').style.display='none';}
+
+function saveTok(){const t=document.getElementById('gh-token-input')?.value.trim();if(t) localStorage.setItem('cab_gh_tok',t);}
+
+async function createSync(){
+  saveTok();
+  if(!GH_TOKEN()){setSyncMsg('⚠️ Entre ton token GitHub d\'abord.');return;}
+  const btn=document.getElementById('btn-create-sync');
+  btn.textContent='⏳ Création...'; btn.disabled=true;
+  const content=JSON.stringify({USER,USER_FD,USER_RD,TRESO});
+  try{
+    const r=await fetch('https://api.github.com/gists',{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${GH_TOKEN()}`,'Content-Type':'application/json'},
+      body:JSON.stringify({description:'Cabinet AG - Données dashboard',public:false,files:{[GH_FILE]:{content}}})
+    });
+    const d=await r.json();
+    if(!d.id){setSyncMsg('❌ Erreur. Vérifie ton token.');btn.textContent='🆕 Créer mon espace de sync';btn.disabled=false;return;}
+    localStorage.setItem(SYNC_KEY,d.id);
+    showSyncActiveUI(d.id);
+    updateSyncStatus(true);
+  }catch(e){setSyncMsg('❌ Erreur réseau.');btn.textContent='🆕 Créer mon espace de sync';btn.disabled=false;}
+}
+
+function enterSyncCode(){
+  saveTok();
+  const code=document.getElementById('sync-code-input').value.trim();
+  if(!code){setSyncMsg('⚠️ Entre un code valide.');return;}
+  if(!GH_TOKEN()){setSyncMsg('⚠️ Entre ton token GitHub d\'abord.');return;}
+  localStorage.setItem(SYNC_KEY,code);
+  cloudLoad().then(ok=>{
+    if(ok){showSyncActiveUI(code);updateSyncStatus(true);go('dashboard');}
+    else{setSyncMsg('❌ Code invalide ou token incorrect.');}
+  });
+}
+
+function showSyncActiveUI(id){
+  document.getElementById('sync-setup').style.display='none';
+  document.getElementById('sync-active').style.display='block';
+  document.getElementById('sync-code-display').value=id;
+}
+
+function copySyncCode(){
+  const inp=document.getElementById('sync-code-display');
+  inp.select(); document.execCommand('copy');
+  const btn=document.getElementById('btn-copy-code');
+  btn.textContent='✅ Copié !'; setTimeout(()=>btn.textContent='📋 Copier',2000);
+}
+
+async function forceSyncNow(){
+  setSyncMsg('⏳ Synchronisation...');
+  const ok=await cloudLoad();
+  if(ok){setSyncMsg('✅ Données récupérées !'); go('dashboard');}
+  else setSyncMsg('❌ Erreur de synchronisation.');
+}
+
+function resetSync(){
+  if(!confirm('Supprimer la config sync de cet appareil ?')) return;
+  localStorage.removeItem(SYNC_KEY);
+  updateSyncStatus(false);
+  openSyncModal();
+}
+
+function updateSyncStatus(ok){
+  const el=document.getElementById('sync-status');
+  if(!el) return;
+  if(!getSyncId()) el.innerHTML='☁️ Sync non configuré';
+  else if(ok) el.innerHTML='<span style="color:#059669">☁️ ✅ Sync activée</span>';
+  else el.innerHTML='<span style="color:#dc2626">☁️ ⚠️ Sync (hors ligne)</span>';
+}
+
+function setSyncMsg(msg){const el=document.getElementById('sync-msg');if(el) el.textContent=msg;}
+
+function openSyncModal(){
+  document.getElementById('sync-modal').style.display='flex';
+  setSyncMsg('');
+  const id=getSyncId();
+  if(id){showSyncActiveUI(id);}
+  else{document.getElementById('sync-setup').style.display='block';document.getElementById('sync-active').style.display='none';}
+}
+function closeSyncModal(){document.getElementById('sync-modal').style.display='none';}
+
+// Wrap saveLocal pour aussi sauvegarder dans le cloud
+const _origSaveLocal=saveLocal;
+function saveLocal(){_origSaveLocal();cloudSave();}
+
+// Init avec chargement cloud
+async function initApp(){
+  loadLocal();
+  if(getSyncId()){
+    updateSyncStatus(true);
+    const ok=await cloudLoad();
+    if(ok) go('dashboard');
+  }
+  setupPWA();
+  go('dashboard');
+}
+initApp();
 </script>
 </body>
 </html>

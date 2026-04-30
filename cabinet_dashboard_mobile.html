@@ -163,24 +163,35 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9;color:#1e293
 <body>
 
 <div id="topbar">
-  <div><div><h1>🏢 Cabinet AG</h1></div><div style="font-size:10px;color:#475569;margin-top:1px">Tableau de bord</div></div>
+  <div><div><h1>🏢 Cabinet AG</h1></div><div style="font-size:10px;color:#475569;margin-top:1px" id="sync-status-top">Tableau de bord</div></div>
   <div style="display:flex;align-items:center;gap:8px">
     <span class="sub" id="topbar-sub">Avril 2026</span>
-    <button onclick="openImport()" style="background:#1d4ed8;color:white;border:none;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">📥 Sync</button>
+    <button onclick="openSyncModal()" style="background:#1d4ed8;color:white;border:none;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">☁️ Sync</button>
   </div>
 </div>
 
-<!-- MODAL IMPORT -->
-<div id="imp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
+<!-- MODAL SYNC -->
+<div id="sync-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
   <div style="background:white;border-radius:16px;padding:20px;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.4)">
-    <h3 style="margin:0 0 8px;font-size:15px;color:#0f172a">📥 Importer des données</h3>
-    <p style="margin:0 0 12px;font-size:12px;color:#475569">Colle ici le code copié depuis le bouton "Exporter" du tableau de bord bureau.</p>
-    <textarea id="imp-txt" placeholder='Colle ton code ici...' style="width:100%;height:130px;font-size:11px;font-family:monospace;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px;resize:none;box-sizing:border-box"></textarea>
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button onclick="doImport()" style="flex:1;background:#1d4ed8;color:white;border:none;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✅ Importer</button>
-      <button onclick="closeImport()" style="flex:1;background:#f1f5f9;color:#334155;border:none;padding:11px;border-radius:8px;font-size:13px;cursor:pointer">Annuler</button>
+    <h3 style="margin:0 0 6px;font-size:15px;color:#0f172a">☁️ Synchronisation</h3>
+    <p style="margin:0 0 14px;font-size:12px;color:#475569">Sync automatique entre tous tes appareils.</p>
+    <div id="sync-setup" style="display:none">
+      <p style="font-size:12px;font-weight:600;color:#0f172a;margin:0 0 4px">Token GitHub :</p>
+      <input id="gh-token-input" type="password" placeholder="ghp_..." style="width:100%;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-family:monospace;box-sizing:border-box;margin-bottom:10px">
+      <p style="font-size:12px;font-weight:600;color:#0f172a;margin:0 0 6px">Code de sync (reçu depuis ton PC) :</p>
+      <input id="sync-code-input" placeholder="Code de sync..." style="width:100%;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-family:monospace;box-sizing:border-box;margin-bottom:8px">
+      <button onclick="enterSyncCode()" style="width:100%;background:#059669;color:white;border:none;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✅ Activer la sync</button>
     </div>
-    <p id="imp-msg" style="margin:8px 0 0;font-size:12px;text-align:center;color:#059669;display:none"></p>
+    <div id="sync-active" style="display:none">
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:13px;font-weight:700;color:#065f46">✅ Sync activée</div>
+        <div style="font-size:11px;color:#047857;margin-top:3px">Données chargées depuis le cloud automatiquement</div>
+      </div>
+      <button onclick="forceSyncNow()" style="width:100%;background:#1d4ed8;color:white;border:none;padding:11px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px">🔄 Recharger depuis le cloud</button>
+      <button onclick="resetSync()" style="width:100%;background:#fff;color:#dc2626;border:1px solid #fca5a5;padding:9px;border-radius:8px;font-size:12px;cursor:pointer">🗑 Réinitialiser la sync</button>
+    </div>
+    <p id="sync-msg" style="margin:10px 0 0;font-size:12px;text-align:center;min-height:18px"></p>
+    <button onclick="closeSyncModal()" style="width:100%;margin-top:10px;background:#f1f5f9;color:#334155;border:none;padding:11px;border-radius:8px;font-size:13px;cursor:pointer">Fermer</button>
   </div>
 </div>
 
@@ -1078,31 +1089,98 @@ function setupPWA(){
 
 loadLocal();
 setupPWA();
-go('bord');
+// ================================================================
+// CLOUD SYNC (GitHub Gist)
+// ================================================================
+const GH_TOKEN=()=>localStorage.getItem('cab_gh_tok')||'';
+const GH_FILE='cab_data.json';
+const SYNC_KEY='cab_sync_id';
 
-// ================================================================
-// IMPORT
-// ================================================================
-function openImport(){
-  document.getElementById('imp-modal').style.display='flex';
-  document.getElementById('imp-txt').value='';
-  document.getElementById('imp-msg').style.display='none';
-}
-function closeImport(){document.getElementById('imp-modal').style.display='none';}
-function doImport(){
-  const raw=document.getElementById('imp-txt').value.trim();
-  if(!raw){alert('Colle d\'abord le code exporté.');return;}
+function getSyncId(){return localStorage.getItem(SYNC_KEY);}
+
+async function cloudLoad(){
+  const id=getSyncId(); if(!id) return false;
   try{
-    JSON.parse(raw); // validation
-    localStorage.setItem('cab_v1',raw);
-    const msg=document.getElementById('imp-msg');
-    msg.textContent='✅ Données importées ! Rechargement...';
-    msg.style.display='block';
-    setTimeout(()=>location.reload(),1200);
-  }catch(e){
-    alert('Code invalide. Vérifie que tu as bien copié le texte complet depuis le bureau.');
-  }
+    const r=await fetch(`https://api.github.com/gists/${id}`,{headers:{'Authorization':`Bearer ${GH_TOKEN()}`}});
+    const d=await r.json();
+    const content=d.files?.[GH_FILE]?.content;
+    if(!content) return false;
+    const data=JSON.parse(content);
+    if(data.USER) USER=data.USER;
+    if(data.USER_FD) USER_FD=data.USER_FD;
+    if(data.USER_RD) USER_RD=data.USER_RD;
+    if(data.TRESO) TRESO=data.TRESO;
+    localStorage.setItem('cab_v1',JSON.stringify({USER,USER_FD,USER_RD,TRESO}));
+    YRS.forEach(yr=>{Object.keys(BASE[yr]||{}).forEach(cat=>{for(let mo=0;mo<12;mo++){const v=catTotalFromUser(yr,cat,mo);if(v!==null) BASE[yr][cat][mo]=v;}});});
+    return true;
+  }catch(e){return false;}
 }
+
+function saveTok(){const t=document.getElementById('gh-token-input')?.value.trim();if(t) localStorage.setItem('cab_gh_tok',t);}
+
+function enterSyncCode(){
+  saveTok();
+  const code=document.getElementById('sync-code-input').value.trim();
+  if(!GH_TOKEN()){setSyncMsg('⚠️ Entre ton token GitHub d\'abord.');return;}
+  if(!code){setSyncMsg('⚠️ Entre un code de sync.');return;}
+  setSyncMsg('⏳ Connexion...');
+  localStorage.setItem(SYNC_KEY,code);
+  cloudLoad().then(ok=>{
+    if(ok){showSyncActiveUI();updateSyncStatusTop(true);setSyncMsg('✅ Sync activée ! Données chargées.');go('bord');}
+    else{setSyncMsg('❌ Code invalide ou token incorrect.');}
+  });
+}
+
+function showSyncActiveUI(){
+  document.getElementById('sync-setup').style.display='none';
+  document.getElementById('sync-active').style.display='block';
+}
+
+async function forceSyncNow(){
+  setSyncMsg('⏳ Chargement...');
+  const ok=await cloudLoad();
+  if(ok){setSyncMsg('✅ Données récupérées !');setTimeout(()=>{closeSyncModal();go('bord');},800);}
+  else setSyncMsg('❌ Erreur réseau.');
+}
+
+function resetSync(){
+  if(!confirm('Supprimer la config sync de cet appareil ?')) return;
+  localStorage.removeItem(SYNC_KEY);
+  updateSyncStatusTop(false);
+  openSyncModal();
+}
+
+function updateSyncStatusTop(ok){
+  const el=document.getElementById('sync-status-top');
+  if(!el) return;
+  if(!getSyncId()) el.textContent='Tableau de bord';
+  else if(ok) el.innerHTML='<span style="color:#059669">☁️ Sync activée</span>';
+  else el.innerHTML='<span style="color:#dc2626">☁️ Hors ligne</span>';
+}
+
+function setSyncMsg(msg){const el=document.getElementById('sync-msg');if(el) el.textContent=msg;}
+
+function openSyncModal(){
+  document.getElementById('sync-modal').style.display='flex';
+  setSyncMsg('');
+  const id=getSyncId();
+  if(id){showSyncActiveUI();}
+  else{document.getElementById('sync-setup').style.display='block';document.getElementById('sync-active').style.display='none';}
+}
+function closeSyncModal(){document.getElementById('sync-modal').style.display='none';}
+
+// Init avec chargement cloud
+async function initApp(){
+  loadLocal();
+  if(getSyncId()){
+    updateSyncStatusTop(true);
+    await cloudLoad();
+    go('bord');
+  }
+  setupPWA();
+  go('bord');
+}
+initApp();
 </script>
 </body>
 </html>
