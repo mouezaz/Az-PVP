@@ -1576,16 +1576,18 @@ function renderCollabVentes() {
   const sc = (p) => p>=100?'var(--green)':p>=60?'var(--orange)':'var(--red)';
   const sb = (p) => p>=100?'var(--green-light)':p>=60?'var(--orange-light)':'var(--red-light)';
 
-  // Commission collab ce mois — Auto/MRH conditionnés, reste toujours payé
+  // Commission collab ce mois — Auto/MRH conditionnés, règle 28 AN dès mai 2026
   const objSt       = getObjectifsStatus(currentUser.name, mois, annee);
   const commCollabM = calcCommissionCollabMensuel(currentUser.name, mois, annee);
   const autoBloque  = !objSt.autoOK;
   const mrhBloque   = !objSt.mrhOK;
-  const hasLock     = autoBloque || mrhBloque;
+  const an28Bloque  = objSt.regle28actif && !objSt.anOK;
+  const hasLock     = autoBloque || mrhBloque || an28Bloque;
   // Construire les badges de conditions manquantes
   const lockBadges  = [
     autoBloque ? `Auto ${objSt.nbAuto}/${OBJECTIFS_COLLAB.autoMin}${!objSt.nopOK?' + NOP '+objSt.nbNOP+'/'+OBJECTIFS_COLLAB.nopMin:''}` : null,
     mrhBloque  ? `MRH ${objSt.nbMRH}/${OBJECTIFS_COLLAB.mrhMin}${!objSt.nopOK && !autoBloque?' + NOP '+objSt.nbNOP+'/'+OBJECTIFS_COLLAB.nopMin:''}` : null,
+    an28Bloque ? `28 AN requis (${objSt.nbAN}/28) — Santé, GAV, PER non bloqués` : null,
   ].filter(Boolean).join(' · ');
 
   document.getElementById('collab-kpis-zone').innerHTML = `
@@ -1669,10 +1671,13 @@ function renderCollabVentes() {
         ${anVentes.map((v,i)=>{
           const isPrio = PRIO_PRODS.includes(v.produit);
           const col = PROD_COLORS[v.produit]||'#6B7280';
-          const prodBloque = (v.produit==='Auto' && autoBloque) || (v.produit==='MRH' && mrhBloque);
+          const prodBloque28 = an28Bloque && EXEMPTES_28AN.indexOf(v.produit) === -1;
+          const prodBloque = (v.produit==='Auto' && autoBloque) || (v.produit==='MRH' && mrhBloque) || prodBloque28;
           const comm = prodBloque ? 0 : calcCommissionCollab(v.produit, v.prime);
           const rateInfo = COMM_RATES_COLLAB[v.produit];
-          const rateLabel = prodBloque ? '🔒 objectif non atteint' : (rateInfo ? (rateInfo.type==='forfait' ? rateInfo.val+'€ forfait' : (rateInfo.val*100)+'% prime') : '');
+          const rateLabel = prodBloque
+            ? (prodBloque28 ? '🔒 28 AN requis' : '🔒 objectif non atteint')
+            : (rateInfo ? (rateInfo.type==='forfait' ? rateInfo.val+'€ forfait' : (rateInfo.val*100)+'% prime') : '');
           const prioPill = isPrio
             ? `<span style="background:${col};color:white;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">⭐ Prioritaire</span>`
             : `<span style="color:var(--gray-400);font-size:11px">—</span>`;
@@ -10392,7 +10397,10 @@ var OBJECTIFS_COLLAB = {
   nopMin:  4,   // NOP minimum (prérequis pour Auto et MRH)
   autoMin: 10,  // objectif mensuel Auto
   mrhMin:  8,   // objectif mensuel MRH
+  anMin:   28,  // AN minimum requis à partir de mai 2026 (sauf Santé, GAV, PER)
 };
+// Produits exemptés de la condition 28 AN (toujours rémunérés même si objectif non atteint)
+var EXEMPTES_28AN = ['Santé', 'GAV', 'PER'];
 
 function getVentesMoisCollab(collab, mois, annee) {
   return (DB.ventes||[]).filter(function(v){
@@ -10408,26 +10416,35 @@ function getObjectifsStatus(collab, mois, annee) {
   var nbAuto = ventesM.filter(function(v){ return v.produit === 'Auto'; }).length;
   var nbMRH  = ventesM.filter(function(v){ return v.produit === 'MRH';  }).length;
   var nbNOP  = ventesM.filter(function(v){ return v.produit === 'NOP';  }).length;
+  var nbAN   = ventesM.filter(function(v){ return v.affaireNouvelle === 'Oui'; }).length;
   var nopOK  = nbNOP  >= OBJECTIFS_COLLAB.nopMin;
+  // Règle 28 AN active à partir de mai 2026
+  var regle28actif = (annee > 2026) || (annee === 2026 && mois >= 5);
+  var anOK = !regle28actif || nbAN >= OBJECTIFS_COLLAB.anMin;
   return {
-    nbAuto: nbAuto, nbMRH: nbMRH, nbNOP: nbNOP,
+    nbAuto: nbAuto, nbMRH: nbMRH, nbNOP: nbNOP, nbAN: nbAN,
     nopOK:  nopOK,
     autoOK: nopOK && nbAuto >= OBJECTIFS_COLLAB.autoMin,
     mrhOK:  nopOK && nbMRH  >= OBJECTIFS_COLLAB.mrhMin,
+    anOK:   anOK,
+    regle28actif: regle28actif,
   };
 }
 
-// Commission collab mensuelle — règle par produit :
-// • Auto  : commission 8€/contrat SEULEMENT si ≥10 Auto ET ≥4 NOP dans le mois
-// • MRH   : commission 10€/contrat SEULEMENT si ≥8 MRH ET ≥4 NOP dans le mois
-// • Autres (NOP, Santé, GAV, PER, Emprunteur, PJ…) : toujours payés, sans condition
+// Commission collab mensuelle — règles par produit :
+// • Auto   : commission 8€/contrat SEULEMENT si ≥10 Auto ET ≥4 NOP dans le mois
+// • MRH    : commission 10€/contrat SEULEMENT si ≥8 MRH ET ≥4 NOP dans le mois
+// • À partir de mai 2026 : AUCUNE prime si AN < 28, SAUF Santé, GAV, PER
+// • Santé, GAV, PER : toujours payés, aucune condition
 function calcCommissionCollabMensuel(collab, mois, annee) {
   var obj     = getObjectifsStatus(collab, mois, annee);
   var ventesM = getVentesMoisCollab(collab, mois, annee);
   return ventesM.reduce(function(s, v) {
     if (v.produit === 'Auto' && !obj.autoOK) return s;  // ≥10 Auto + ≥4 NOP requis
     if (v.produit === 'MRH'  && !obj.mrhOK)  return s;  // ≥8 MRH + ≥4 NOP requis
-    return s + calcCommissionCollab(v.produit, v.prime); // tous les autres : toujours
+    // Règle 28 AN (active dès mai 2026) : bloque tout sauf Santé, GAV, PER
+    if (obj.regle28actif && !obj.anOK && EXEMPTES_28AN.indexOf(v.produit) === -1) return s;
+    return s + calcCommissionCollab(v.produit, v.prime);
   }, 0);
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -11269,11 +11286,15 @@ function getPrimeBreakdown(collab, mois, annee) {
     var r = (window.COMM_RATES_COLLAB||{})[prod] || null;
     if (!r) { lines.push(prod+' ('+nb+') : non rémunéré'); return; }
     var bloque = false;
-    if (prod==='Auto' && !obj.autoOK) bloque = true;
-    if (prod==='MRH'  && !obj.mrhOK)  bloque = true;
+    var raisonBlocage = '';
+    if (prod==='Auto' && !obj.autoOK) { bloque = true; raisonBlocage = !obj.nopOK ? 'NOP insuff. ('+obj.nbNOP+'/4)' : 'Auto insuff. ('+obj.nbAuto+'/10)'; }
+    if (prod==='MRH'  && !obj.mrhOK)  { bloque = true; raisonBlocage = !obj.nopOK ? 'NOP insuff. ('+obj.nbNOP+'/4)' : 'MRH insuff. ('+obj.nbMRH+'/8)'; }
+    // Règle 28 AN (mai 2026+) — ne bloque pas Santé, GAV, PER
+    if (obj.regle28actif && !obj.anOK && EXEMPTES_28AN.indexOf(prod) === -1) {
+      bloque = true; raisonBlocage = '28 AN requis ('+obj.nbAN+'/28)';
+    }
     if (bloque) {
-      var raison = !obj.nopOK ? 'NOP insuff. ('+obj.nbNOP+'/4)' : (prod==='Auto'?'Auto insuff. ('+obj.nbAuto+'/10)':'MRH insuff. ('+obj.nbMRH+'/8)');
-      lines.push(prod+' ('+nb+') : 🔒 bloqué — '+raison);
+      lines.push(prod+' ('+nb+') : 🔒 bloqué — '+raisonBlocage);
       return;
     }
     var montant = 0;
@@ -11290,6 +11311,7 @@ function getPrimeBreakdown(collab, mois, annee) {
   lines.push('─────');
   lines.push('Total calculé : '+fmtEuro(total));
   if (!obj.nopOK) lines.push('⚠ NOP = '+obj.nbNOP+'/4 → Auto & MRH bloqués');
+  if (obj.regle28actif && !obj.anOK) lines.push('⚠ AN = '+obj.nbAN+'/28 → Primes bloquées sauf Santé, GAV, PER');
   return lines.join('\n');
 }
 
@@ -11477,7 +11499,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.0.2";',
+      'var CACHE="allianz-v3.0.3";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
