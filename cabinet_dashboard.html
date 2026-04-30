@@ -261,6 +261,20 @@ tr.tr-item.hidden-row{display:none}
   <div class="sb-info">
     <div class="badge">📅 Avril 2026</div>
     <div style="color:#475569;font-size:11px;margin-top:8px">4 mois sur 12</div>
+    <button onclick="exportData()" style="margin-top:12px;width:100%;background:#1d4ed8;color:white;border:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📤 Exporter mes données</button>
+  </div>
+</div>
+
+<!-- MODAL EXPORT -->
+<div id="exp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;display:none">
+  <div style="background:white;border-radius:16px;padding:24px;max-width:500px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <h3 style="margin:0 0 8px;font-size:16px">📤 Exporter mes données</h3>
+    <p style="margin:0 0 12px;font-size:13px;color:#475569">Copie ce code et colle-le dans le bouton "Importer" de la version mobile.</p>
+    <textarea id="exp-txt" readonly style="width:100%;height:120px;font-size:11px;font-family:monospace;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px;resize:none;box-sizing:border-box"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="copyExport()" style="flex:1;background:#1d4ed8;color:white;border:none;padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer" id="exp-copy-btn">📋 Copier</button>
+      <button onclick="closeExport()" style="flex:1;background:#f1f5f9;color:#334155;border:none;padding:10px;border-radius:8px;font-size:13px;cursor:pointer">Fermer</button>
+    </div>
   </div>
 </div>
 
@@ -1988,6 +2002,25 @@ self.addEventListener('fetch',e=>{e.respondWith(fetch(e.request).catch(()=>cache
 // ================================================================
 setupPWA();
 go('dashboard');
+
+// ================================================================
+// EXPORT / IMPORT
+// ================================================================
+function exportData(){
+  const data=localStorage.getItem('cab_v1')||'{}';
+  document.getElementById('exp-txt').value=data;
+  const m=document.getElementById('exp-modal');
+  m.style.display='flex';
+}
+function copyExport(){
+  const txt=document.getElementById('exp-txt');
+  txt.select();
+  document.execCommand('copy');
+  const btn=document.getElementById('exp-copy-btn');
+  btn.textContent='✅ Copié !';
+  setTimeout(()=>btn.textContent='📋 Copier',2000);
+}
+function closeExport(){document.getElementById('exp-modal').style.display='none';}
 </script>
 </body>
 </html>

@@ -164,7 +164,24 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9;color:#1e293
 
 <div id="topbar">
   <div><div><h1>🏢 Cabinet AG</h1></div><div style="font-size:10px;color:#475569;margin-top:1px">Tableau de bord</div></div>
-  <span class="sub" id="topbar-sub">Avril 2026</span>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span class="sub" id="topbar-sub">Avril 2026</span>
+    <button onclick="openImport()" style="background:#1d4ed8;color:white;border:none;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">📥 Sync</button>
+  </div>
+</div>
+
+<!-- MODAL IMPORT -->
+<div id="imp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:16px;padding:20px;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <h3 style="margin:0 0 8px;font-size:15px;color:#0f172a">📥 Importer des données</h3>
+    <p style="margin:0 0 12px;font-size:12px;color:#475569">Colle ici le code copié depuis le bouton "Exporter" du tableau de bord bureau.</p>
+    <textarea id="imp-txt" placeholder='Colle ton code ici...' style="width:100%;height:130px;font-size:11px;font-family:monospace;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px;resize:none;box-sizing:border-box"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="doImport()" style="flex:1;background:#1d4ed8;color:white;border:none;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✅ Importer</button>
+      <button onclick="closeImport()" style="flex:1;background:#f1f5f9;color:#334155;border:none;padding:11px;border-radius:8px;font-size:13px;cursor:pointer">Annuler</button>
+    </div>
+    <p id="imp-msg" style="margin:8px 0 0;font-size:12px;text-align:center;color:#059669;display:none"></p>
+  </div>
 </div>
 
 <div id="ct">
@@ -1062,6 +1079,30 @@ function setupPWA(){
 loadLocal();
 setupPWA();
 go('bord');
+
+// ================================================================
+// IMPORT
+// ================================================================
+function openImport(){
+  document.getElementById('imp-modal').style.display='flex';
+  document.getElementById('imp-txt').value='';
+  document.getElementById('imp-msg').style.display='none';
+}
+function closeImport(){document.getElementById('imp-modal').style.display='none';}
+function doImport(){
+  const raw=document.getElementById('imp-txt').value.trim();
+  if(!raw){alert('Colle d\'abord le code exporté.');return;}
+  try{
+    JSON.parse(raw); // validation
+    localStorage.setItem('cab_v1',raw);
+    const msg=document.getElementById('imp-msg');
+    msg.textContent='✅ Données importées ! Rechargement...';
+    msg.style.display='block';
+    setTimeout(()=>location.reload(),1200);
+  }catch(e){
+    alert('Code invalide. Vérifie que tu as bien copié le texte complet depuis le bureau.');
+  }
+}
 </script>
 </body>
 </html>
