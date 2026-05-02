@@ -1259,8 +1259,14 @@ function updateAllBadges() {
     return (r.statut === 'En attente' || r.statut === 'À traiter') && r.collab === currentUser.name;
   }).length);
 
+  // ── Chèques différés en attente d'autorisation ──────────────────
+  var chequesDifferes = ((DB.compta||{}).ecritures||[]).filter(function(e){
+    return e.statut === 'differe';
+  }).length;
+  _setBadge('admin-compta', chequesDifferes);
+
   // ── Badge total sur dashboard (somme de tout) ────────────────────
-  var totalAdmin = mesLeadsUrgents + mesTachesRetard + congesAttente;
+  var totalAdmin = mesLeadsUrgents + mesTachesRetard + congesAttente + chequesDifferes;
   _setBadge('admin-dashboard', totalAdmin > 0 ? totalAdmin : 0);
 }
 
@@ -11569,7 +11575,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.2.2";',
+      'var CACHE="allianz-v3.2.3";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
