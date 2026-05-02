@@ -1587,7 +1587,7 @@ function renderCollabVentes() {
   const lockBadges  = [
     autoBloque ? `Auto ${objSt.nbAuto}/${OBJECTIFS_COLLAB.autoMin}${!objSt.nopOK?' + NOP '+objSt.nbNOP+'/'+OBJECTIFS_COLLAB.nopMin:''}` : null,
     mrhBloque  ? `MRH ${objSt.nbMRH}/${OBJECTIFS_COLLAB.mrhMin}${!objSt.nopOK && !autoBloque?' + NOP '+objSt.nbNOP+'/'+OBJECTIFS_COLLAB.nopMin:''}` : null,
-    an28Bloque ? `28 AN requis (${objSt.nbAN}/28) — Santé, GAV, PER non bloqués` : null,
+    an28Bloque ? `⚠ Décote -30% AN (${objSt.nbAN}/28) — Santé, GAV, PER exemptées` : null,
   ].filter(Boolean).join(' · ');
 
   document.getElementById('collab-kpis-zone').innerHTML = `
@@ -1602,8 +1602,11 @@ function renderCollabVentes() {
         </div>
         <div style="font-size:2.5rem;opacity:.4;">💳</div>
       </div>
-      ${hasLock ? `<div style="margin-top:10px;background:rgba(220,38,38,.25);border-radius:8px;padding:8px 12px;font-size:11px;font-weight:600;">
-        🔒 Commissions Auto/MRH non déclenchées · Manque : ${lockBadges}
+      ${(autoBloque || mrhBloque) ? `<div style="margin-top:10px;background:rgba(220,38,38,.25);border-radius:8px;padding:8px 12px;font-size:11px;font-weight:600;">
+        🔒 Commissions Auto/MRH non déclenchées · Manque : ${[autoBloque?`Auto ${objSt.nbAuto}/${OBJECTIFS_COLLAB.autoMin}`:null,mrhBloque?`MRH ${objSt.nbMRH}/${OBJECTIFS_COLLAB.mrhMin}`:null].filter(Boolean).join(' · ')}
+      </div>` : ''}
+      ${an28Bloque ? `<div style="margin-top:${(autoBloque||mrhBloque)?'6px':'10px'};background:rgba(234,179,8,.25);border-radius:8px;padding:8px 12px;font-size:11px;font-weight:600;">
+        ⚠ AN = ${objSt.nbAN}/28 → Décote -30% appliquée (sauf Santé, GAV, PER)
       </div>` : ''}
     </div>` : ''}
 
@@ -1671,13 +1674,16 @@ function renderCollabVentes() {
         ${anVentes.map((v,i)=>{
           const isPrio = PRIO_PRODS.includes(v.produit);
           const col = PROD_COLORS[v.produit]||'#6B7280';
-          const prodBloque28 = an28Bloque && EXEMPTES_28AN.indexOf(v.produit) === -1;
-          const prodBloque = (v.produit==='Auto' && autoBloque) || (v.produit==='MRH' && mrhBloque) || prodBloque28;
-          const comm = prodBloque ? 0 : calcCommissionCollab(v.produit, v.prime);
+          const prodDecote28 = an28Bloque && EXEMPTES_28AN.indexOf(v.produit) === -1;
+          const prodBloque = (v.produit==='Auto' && autoBloque) || (v.produit==='MRH' && mrhBloque);
+          const commBase = prodBloque ? 0 : calcCommissionCollab(v.produit, v.prime);
+          const comm = (prodDecote28 && !prodBloque) ? commBase * DECOTE_28AN : commBase;
           const rateInfo = COMM_RATES_COLLAB[v.produit];
           const rateLabel = prodBloque
-            ? (prodBloque28 ? '🔒 28 AN requis' : '🔒 objectif non atteint')
-            : (rateInfo ? (rateInfo.type==='forfait' ? rateInfo.val+'€ forfait' : (rateInfo.val*100)+'% prime') : '');
+            ? '🔒 objectif non atteint'
+            : prodDecote28
+              ? (rateInfo ? (rateInfo.type==='forfait' ? rateInfo.val+'€ × 70% (-30%)' : (rateInfo.val*100)+'% × 70% (-30%)') : '⚠ -30%')
+              : (rateInfo ? (rateInfo.type==='forfait' ? rateInfo.val+'€ forfait' : (rateInfo.val*100)+'% prime') : '');
           const prioPill = isPrio
             ? `<span style="background:${col};color:white;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">⭐ Prioritaire</span>`
             : `<span style="color:var(--gray-400);font-size:11px">—</span>`;
@@ -10485,17 +10491,21 @@ function getObjectifsStatus(collab, mois, annee) {
 // Commission collab mensuelle — règles par produit :
 // • Auto   : commission 8€/contrat SEULEMENT si ≥10 Auto ET ≥4 NOP dans le mois
 // • MRH    : commission 10€/contrat SEULEMENT si ≥8 MRH ET ≥4 NOP dans le mois
-// • À partir de mai 2026 : AUCUNE prime si AN < 28, SAUF Santé, GAV, PER
-// • Santé, GAV, PER : toujours payés, aucune condition
+// • À partir de mai 2026 : décote -30% si AN < 28 (sauf Santé, GAV, PER → toujours 100%)
+// • Santé, GAV, PER : toujours payés à 100%, aucune condition
+var DECOTE_28AN = 0.70; // coefficient appliqué si AN < 28 (= -30%)
 function calcCommissionCollabMensuel(collab, mois, annee) {
   var obj     = getObjectifsStatus(collab, mois, annee);
   var ventesM = getVentesMoisCollab(collab, mois, annee);
   return ventesM.reduce(function(s, v) {
     if (v.produit === 'Auto' && !obj.autoOK) return s;  // ≥10 Auto + ≥4 NOP requis
     if (v.produit === 'MRH'  && !obj.mrhOK)  return s;  // ≥8 MRH + ≥4 NOP requis
-    // Règle 28 AN (active dès mai 2026) : bloque tout sauf Santé, GAV, PER
-    if (obj.regle28actif && !obj.anOK && EXEMPTES_28AN.indexOf(v.produit) === -1) return s;
-    return s + calcCommissionCollab(v.produit, v.prime);
+    var comm = calcCommissionCollab(v.produit, v.prime);
+    // Décote -30% si AN < 28 (dès mai 2026), sauf produits exemptés
+    if (obj.regle28actif && !obj.anOK && EXEMPTES_28AN.indexOf(v.produit) === -1) {
+      comm = comm * DECOTE_28AN;
+    }
+    return s + comm;
   }, 0);
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -11340,22 +11350,29 @@ function getPrimeBreakdown(collab, mois, annee) {
     var raisonBlocage = '';
     if (prod==='Auto' && !obj.autoOK) { bloque = true; raisonBlocage = !obj.nopOK ? 'NOP insuff. ('+obj.nbNOP+'/4)' : 'Auto insuff. ('+obj.nbAuto+'/10)'; }
     if (prod==='MRH'  && !obj.mrhOK)  { bloque = true; raisonBlocage = !obj.nopOK ? 'NOP insuff. ('+obj.nbNOP+'/4)' : 'MRH insuff. ('+obj.nbMRH+'/8)'; }
-    // Règle 28 AN (mai 2026+) — ne bloque pas Santé, GAV, PER
-    if (obj.regle28actif && !obj.anOK && EXEMPTES_28AN.indexOf(prod) === -1) {
-      bloque = true; raisonBlocage = '28 AN requis ('+obj.nbAN+'/28)';
-    }
     if (bloque) {
       lines.push(prod+' ('+nb+') : 🔒 bloqué — '+raisonBlocage);
       return;
     }
     var montant = 0;
+    var decote28 = obj.regle28actif && !obj.anOK && EXEMPTES_28AN.indexOf(prod) === -1;
     if (r.type==='forfait') {
       montant = nb * r.val;
-      lines.push(prod+' ('+nb+' × '+r.val+'€) = '+fmtEuro(montant));
+      if (decote28) {
+        lines.push(prod+' ('+nb+' × '+r.val+'€) = '+fmtEuro(montant)+' × 70% = '+fmtEuro(montant*DECOTE_28AN)+' ⚠ décote -30% (AN='+obj.nbAN+'/28)');
+        montant = montant * DECOTE_28AN;
+      } else {
+        lines.push(prod+' ('+nb+' × '+r.val+'€) = '+fmtEuro(montant));
+      }
     } else {
       var primeSum = ventes.reduce(function(s,v){ return s+(parseFloat(v.prime)||0); },0);
       montant = primeSum * r.val;
-      lines.push(prod+' ('+nb+' · prime '+fmtEuro(primeSum)+' × '+(r.val*100)+'%) = '+fmtEuro(montant));
+      if (decote28) {
+        lines.push(prod+' ('+nb+' · prime '+fmtEuro(primeSum)+' × '+(r.val*100)+'%) = '+fmtEuro(montant)+' × 70% = '+fmtEuro(montant*DECOTE_28AN)+' ⚠ décote -30%');
+        montant = montant * DECOTE_28AN;
+      } else {
+        lines.push(prod+' ('+nb+' · prime '+fmtEuro(primeSum)+' × '+(r.val*100)+'%) = '+fmtEuro(montant));
+      }
     }
     total += montant;
   });
@@ -11550,7 +11567,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.0.4";',
+      'var CACHE="allianz-v3.0.5";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
