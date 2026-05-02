@@ -11569,7 +11569,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.1.9";',
+      'var CACHE="allianz-v3.2.0";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
@@ -13110,11 +13110,45 @@ function openContaModal(id) {
           🔒 Encaissement différé (nécessite mon autorisation)
         </label>
         <div style="font-size:.75rem;color:#6b7280;margin-top:6px;">Le chèque sera visible en attente d'autorisation.</div>
-        <!-- Date du chèque — visible si case cochée -->
-        <div id="cm-date-cheque-bloc" style="display:${ex&&ex.statut==='differe'&&ex.dateCheque?'block':'none'};margin-top:12px;">
-          <label style="font-size:.78rem;font-weight:600;color:#dc2626;display:block;margin-bottom:4px;">📅 Date inscrite sur le chèque</label>
-          <input type="date" id="cm-date-cheque" value="${ex&&ex.dateCheque?ex.dateCheque:''}"
-            style="width:100%;padding:8px 10px;border:1.5px solid #fecaca;border-radius:8px;font-size:.88rem;box-sizing:border-box;background:white;">
+
+        <!-- Date + vérifications légales — visible dès que la case est cochée -->
+        <div id="cm-date-cheque-bloc" style="display:${ex&&ex.statut==='differe'?'block':'none'};margin-top:12px;">
+
+          <div>
+            <label style="font-size:.78rem;font-weight:600;color:#dc2626;display:block;margin-bottom:4px;">📅 Date inscrite sur le chèque *</label>
+            <input type="date" id="cm-date-cheque" value="${ex&&ex.dateCheque?ex.dateCheque:''}"
+              style="width:100%;padding:8px 10px;border:1.5px solid #fecaca;border-radius:8px;font-size:.88rem;box-sizing:border-box;background:white;">
+          </div>
+
+          <!-- Checklist mentions légales -->
+          <div style="margin-top:12px;background:#fff;border:1.5px solid #fca5a5;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:.78rem;font-weight:800;color:#dc2626;margin-bottom:8px;">⚠️ Avant d'accepter le chèque, vérifiez :</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:.78rem;color:#374151;">
+                <input type="checkbox" id="chk-benef" style="margin-top:2px;accent-color:#dc2626;flex-shrink:0;">
+                <span>L'ordre est libellé à <strong>ALLIANZ · MOUEZ ESSID EI</strong> (aucune autre mention)</span>
+              </label>
+              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:.78rem;color:#374151;">
+                <input type="checkbox" id="chk-montant" style="margin-top:2px;accent-color:#dc2626;flex-shrink:0;">
+                <span>Les montants en <strong>chiffres et en lettres</strong> sont identiques</span>
+              </label>
+              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:.78rem;color:#374151;">
+                <input type="checkbox" id="chk-date" style="margin-top:2px;accent-color:#dc2626;flex-shrink:0;">
+                <span>La <strong>date</strong> est lisible et cohérente (pas post-datée de plus de 1 an)</span>
+              </label>
+              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:.78rem;color:#374151;">
+                <input type="checkbox" id="chk-signature" style="margin-top:2px;accent-color:#dc2626;flex-shrink:0;">
+                <span>Le chèque est <strong>signé</strong> par le titulaire du compte</span>
+              </label>
+              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:.78rem;color:#374151;">
+                <input type="checkbox" id="chk-ratures" style="margin-top:2px;accent-color:#dc2626;flex-shrink:0;">
+                <span>Pas de <strong>ratures ni surcharge</strong> sur le document</span>
+              </label>
+            </div>
+            <div id="chk-warn" style="display:none;margin-top:8px;font-size:.75rem;color:#dc2626;font-weight:600;background:#fef2f2;padding:6px 10px;border-radius:6px;">
+              ⚠️ Veuillez cocher toutes les cases avant d'enregistrer.
+            </div>
+          </div>
         </div>
       </div>
       <div>
@@ -13279,6 +13313,15 @@ function saveContaModal(existingId) {
   if (type==='cheque' && differeEl && differeEl.checked) {
     statut = 'differe';
     dateCheque = (document.getElementById('cm-date-cheque')||{}).value || '';
+    // Vérifier que toutes les cases légales sont cochées
+    var chkIds = ['chk-benef','chk-montant','chk-date','chk-signature','chk-ratures'];
+    var allChecked = chkIds.every(function(cid){ var el=document.getElementById(cid); return el&&el.checked; });
+    if (!allChecked) {
+      var w = document.getElementById('chk-warn');
+      if (w) w.style.display='block';
+      toast('Vérifiez toutes les mentions légales du chèque','error');
+      return;
+    }
   }
 
   if (!date)   { toast('Date requise','error'); return; }
