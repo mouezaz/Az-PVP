@@ -551,7 +551,8 @@ function initFirebaseCompta(){
 function _buildComptaSync(ecritures){
   const typeLabel={cheque:'Chèque',especes:'Espèces',virement:'Virement'};
   const sync={};
-  (ecritures||[]).filter(e=>e&&e.statut!=='differe'&&e.date).forEach(function(e){
+  // Exclure les chèques différés ET les entrées créées depuis ce dashboard (évite la boucle)
+  (ecritures||[]).filter(e=>e&&e.statut!=='differe'&&e.date&&e._source!=='dashboard').forEach(function(e){
     const yr=e.date.slice(0,4);
     const mo=+e.date.slice(5,7);
     if(!sync[yr]) sync[yr]={};
@@ -1390,13 +1391,49 @@ function collectTresoData(){
   document.querySelectorAll('#tpai-body tr').forEach(row=>{const inputs=[...row.querySelectorAll('input')];const desc=inputs[0]?.value||'';const amount=+(inputs[1]?.value||0);if(amount>0||desc) pai.push({desc,amount});});
   return{encaissements:enc,paiements:pai};
 }
+// ── Sync Cabinet Dashboard → Firebase (perf app) ──────────────
+function syncDashboardToFirebase(yr, mo, manualRows){
+  if(!_fbDb) return;
+  const typeMap={'Chèque':'cheque','Virement':'virement','Espèces':'especes'};
+  const datePfx=String(yr)+'-'+String(mo).padStart(2,'0');
+  const ref=_fbDb.ref('allianz_db_v4/compta/ecritures');
+  ref.once('value',function(snap){
+    const raw=snap.val()||[];
+    // Reconstruire la liste en supprimant les anciennes entrées dashboard de ce mois
+    const list=(Array.isArray(raw)?raw:Object.values(raw)).filter(e=>
+      !(e&&e._source==='dashboard'&&e.date&&e.date.startsWith(datePfx))
+    );
+    // Ajouter les nouvelles lignes manuelles
+    const now=Date.now();
+    (manualRows||[]).forEach(function(r,i){
+      if(!r.amount&&!r.desc) return;
+      list.push({
+        id:'dash-'+datePfx+'-'+i+'-'+now,
+        date:datePfx+'-01',
+        type:typeMap[r.type]||'cheque',
+        montant:r.amount||0,
+        client:r.desc||'',
+        produit:'', contrat:'',
+        collaborateur:'Dashboard Cabinet',
+        note:'Saisi depuis Cabinet Dashboard',
+        statut:'en_attente',
+        _source:'dashboard',
+        createdAt:now
+      });
+    });
+    ref.set(list).catch(function(e){console.warn('Sync dashboard→Firebase error',e);});
+  });
+}
+
 function saveTreso(){
   const data=collectTresoData();
   const el=document.getElementById('treso-remonter');if(el) data.remonter=+el.value||0;
   if(!TRESO[t_yr]) TRESO[t_yr]={};
   TRESO[t_yr][t_mo]=data;
   saveLocal();
-  showNotif('💾 Trésorerie enregistrée !');
+  // Remonter les saisies manuelles vers Firebase (perf app)
+  syncDashboardToFirebase(t_yr, t_mo, data.encaissements);
+  showNotif('💾 Trésorerie enregistrée et synchronisée !');
   buildTresoMonthNav();
 }
 function toggleCard(id){document.getElementById(id).classList.toggle('open');}
