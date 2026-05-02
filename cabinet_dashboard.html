@@ -1241,16 +1241,50 @@ function buildTresoMonthNav(){
   buildTresoForm();
 }
 function getTresoData(yr,mo){return TRESO[yr]?.[mo]||{encaissements:[],paiements:[]};}
+
+// ── Sync depuis index.html (même domaine) ──────────────────────
+function getComptaSync(yr,mo){
+  try{const raw=localStorage.getItem('az_compta_sync');if(!raw)return[];const s=JSON.parse(raw);return(s[yr]&&s[yr][mo])||[];}catch(e){return[];}
+}
+function tresoEncRowAuto(r){
+  const colors={'Chèque':'#1e3a5f','Espèces':'#065f46','Virement':'#1d4ed8'};
+  const bgs={'Chèque':'#eff6ff','Espèces':'#f0fdf4','Virement':'#dbeafe'};
+  const col=colors[r.type]||'#374151'; const bg=bgs[r.type]||'#f0fdf4';
+  return `<tr data-auto="1" style="background:#f0fdf4;">
+    <td><span style="padding:2px 8px;background:${bg};color:${col};border-radius:4px;font-size:11px;font-weight:700;">${r.type}</span></td>
+    <td style="font-size:12px;color:#374151;">${r.desc||''}&nbsp;<span style="font-size:10px;color:#10b981;font-weight:700;">📱</span></td>
+    <td style="text-align:right;font-weight:700;color:#065f46;">${fmt(r.amount||0)}<input type="number" value="${r.amount||0}" style="display:none" readonly></td>
+    <td class="del-cell"><span style="font-size:10px;color:#9ca3af;">auto</span></td>
+  </tr>`;
+}
+
 function buildTresoForm(){
   const data=getTresoData(t_yr,t_mo);
-  let encR=data.encaissements.map((r,i)=>tresoEncRow(r,i)).join('');
-  if(!encR) encR=`<tr><td><select onchange="onTI()"><option>Chèque</option><option>Virement</option><option>Espèces</option></select></td><td><input type="text" placeholder="Description" oninput="onTI()"></td><td><input type="number" step="0.01" class="amt" placeholder="0,00" oninput="onTI()"></td><td class="del-cell"><button class="dyn-del" onclick="delTR(this,'enc')">×</button></td></tr>`;
+  const autoEnc=getComptaSync(t_yr,t_mo);
+  const manualEnc=(data.encaissements||[]).filter(r=>!r._auto);
+
+  let autoR='';
+  if(autoEnc.length){
+    autoR=`<tr style="background:#dcfce7;"><td colspan="4" style="padding:5px 10px;font-size:10px;font-weight:800;color:#065f46;letter-spacing:.5px;text-transform:uppercase;">📱 Synchronisé depuis l'application (${autoEnc.length} ligne${autoEnc.length>1?'s':''})</td></tr>`
+      +autoEnc.map(r=>tresoEncRowAuto(r)).join('');
+    if(manualEnc.length){
+      autoR+=`<tr style="background:#f1f5f9;"><td colspan="4" style="padding:5px 10px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-transform:uppercase;">✏️ Saisies manuelles</td></tr>`;
+    }
+  }
+  let manualR=manualEnc.map(r=>tresoEncRow(r)).join('');
+  if(!manualR&&!autoEnc.length) manualR=`<tr><td><select onchange="onTI()"><option>Chèque</option><option>Virement</option><option>Espèces</option></select></td><td><input type="text" placeholder="Description" oninput="onTI()"></td><td><input type="number" step="0.01" class="amt" placeholder="0,00" oninput="onTI()"></td><td class="del-cell"><button class="dyn-del" onclick="delTR(this,'enc')">×</button></td></tr>`;
+  const encR=autoR+manualR;
+
   let paiR=data.paiements.map((r,i)=>tresoPaiRow(r,i)).join('');
   if(!paiR) paiR=`<tr><td><input type="text" placeholder="Organisme" oninput="onTI()"></td><td><input type="number" step="0.01" class="amt" placeholder="0,00" oninput="onTI()"></td><td class="del-cell"><button class="dyn-del" onclick="delTR(this,'pai')">×</button></td></tr>`;
+
+  const autoTotal=autoEnc.reduce((s,r)=>s+(r.amount||0),0);
+  const manTotal=manualEnc.reduce((s,r)=>s+(r.amount||0),0);
+
   document.getElementById('tresoForm').innerHTML=`
     <div class="fcard" id="fc-enc" style="margin-bottom:10px">
-      <div class="fcard-hd" onclick="toggleCard('fc-enc')"><div class="title"><span class="ic2">💰</span>Encaissements clients</div><div class="right"><span class="ftot" id="tot-enc">${fmt(sum(data.encaissements.map(r=>r.amount||0)))}</span><span class="arr">▾</span></div></div>
-      <div class="fcard-bd"><table class="dyn-table"><thead><tr><th>Type</th><th>Description / Client</th><th>Montant</th><th class="del-cell"></th></tr></thead><tbody id="tenc-body">${encR}</tbody></table><button class="btn-add-row" onclick="addTR('enc')">+ Ajouter</button></div>
+      <div class="fcard-hd" onclick="toggleCard('fc-enc')"><div class="title"><span class="ic2">💰</span>Encaissements clients</div><div class="right"><span class="ftot" id="tot-enc">${fmt(autoTotal+manTotal)}</span><span class="arr">▾</span></div></div>
+      <div class="fcard-bd"><table class="dyn-table"><thead><tr><th>Type</th><th>Description / Client</th><th>Montant</th><th class="del-cell"></th></tr></thead><tbody id="tenc-body">${encR}</tbody></table><button class="btn-add-row" onclick="addTR('enc')">+ Ajouter une ligne manuelle</button></div>
     </div>
     <div class="fcard" id="fc-pai">
       <div class="fcard-hd" onclick="toggleCard('fc-pai')"><div class="title"><span class="ic2">🏦</span>Paiements directs Allianz</div><div class="right"><span class="ftot" id="tot-pai">${fmt(sum(data.paiements.map(r=>r.amount||0)))}</span><span class="arr">▾</span></div></div>
@@ -1280,7 +1314,14 @@ function onTI(){
   updateTresoKpi(et,pt);
 }
 function updateTresoKpi(et,pt){
-  if(et===undefined){const d=getTresoData(t_yr,t_mo);et=sum(d.encaissements.map(r=>r.amount||0));pt=sum(d.paiements.map(r=>r.amount||0));}
+  if(et===undefined){
+    const d=getTresoData(t_yr,t_mo);
+    const autoEnc=getComptaSync(t_yr,t_mo);
+    const manualTotal=sum(d.encaissements.filter(r=>!r._auto).map(r=>r.amount||0));
+    const autoTotal=sum(autoEnc.map(r=>r.amount||0));
+    et=manualTotal+autoTotal;
+    pt=sum(d.paiements.map(r=>r.amount||0));
+  }
   const stored=TRESO[t_yr]?.[t_mo]?.remonter||0;
   const existing=document.getElementById('treso-remonter');
   const rv=existing?(+existing.value||0):stored;
@@ -1295,7 +1336,8 @@ function updateTresoKpi(et,pt){
 function saveTresoRemonter(){if(!TRESO[t_yr]) TRESO[t_yr]={};if(!TRESO[t_yr][t_mo]) TRESO[t_yr][t_mo]={encaissements:[],paiements:[]};const el=document.getElementById('treso-remonter');if(el) TRESO[t_yr][t_mo].remonter=+el.value||0;}
 function collectTresoData(){
   const enc=[],pai=[];
-  document.querySelectorAll('#tenc-body tr').forEach(row=>{const sel=row.querySelector('select');const inputs=[...row.querySelectorAll('input')];const type=sel?sel.value:'Chèque';const desc=inputs[0]?.value||'';const amount=+(inputs[1]?.value||0);if(amount>0||desc) enc.push({type,desc,amount});});
+  // Exclure les lignes auto (synchronisées depuis l'application)
+  document.querySelectorAll('#tenc-body tr:not([data-auto])').forEach(row=>{const sel=row.querySelector('select');const inputs=[...row.querySelectorAll('input:not([readonly])')];const type=sel?sel.value:'Chèque';const desc=inputs[0]?.value||'';const amount=+(inputs[1]?.value||0);if(amount>0||desc) enc.push({type,desc,amount});});
   document.querySelectorAll('#tpai-body tr').forEach(row=>{const inputs=[...row.querySelectorAll('input')];const desc=inputs[0]?.value||'';const amount=+(inputs[1]?.value||0);if(amount>0||desc) pai.push({desc,amount});});
   return{encaissements:enc,paiements:pai};
 }
