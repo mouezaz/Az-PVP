@@ -916,10 +916,23 @@ function saveDB(db) {
         var remoteExtra = (remote.conges||[]).filter(function(c){ return localIds.indexOf(c.id) === -1; });
         if (remoteExtra.length > 0) {
           merged.conges = (merged.conges||[]).concat(remoteExtra);
-          // Also update local DB and localStorage with merged data
           DB.conges = merged.conges;
           try { localStorage.setItem('allianz_db_v4', JSON.stringify(DB)); } catch(e){}
           console.log('🔀 Fusion congés Firebase:', remoteExtra.length, 'entrée(s) préservée(s)');
+        }
+        // Merge compta.ecritures: préserver les entrées _source:'dashboard' (cabinet_dashboard)
+        var remoteEcritures = (remote.compta && remote.compta.ecritures) || [];
+        var remoteEcrituresList = Array.isArray(remoteEcritures) ? remoteEcritures : Object.values(remoteEcritures);
+        var localEcrituresIds = ((merged.compta && merged.compta.ecritures)||[]).map(function(e){ return e.id; });
+        var dashboardExtra = remoteEcrituresList.filter(function(e){
+          return e && e._source === 'dashboard' && localEcrituresIds.indexOf(e.id) === -1;
+        });
+        if (dashboardExtra.length > 0) {
+          if (!merged.compta) merged.compta = {};
+          merged.compta.ecritures = (merged.compta.ecritures||[]).concat(dashboardExtra);
+          DB.compta = merged.compta;
+          try { localStorage.setItem('allianz_db_v4', JSON.stringify(DB)); } catch(e){}
+          console.log('🔀 Fusion compta dashboard→perf:', dashboardExtra.length, 'entrée(s) préservée(s)');
         }
         return _fbRef.set(merged);
       }).then(function() {
@@ -11575,7 +11588,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.2.7";',
+      'var CACHE="allianz-v3.2.8";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
