@@ -11569,7 +11569,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.2.1";',
+      'var CACHE="allianz-v3.2.2";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
@@ -13137,9 +13137,9 @@ function openContaModal(id) {
       <div id="cm-differe-bloc" style="display:none;background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;padding:12px 16px;">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.85rem;font-weight:600;color:#dc2626;">
           <input type="checkbox" id="cm-differe" ${ex&&ex.statut==='differe'?'checked':''} style="width:16px;height:16px;accent-color:#dc2626;">
-          🔒 Encaissement différé (nécessite mon autorisation)
+          🔒 Encaissement différé (nécessite l'autorisation de Mouez)
         </label>
-        <div style="font-size:.75rem;color:#6b7280;margin-top:6px;">Le chèque sera visible en attente d'autorisation.</div>
+        <div style="font-size:.75rem;color:#6b7280;margin-top:6px;">Le chèque sera mis en attente jusqu'à validation par Mouez.</div>
         <!-- Date du chèque — visible si case cochée -->
         <div id="cm-date-cheque-bloc" style="display:${ex&&ex.statut==='differe'?'block':'none'};margin-top:12px;">
           <label style="font-size:.78rem;font-weight:600;color:#dc2626;display:block;margin-bottom:4px;">📅 Date inscrite sur le chèque *</label>
@@ -13358,7 +13358,7 @@ function saveContaModal(existingId) {
   if (currentPage==='admin-compta')  showPage('admin-compta');
 
   // Bannière avec rendu et bouton reçu
-  var msg = statut==='differe' ? '🔒 Chèque différé enregistré'
+  var msg = statut==='differe' ? '🔒 Chèque en attente d\'autorisation de Mouez'
     : (renduMonnaie>0 ? '✅ Rendu : <strong>'+fmtEuro(renduMonnaie)+'</strong>' : '✅ Écriture enregistrée');
   var div = document.createElement('div');
   div.id = 'recu-prompt';
