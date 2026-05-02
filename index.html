@@ -11588,7 +11588,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.2.8";',
+      'var CACHE="allianz-v3.2.9";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
@@ -13259,6 +13259,9 @@ function openContaModal(id) {
   var cheqEl2 = document.getElementById('cm-montant-cheq');
   var sommeEl = document.getElementById('cm-somme-remise');
 
+  // Helper: parse float en acceptant la virgule française (ex: "150,50" → 150.5)
+  function _pf(val) { return parseFloat(String(val||0).replace(/\s/g,'').replace(',','.'))||0; }
+
   function _getEspAnnuel(clientName, excludeId) {
     if (!clientName) return 0;
     var annee = new Date().getFullYear();
@@ -13283,8 +13286,8 @@ function openContaModal(id) {
     var clientNom = clientEl ? clientEl.value.trim() : '';
     var deja      = _getEspAnnuel(clientNom, ex ? ex.id : null);
     var montantEsp = t === 'mixte'
-      ? (parseFloat((document.getElementById('cm-montant-esp')||{}).value)||0)
-      : (parseFloat((document.getElementById('cm-montant')||{}).value)||0);
+      ? _pf((document.getElementById('cm-montant-esp')||{}).value)
+      : _pf((document.getElementById('cm-montant')||{}).value);
     var total     = deja + montantEsp;
     var pct       = Math.min(100, Math.round(total / 10));
     var restant   = Math.max(0, 1000 - deja);
@@ -13329,14 +13332,14 @@ function openContaModal(id) {
     // Montant espèces à utiliser pour le rendu
     var t = typeEl ? typeEl.value : 'cheque';
     var montEsp = t==='mixte'
-      ? (parseFloat((espEl||{}).value)||0)
-      : (parseFloat((montEl||{}).value)||0);
-    var remise  = parseFloat((sommeEl||{}).value)||0;
+      ? _pf((espEl||{}).value)
+      : _pf((montEl||{}).value);
+    var remise  = _pf((sommeEl||{}).value);
     var disp    = document.getElementById('cm-rendu-display');
     var warn    = document.getElementById('cm-rendu-warn');
     // Mise à jour total mixte
     if (t==='mixte') {
-      var mCheq = parseFloat((cheqEl2||{}).value)||0;
+      var mCheq = _pf((cheqEl2||{}).value);
       var tot   = document.getElementById('cm-mixte-total');
       if (tot) { tot.textContent = 'Total : '+(montEsp+mCheq>0?fmtEuro(montEsp+mCheq):'—'); }
     }
@@ -13383,16 +13386,22 @@ function saveContaModal(existingId) {
   var statutEl= document.getElementById('cm-statut');
   var statut  = statutEl ? statutEl.value : 'en_attente';
 
+  // Helper: parse montant (supporte virgule française et point)
+  function _parseMontant(val) {
+    if (!val && val !== 0) return 0;
+    return parseFloat(String(val).replace(/\s/g,'').replace(',','.')) || 0;
+  }
+
   // Montant selon type
   var montant=0, montantEspeces=0, montantCheque=0;
   if (type==='mixte') {
-    montantEspeces = parseFloat((document.getElementById('cm-montant-esp')||{}).value)||0;
-    montantCheque  = parseFloat((document.getElementById('cm-montant-cheq')||{}).value)||0;
+    montantEspeces = _parseMontant((document.getElementById('cm-montant-esp')||{}).value);
+    montantCheque  = _parseMontant((document.getElementById('cm-montant-cheq')||{}).value);
     montant = montantEspeces + montantCheque;
     if (!montantEspeces && !montantCheque) { toast('Saisir au moins un montant','error'); return; }
   } else {
-    montant = parseFloat((document.getElementById('cm-montant')||{}).value)||0;
-    if (!montant) { toast('Montant requis','error'); return; }
+    montant = _parseMontant((document.getElementById('cm-montant')||{}).value);
+    if (!montant) { toast('Montant requis (ex: 150,00 ou 150.00)','error'); return; }
   }
 
   // Contrôle plafond légal espèces 1000€/an/client
@@ -13415,7 +13424,7 @@ function saveContaModal(existingId) {
   // Rendu monnaie (espèces/mixte)
   var sommeRemise=0, renduMonnaie=0;
   if (type==='especes'||type==='mixte') {
-    sommeRemise = parseFloat((document.getElementById('cm-somme-remise')||{}).value)||0;
+    sommeRemise = _parseMontant((document.getElementById('cm-somme-remise')||{}).value);
     var baseEsp = type==='mixte' ? montantEspeces : montant;
     if (sommeRemise>0) {
       renduMonnaie = Math.round((sommeRemise - baseEsp)*100)/100;
@@ -13436,8 +13445,23 @@ function saveContaModal(existingId) {
     var allChecked = chkIds.every(function(cid){ var el=document.getElementById(cid); return el&&el.checked; });
     if (!allChecked) {
       var warnEl = document.getElementById('chk-warn');
-      if (warnEl) warnEl.style.display='block';
-      toast('Vérifiez toutes les mentions légales du chèque','error');
+      if (warnEl) { warnEl.style.display='block'; warnEl.style.fontWeight='bold'; warnEl.style.fontSize='1rem'; }
+      // Mettre en évidence les cases non cochées
+      chkIds.forEach(function(cid){
+        var el=document.getElementById(cid);
+        var lbl=el&&el.closest&&el.closest('label');
+        if (el&&!el.checked) {
+          if(lbl) lbl.style.color='#dc2626';
+          el.style.outline='2px solid #dc2626';
+        } else if(el) {
+          if(lbl) lbl.style.color='';
+          el.style.outline='';
+        }
+      });
+      // Faire défiler jusqu'à la section mentions
+      var mentionsB=document.getElementById('cm-cheque-mentions-bloc');
+      if(mentionsB) mentionsB.scrollIntoView({behavior:'smooth',block:'center'});
+      toast('⚠️ Cochez toutes les mentions légales du chèque avant d\'enregistrer','error');
       return;
     }
   }
