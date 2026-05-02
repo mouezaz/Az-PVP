@@ -11575,7 +11575,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.2.5";',
+      'var CACHE="allianz-v3.2.6";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
@@ -13161,6 +13161,29 @@ function openContaModal(id) {
         <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Client *</label>
         <input type="text" id="cm-client" value="${ex?ex.client:''}" placeholder="Nom du client" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;box-sizing:border-box;">
       </div>
+
+      <!-- Compteur plafond espèces 1000€/an/client -->
+      <div id="cm-esp-limit-bloc" style="display:none;">
+        <div id="cm-esp-limit-inner" style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 14px;">
+          <div style="font-size:.78rem;font-weight:800;color:#92400e;margin-bottom:8px;">⚖️ Plafond légal espèces — 1 000 € / an / client</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:.78rem;color:#374151;">Déjà encaissé en <span id="cm-esp-year">${new Date().getFullYear()}</span></span>
+              <span id="cm-esp-deja" style="font-weight:800;color:#92400e;font-size:.9rem;">—</span>
+            </div>
+            <div style="background:#e5e7eb;border-radius:99px;height:8px;overflow:hidden;">
+              <div id="cm-esp-bar" style="height:8px;border-radius:99px;background:#f59e0b;width:0%;transition:width .3s;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span id="cm-esp-restant-lbl" style="font-size:.78rem;color:#374151;">Reste disponible</span>
+              <span id="cm-esp-restant" style="font-weight:800;font-size:.9rem;color:#059669;">—</span>
+            </div>
+          </div>
+          <div id="cm-esp-warn" style="display:none;margin-top:8px;padding:8px 10px;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;font-size:.75rem;color:#dc2626;font-weight:700;">
+            ⛔ Ce versement dépasse le plafond légal de 1 000 €/an en espèces pour ce client.
+          </div>
+        </div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div>
           <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Produit</label>
@@ -13223,6 +13246,57 @@ function openContaModal(id) {
   var cheqEl2 = document.getElementById('cm-montant-cheq');
   var sommeEl = document.getElementById('cm-somme-remise');
 
+  function _getEspAnnuel(clientName, excludeId) {
+    if (!clientName) return 0;
+    var annee = new Date().getFullYear();
+    return ((DB.compta && DB.compta.ecritures)||[]).reduce(function(s, e) {
+      if (e.id === excludeId) return s; // ignorer l'écriture en cours de modification
+      if (!e.date || e.date.slice(0,4) !== String(annee)) return s;
+      if (e.client.trim().toLowerCase() !== clientName.trim().toLowerCase()) return s;
+      if (e.type === 'especes') return s + (e.montant||0);
+      if (e.type === 'mixte')   return s + (e.montantEspeces||0);
+      return s;
+    }, 0);
+  }
+
+  function _updateEspLimit() {
+    var t          = typeEl ? typeEl.value : 'cheque';
+    var limitBloc  = document.getElementById('cm-esp-limit-bloc');
+    if (!limitBloc) return;
+    var isEsp = (t === 'especes' || t === 'mixte');
+    limitBloc.style.display = isEsp ? 'block' : 'none';
+    if (!isEsp) return;
+    var clientEl  = document.getElementById('cm-client');
+    var clientNom = clientEl ? clientEl.value.trim() : '';
+    var deja      = _getEspAnnuel(clientNom, ex ? ex.id : null);
+    var montantEsp = t === 'mixte'
+      ? (parseFloat((document.getElementById('cm-montant-esp')||{}).value)||0)
+      : (parseFloat((document.getElementById('cm-montant')||{}).value)||0);
+    var total     = deja + montantEsp;
+    var pct       = Math.min(100, Math.round(total / 10));
+    var restant   = Math.max(0, 1000 - deja);
+    var bar       = document.getElementById('cm-esp-bar');
+    var dejaEl    = document.getElementById('cm-esp-deja');
+    var restEl    = document.getElementById('cm-esp-restant');
+    var restLbl   = document.getElementById('cm-esp-restant-lbl');
+    var warnEl    = document.getElementById('cm-esp-warn');
+    var inner     = document.getElementById('cm-esp-limit-inner');
+    if (dejaEl) dejaEl.textContent = fmtEuro(deja);
+    if (restEl) {
+      restEl.textContent = fmtEuro(restant);
+      restEl.style.color = restant <= 0 ? '#dc2626' : (restant < 300 ? '#d97706' : '#059669');
+    }
+    if (bar) {
+      bar.style.width = pct+'%';
+      bar.style.background = total > 1000 ? '#dc2626' : (pct > 70 ? '#f59e0b' : '#10b981');
+    }
+    var depasse = total > 1000;
+    if (warnEl) warnEl.style.display = (depasse && montantEsp > 0) ? 'block' : 'none';
+    if (inner) inner.style.borderColor = depasse ? '#fca5a5' : '#fed7aa';
+    if (inner) inner.style.background  = depasse ? '#fef2f2' : '#fff7ed';
+    if (restLbl) restLbl.textContent = clientNom ? 'Reste disponible' : 'Saisissez un nom de client pour voir le solde';
+  }
+
   function _toggle() {
     var t    = typeEl ? typeEl.value : 'cheque';
     var renduB    = document.getElementById('cm-rendu-bloc');
@@ -13236,6 +13310,7 @@ function openContaModal(id) {
     if (differeB)  differeB.style.display  = (t==='cheque') ? 'block' : 'none';
     if (mentionsB) mentionsB.style.display = (t==='cheque'||t==='mixte') ? 'block' : 'none';
     _calc();
+    _updateEspLimit();
   }
   function _calc() {
     // Montant espèces à utiliser pour le rendu
@@ -13263,10 +13338,12 @@ function openContaModal(id) {
       if(warn) warn.style.display='none';
     }
   }
-  if (typeEl)  typeEl.addEventListener('change', _toggle);
-  if (montEl)  montEl.addEventListener('input',  _calc);
-  if (espEl)   espEl.addEventListener('input',   _calc);
-  if (cheqEl2) cheqEl2.addEventListener('input', _calc);
+  var clientEl = document.getElementById('cm-client');
+  if (typeEl)   typeEl.addEventListener('change', _toggle);
+  if (montEl)   montEl.addEventListener('input',  function(){ _calc(); _updateEspLimit(); });
+  if (espEl)    espEl.addEventListener('input',   function(){ _calc(); _updateEspLimit(); });
+  if (cheqEl2)  cheqEl2.addEventListener('input', _calc);
+  if (clientEl) clientEl.addEventListener('input', _updateEspLimit);
   // Afficher/masquer la date du chèque selon la case différé
   var differeChk = document.getElementById('cm-differe');
   if (differeChk) {
@@ -13276,7 +13353,8 @@ function openContaModal(id) {
     });
   }
   if (sommeEl) sommeEl.addEventListener('input',  _calc);
-  _toggle(); // état initial
+  _toggle();        // état initial
+  _updateEspLimit(); // compteur plafond
 }
 
 function calcRenduMonnaie() { /* no-op — géré par _calc dans openContaModal */ }
@@ -13302,6 +13380,23 @@ function saveContaModal(existingId) {
   } else {
     montant = parseFloat((document.getElementById('cm-montant')||{}).value)||0;
     if (!montant) { toast('Montant requis','error'); return; }
+  }
+
+  // Contrôle plafond légal espèces 1000€/an/client
+  if ((type==='especes'||type==='mixte') && client) {
+    var anneeVerif = (document.getElementById('cm-date').value||'').slice(0,4) || String(new Date().getFullYear());
+    var dejaAnnuel = ((DB.compta&&DB.compta.ecritures)||[]).reduce(function(s,e){
+      if (e.id === existingId) return s;
+      if (!e.date || e.date.slice(0,4) !== anneeVerif) return s;
+      if (e.client.trim().toLowerCase() !== client.toLowerCase()) return s;
+      if (e.type==='especes') return s+(e.montant||0);
+      if (e.type==='mixte')   return s+(e.montantEspeces||0);
+      return s;
+    },0);
+    var partEsp = type==='mixte' ? montantEspeces : montant;
+    if (dejaAnnuel + partEsp > 1000) {
+      if (!confirm('⚠️ PLAFOND LÉGAL DÉPASSÉ\n\nCe versement en espèces porterait le total annuel de '+client+' à '+fmtEuro(dejaAnnuel+partEsp)+' (plafond légal : 1 000 €/an).\n\nConfirmer quand même ?')) return;
+    }
   }
 
   // Rendu monnaie (espèces/mixte)
