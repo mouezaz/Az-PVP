@@ -1109,6 +1109,7 @@ function buildCollabSidebar() {
     { id: 'collab-ventes',      icon: '📂', label: 'Mes affaires' },
     { id: 'collab-stats',       icon: '📊', label: 'Mes stats & R/O' },
     { id: 'collab-resil',       icon: '🛡',  label: 'Résiliations' },
+    { id: 'collab-compta',      icon: '💵', label: 'Encaissements' },
   ];
   const rh = [
     { id: 'collab-conges',       icon: '🏖️', label: 'Mes congés' },
@@ -1136,6 +1137,7 @@ function buildAdminSidebar() {
     { id: 'admin-import',       icon: '📥', label: 'Import données' },
     { id: 'admin-settings',     icon: '⚙️', label: 'Paramètres & PIN' },
     { id: 'admin-export',       icon: '⬇',  label: 'Export & Impression' },
+    { id: 'admin-compta',       icon: '🏦', label: 'Comptabilité Caisse' },
   ];
   const rh = [
     { id: 'admin-rh-conges',      icon: '🏖️', label: 'Congés équipe' },
@@ -11567,7 +11569,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.0.5";',
+      'var CACHE="allianz-v3.1.0";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
@@ -12607,5 +12609,533 @@ function toggleAdminTacheTermineEquipe(id) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ============================================================
+// COMPTABILITÉ — Encaissements chèques & espèces, fond de caisse
+// ============================================================
+
+function initCompta() {
+  if (!DB.compta) DB.compta = {};
+  if (!DB.compta.ecritures)  DB.compta.ecritures  = [];
+  if (!DB.compta.mouvements) DB.compta.mouvements = [];
+  if (!DB.compta.remises)    DB.compta.remises    = [];
+}
+
+function getFondCaisse() {
+  initCompta();
+  return (DB.compta.mouvements||[]).reduce(function(s,m){
+    if (m.type==='approvisionnement') return s + (m.montant||0);
+    if (m.type==='retrait')           return s - (m.montant||0);
+    if (m.type==='remise_banque')     return s - (m.montant||0);
+    return s;
+  }, 0);
+}
+
+function getEcrituresMois(mois, annee) {
+  initCompta();
+  return (DB.compta.ecritures||[]).filter(function(e){
+    if (!e.date) return false;
+    var d = new Date(e.date);
+    return (d.getMonth()+1) === mois && d.getFullYear() === annee;
+  });
+}
+
+function saveComptaEcriture(obj) {
+  initCompta();
+  var idx = DB.compta.ecritures.findIndex(function(x){return x.id===obj.id;});
+  if (idx >= 0) DB.compta.ecritures[idx] = obj;
+  else DB.compta.ecritures.push(obj);
+  saveDB(DB);
+}
+
+function saveComptaMouvement(obj) {
+  initCompta();
+  DB.compta.mouvements.push(obj);
+  saveDB(DB);
+}
+
+function saveComptaRemise(obj) {
+  initCompta();
+  var idx = DB.compta.remises.findIndex(function(x){return x.id===obj.id;});
+  if (idx >= 0) DB.compta.remises[idx] = obj;
+  else DB.compta.remises.push(obj);
+  saveDB(DB);
+}
+
+// ── Page Collab ───────────────────────────────────────────────
+PAGES['collab-compta'] = function(mc) {
+  var td = new Date();
+  var mois = td.getMonth()+1, annee = td.getFullYear();
+  var mStr = document.getElementById('compta-mois-sel') ? document.getElementById('compta-mois-sel').value : (annee+'-'+String(mois).padStart(2,'0'));
+  if (mStr) { var p=mStr.split('-'); mois=+p[1]; annee=+p[0]; }
+
+  var moisSel = annee+'-'+String(mois).padStart(2,'0');
+  initCompta();
+  var ecM = getEcrituresMois(mois, annee);
+  var totalMes = ecM.filter(function(e){return e.collaborateur===currentUser.name;}).reduce(function(s,e){return s+(e.montant||0);},0);
+  var totalCheq = ecM.reduce(function(s,e){return s+(e.type==='cheque'?(e.montant||0):0);},0);
+  var totalEsp  = ecM.reduce(function(s,e){return s+(e.type==='especes'?(e.montant||0):0);},0);
+  var totalMois = ecM.reduce(function(s,e){return s+(e.montant||0);},0);
+
+  var filtrType = '', filtrStatut = '';
+
+  mc.innerHTML = `
+  <div class="page-header" style="background:linear-gradient(135deg,#1e3a5f,#065f46);color:#fff;padding:18px 20px;border-radius:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;opacity:.7;letter-spacing:.08em;">💵 Encaissements</div>
+        <div style="font-size:22px;font-weight:800;margin-top:2px;">Chèques & Espèces</div>
+      </div>
+      <button onclick="openContaModal()" style="background:#10b981;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-weight:700;font-size:.88rem;cursor:pointer;">✚ Nouvelle écriture</button>
+    </div>
+  </div>
+  <div style="padding:16px;max-width:1100px;margin:0 auto;">
+
+    <!-- Sélecteur mois -->
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+      <label style="font-size:.82rem;font-weight:600;color:var(--gray-600);">Mois :</label>
+      <input type="month" id="compta-mois-sel" value="${moisSel}" onchange="showPage('collab-compta')"
+        style="padding:6px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.85rem;">
+    </div>
+
+    <!-- KPI cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px;">
+      ${comptaKpi('💰 Total cabinet',fmtEuro(totalMois),'ce mois','#1d4ed8','#eff6ff')}
+      ${comptaKpi('👤 Mes encaissements',fmtEuro(totalMes),'mes saisies','#0891b2','#f0f9ff')}
+      ${comptaKpi('📝 Chèques',fmtEuro(totalCheq),ecM.filter(function(e){return e.type==='cheque';}).length+' encaissements','#7c3aed','#f5f3ff')}
+      ${comptaKpi('💵 Espèces',fmtEuro(totalEsp),ecM.filter(function(e){return e.type==='especes';}).length+' encaissements','#059669','#ecfdf5')}
+    </div>
+
+    <!-- Tableau -->
+    <div id="compta-table-zone"></div>
+  </div>`;
+
+  renderComptaTable(ecM, 'compta-table-zone', false);
+};
+
+// ── Page Admin ────────────────────────────────────────────────
+PAGES['admin-compta'] = function(mc) {
+  var td = new Date();
+  var mois = td.getMonth()+1, annee = td.getFullYear();
+  var selEl = document.getElementById('admin-compta-mois-sel');
+  var mStr = selEl ? selEl.value : (annee+'-'+String(mois).padStart(2,'0'));
+  if (mStr) { var p=mStr.split('-'); mois=+p[1]; annee=+p[0]; }
+  var moisSel = annee+'-'+String(mois).padStart(2,'0');
+
+  initCompta();
+  var ecM         = getEcrituresMois(mois, annee);
+  var espAttente  = (DB.compta.ecritures||[]).filter(function(e){return e.type==='especes'&&e.statut==='en_attente';});
+  var cheqAttente = (DB.compta.ecritures||[]).filter(function(e){return e.type==='cheque'&&e.statut==='en_attente';});
+  var remisM      = (DB.compta.remises||[]).filter(function(r){ if(!r.date) return false; var d=new Date(r.date); return (d.getMonth()+1)===mois && d.getFullYear()===annee; });
+  var totalRemisM = remisM.reduce(function(s,r){return s+(r.montantTotal||0);},0);
+  var fondSolde   = getFondCaisse();
+  var totalEspAtt = espAttente.reduce(function(s,e){return s+(e.montant||0);},0);
+  var totalCheqAtt= cheqAttente.reduce(function(s,e){return s+(e.montant||0);},0);
+
+  // Historique mouvements caisse (last 8)
+  var mouvs = (DB.compta.mouvements||[]).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).slice(0,8);
+
+  mc.innerHTML = `
+  <div class="page-header" style="background:linear-gradient(135deg,#1e3a5f,#065f46);color:#fff;padding:18px 20px;border-radius:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;opacity:.7;letter-spacing:.08em;">🏦 Comptabilité Cabinet</div>
+        <div style="font-size:22px;font-weight:800;margin-top:2px;">Encaissements & Caisse</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="openContaModal()" style="background:#10b981;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:.85rem;cursor:pointer;">✚ Nouvelle écriture</button>
+        <button onclick="openRemiseBanqueModal()" style="background:#fff;color:#1e3a5f;border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:.85rem;cursor:pointer;">🏦 Remise en banque</button>
+      </div>
+    </div>
+  </div>
+  <div style="padding:16px;max-width:1100px;margin:0 auto;">
+
+    <!-- Fond de caisse encart -->
+    <div style="background:linear-gradient(135deg,#065f46,#047857);border-radius:14px;padding:18px 22px;margin-bottom:16px;color:#fff;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;opacity:.7;letter-spacing:.05em;margin-bottom:4px;">💰 Fond de caisse (espèces)</div>
+        <div style="font-size:38px;font-weight:800;line-height:1;">${fmtEuro(fondSolde)}</div>
+        <div style="font-size:11px;opacity:.7;margin-top:4px;">Solde physique en caisse · espèces clients en attente : ${fmtEuro(totalEspAtt)}</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="openFondCaisseModal('approvisionnement')" style="background:rgba(255,255,255,.2);color:#fff;border:2px solid rgba(255,255,255,.4);border-radius:10px;padding:10px 18px;font-weight:700;font-size:.88rem;cursor:pointer;">＋ Approvisionner</button>
+        <button onclick="openFondCaisseModal('retrait')" style="background:rgba(0,0,0,.15);color:#fff;border:2px solid rgba(255,255,255,.25);border-radius:10px;padding:10px 18px;font-weight:700;font-size:.88rem;cursor:pointer;">－ Retrait</button>
+      </div>
+    </div>
+
+    <!-- KPI row -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px;">
+      ${comptaKpi('📝 Chèques en attente',fmtEuro(totalCheqAtt),cheqAttente.length+' chèque(s)','#7c3aed','#f5f3ff')}
+      ${comptaKpi('💵 Espèces en attente',fmtEuro(totalEspAtt),espAttente.length+' reçu(s)','#059669','#ecfdf5')}
+      ${comptaKpi('✅ Remis ce mois',fmtEuro(totalRemisM),remisM.length+' remise(s)','#1d4ed8','#eff6ff')}
+      ${comptaKpi('📊 Total encaissé',fmtEuro(ecM.reduce(function(s,e){return s+(e.montant||0);},0)),ecM.length+' écriture(s)','#d97706','#fffbeb')}
+    </div>
+
+    <!-- Sélecteur mois + tableau -->
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+      <label style="font-size:.82rem;font-weight:600;color:var(--gray-600);">Mois :</label>
+      <input type="month" id="admin-compta-mois-sel" value="${moisSel}" onchange="showPage('admin-compta')"
+        style="padding:6px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.85rem;">
+    </div>
+    <div id="admin-compta-table-zone"></div>
+
+    <!-- Historique mouvements caisse -->
+    <details style="margin-top:18px;">
+      <summary style="cursor:pointer;font-weight:700;font-size:.88rem;color:#065f46;padding:10px 0;">📋 Historique mouvements caisse (${(DB.compta.mouvements||[]).length} entrée(s))</summary>
+      <div style="margin-top:10px;background:white;border-radius:12px;border:1.5px solid #d1fae5;overflow:hidden;">
+        ${mouvs.length===0?'<div style="padding:20px;text-align:center;color:#9ca3af;">Aucun mouvement</div>':
+          mouvs.map(function(m){
+            var col = m.type==='approvisionnement'?'#059669':m.type==='retrait'?'#dc2626':'#2563eb';
+            var icon = m.type==='approvisionnement'?'⬆':'⬇';
+            var label = m.type==='approvisionnement'?'Approvisionnement':m.type==='retrait'?'Retrait':'Remise banque (espèces)';
+            var sign  = m.type==='approvisionnement'?'+':'-';
+            return '<div style="padding:10px 16px;border-bottom:1px solid #f0fdf4;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+              +'<div style="display:flex;align-items:center;gap:10px;">'
+                +'<span style="width:28px;height:28px;border-radius:50%;background:'+col+'18;color:'+col+';display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;">'+icon+'</span>'
+                +'<div>'
+                  +'<div style="font-weight:600;font-size:.85rem;">'+label+'</div>'
+                  +(m.note?'<div style="font-size:.75rem;color:#6b7280;">'+m.note+'</div>':'')
+                +'</div>'
+              +'</div>'
+              +'<div style="text-align:right;">'
+                +'<div style="font-weight:700;color:'+col+';">'+sign+fmtEuro(m.montant||0)+'</div>'
+                +'<div style="font-size:.72rem;color:#9ca3af;">'+fmtDateFR2(m.date||'')+'</div>'
+              +'</div>'
+              +'</div>';
+          }).join('')
+        }
+      </div>
+    </details>
+  </div>`;
+
+  renderComptaTable(ecM, 'admin-compta-table-zone', true);
+};
+
+// ── Helpers UI ────────────────────────────────────────────────
+function comptaKpi(title, val, sub, color, bg) {
+  return '<div style="background:'+bg+';border-radius:12px;padding:14px 16px;border-left:4px solid '+color+';">'
+    +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:'+color+';opacity:.8;margin-bottom:4px;">'+title+'</div>'
+    +'<div style="font-size:22px;font-weight:800;color:'+color+';line-height:1;">'+val+'</div>'
+    +'<div style="font-size:11px;color:#6b7280;margin-top:4px;">'+sub+'</div>'
+  +'</div>';
+}
+
+function renderComptaTable(ecritures, zoneId, isAdmin) {
+  var zone = document.getElementById(zoneId);
+  if (!zone) return;
+  var sorted = ecritures.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  if (sorted.length===0) {
+    zone.innerHTML='<div style="background:white;border-radius:12px;border:1.5px dashed #e5e7eb;padding:32px;text-align:center;color:#9ca3af;font-size:.9rem;">Aucune écriture ce mois-ci</div>';
+    return;
+  }
+  var total = sorted.reduce(function(s,e){return s+(e.montant||0);},0);
+  zone.innerHTML = '<div style="overflow-x:auto;background:white;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.07);">'
+  +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+  +'<thead><tr style="background:#f8fafc;">'
+    +'<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;border-bottom:2px solid #f1f5f9;">Date</th>'
+    +(isAdmin?'<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;border-bottom:2px solid #f1f5f9;">Collaborateur</th>':'')
+    +'<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;border-bottom:2px solid #f1f5f9;">Type</th>'
+    +'<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;border-bottom:2px solid #f1f5f9;">Client</th>'
+    +'<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;border-bottom:2px solid #f1f5f9;">Produit / Contrat</th>'
+    +'<th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;border-bottom:2px solid #f1f5f9;">Montant</th>'
+    +'<th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;border-bottom:2px solid #f1f5f9;">Statut</th>'
+    +'<th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;border-bottom:2px solid #f1f5f9;"></th>'
+  +'</tr></thead><tbody>'
+  + sorted.map(function(e){
+    var typeColor = e.type==='cheque' ? '#7c3aed' : '#059669';
+    var typeBg    = e.type==='cheque' ? '#f5f3ff' : '#ecfdf5';
+    var typeLabel = e.type==='cheque' ? '📝 Chèque' : '💵 Espèces';
+    var statutMap = { 'en_attente': { label:'⏳ En attente', color:'#d97706', bg:'#fffbeb' }, 'remis': { label:'✅ Remis', color:'#059669', bg:'#ecfdf5' }, 'annule': { label:'❌ Annulé', color:'#dc2626', bg:'#fef2f2' } };
+    var s = statutMap[e.statut] || statutMap['en_attente'];
+    var canEdit = isAdmin || e.createdBy === currentUser.name;
+    return '<tr style="border-bottom:1px solid #f1f5f9;'+(e.statut==='annule'?'opacity:.5':'')+';">'
+      +'<td style="padding:10px 14px;color:#374151;font-size:12px;">'+fmtDateFR2(e.date||'')+'</td>'
+      +(isAdmin?'<td style="padding:10px 14px;font-weight:600;font-size:12px;color:#374151;">'+e.collaborateur+'</td>':'')
+      +'<td style="padding:10px 14px;"><span style="background:'+typeBg+';color:'+typeColor+';padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;">'+typeLabel+'</span></td>'
+      +'<td style="padding:10px 14px;font-weight:600;color:#111;">'+e.client+'</td>'
+      +'<td style="padding:10px 14px;font-size:12px;color:#6b7280;">'+(e.produit||'')+(e.contrat?' · <span style="font-family:monospace;font-size:11px;">'+e.contrat+'</span>':'')+(e.note?'<br><span style="font-size:.72rem;color:#9ca3af;">'+e.note+'</span>':'')+'</td>'
+      +'<td style="padding:10px 14px;text-align:right;font-weight:800;color:#1d4ed8;font-size:14px;">'+fmtEuro(e.montant||0)+'</td>'
+      +'<td style="padding:10px 14px;text-align:center;"><span style="background:'+s.bg+';color:'+s.color+';padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;">'+s.label+'</span></td>'
+      +'<td style="padding:10px 14px;text-align:center;">'+(canEdit?'<button onclick="openContaModal(\''+e.id+'\')" style="background:#f1f5f9;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">✏️</button>':'')+'</td>'
+      +'</tr>';
+  }).join('')
+  +'</tbody><tfoot><tr style="background:#f8fafc;border-top:2px solid #e5e7eb;">'
+    +'<td colspan="'+(isAdmin?5:4)+'" style="padding:10px 14px;font-weight:700;">'+(sorted.length)+' écriture(s)</td>'
+    +'<td style="padding:10px 14px;text-align:right;font-weight:800;color:#1d4ed8;font-size:14px;">'+fmtEuro(total)+'</td>'
+    +'<td colspan="2"></td>'
+  +'</tfoot></table></div>';
+}
+
+// ── Modal Nouvelle/Modifier écriture ─────────────────────────
+function openContaModal(id) {
+  initCompta();
+  var ex = id ? (DB.compta.ecritures||[]).find(function(x){return x.id===id;}) : null;
+  var today = (function(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+  var collabs = ['Mouez'].concat(getCollabNames());
+  var modal = document.createElement('div');
+  modal.id = 'conta-modal-overlay';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  modal.innerHTML = `
+  <div style="background:white;border-radius:18px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div style="background:linear-gradient(135deg,#065f46,#047857);color:#fff;padding:18px 22px;border-radius:18px 18px 0 0;display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-weight:800;font-size:1rem;">${ex?'✏️ Modifier l\'écriture':'✚ Nouvelle écriture'}</div>
+      <button onclick="document.getElementById('conta-modal-overlay').remove()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Date *</label>
+          <input type="date" id="cm-date" value="${ex?ex.date:today}" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Type *</label>
+          <select id="cm-type" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;background:white;box-sizing:border-box;">
+            <option value="cheque" ${(!ex||ex.type==='cheque')?'selected':''}>📝 Chèque</option>
+            <option value="especes" ${ex&&ex.type==='especes'?'selected':''}>💵 Espèces</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Montant (€) *</label>
+        <input type="number" id="cm-montant" value="${ex?ex.montant:''}" placeholder="0.00" min="0" step="0.01" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Client *</label>
+        <input type="text" id="cm-client" value="${ex?ex.client:''}" placeholder="Nom du client" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;box-sizing:border-box;">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Produit</label>
+          <select id="cm-produit" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;background:white;box-sizing:border-box;">
+            <option value="">— Choisir —</option>
+            ${['Auto','MRH','Santé','GAV','PER','NOP','PJ Pro','PJ Part','Emprunteur','Autre'].map(function(p){return '<option value="'+p+'"'+(ex&&ex.produit===p?' selected':'')+'>'+p+'</option>';}).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">N° contrat</label>
+          <input type="text" id="cm-contrat" value="${ex?ex.contrat||'':''}" placeholder="ex. 4812345678" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;box-sizing:border-box;">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Collaborateur *</label>
+        <select id="cm-collab" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;background:white;box-sizing:border-box;">
+          ${collabs.map(function(c){return '<option value="'+c+'"'+((ex?ex.collaborateur:currentUser.name)===c?' selected':'')+'>'+c+'</option>';}).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Note</label>
+        <input type="text" id="cm-note" value="${ex?ex.note||'':''}" placeholder="Information complémentaire…" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;box-sizing:border-box;">
+      </div>
+      ${(ex && currentUser && currentUser.role==='admin') ? `<div>
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Statut</label>
+        <select id="cm-statut" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;background:white;box-sizing:border-box;">
+          <option value="en_attente" ${ex.statut==='en_attente'?'selected':''}>⏳ En attente</option>
+          <option value="remis" ${ex.statut==='remis'?'selected':''}>✅ Remis</option>
+          <option value="annule" ${ex.statut==='annule'?'selected':''}>❌ Annulé</option>
+        </select>
+      </div>` : ''}
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px;">
+        <button onclick="document.getElementById('conta-modal-overlay').remove()" style="padding:10px 22px;border:1.5px solid #e5e7eb;border-radius:10px;background:white;font-weight:600;cursor:pointer;">Annuler</button>
+        <button onclick="saveContaModal('${ex?ex.id:''}')" style="padding:10px 22px;background:#065f46;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;">💾 Enregistrer</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function saveContaModal(existingId) {
+  var date    = (document.getElementById('cm-date').value||'').trim();
+  var type    = document.getElementById('cm-type').value;
+  var montant = parseFloat(document.getElementById('cm-montant').value)||0;
+  var client  = (document.getElementById('cm-client').value||'').trim();
+  var produit = document.getElementById('cm-produit').value;
+  var contrat = (document.getElementById('cm-contrat').value||'').trim();
+  var collab  = document.getElementById('cm-collab').value;
+  var note    = (document.getElementById('cm-note').value||'').trim();
+  var statutEl= document.getElementById('cm-statut');
+  var statut  = statutEl ? statutEl.value : 'en_attente';
+  if (!date)   { toast('Date requise','error'); return; }
+  if (!montant){ toast('Montant requis','error'); return; }
+  if (!client) { toast('Client requis','error'); return; }
+  initCompta();
+  var obj;
+  if (existingId) {
+    obj = (DB.compta.ecritures||[]).find(function(x){return x.id===existingId;});
+    if (!obj) return;
+    obj.date=date; obj.type=type; obj.montant=montant; obj.client=client;
+    obj.produit=produit; obj.contrat=contrat; obj.collaborateur=collab; obj.note=note;
+    if (statutEl) obj.statut=statut;
+  } else {
+    obj = { id:'ec-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), date:date, type:type, montant:montant, client:client, produit:produit, contrat:contrat, collaborateur:collab, note:note, statut:'en_attente', remiseId:null, createdAt:Date.now(), createdBy:currentUser.name };
+  }
+  saveComptaEcriture(obj);
+  document.getElementById('conta-modal-overlay').remove();
+  toast(existingId?'Écriture modifiée ✓':'Écriture enregistrée ✓','success');
+  if (currentPage==='collab-compta') showPage('collab-compta');
+  if (currentPage==='admin-compta')  showPage('admin-compta');
+}
+
+// ── Modal Fond de caisse ───────────────────────────────────────
+function openFondCaisseModal(type) {
+  var label = type==='approvisionnement' ? 'Approvisionner la caisse' : 'Retrait de caisse';
+  var icon  = type==='approvisionnement' ? '⬆' : '⬇';
+  var color = type==='approvisionnement' ? '#059669' : '#dc2626';
+  var today = (function(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+  var modal = document.createElement('div');
+  modal.id = 'fond-modal-overlay';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  modal.innerHTML = `
+  <div style="background:white;border-radius:16px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div style="background:${color};color:#fff;padding:16px 20px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-weight:800;font-size:1rem;">${icon} ${label}</div>
+      <button onclick="document.getElementById('fond-modal-overlay').remove()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Date *</label>
+        <input type="date" id="fm-date" value="${today}" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Montant (€) *</label>
+        <input type="number" id="fm-montant" placeholder="0.00" min="0" step="0.01" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Motif</label>
+        <input type="text" id="fm-note" placeholder="ex. Dotation mensuelle, dépôt espèces…" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;box-sizing:border-box;">
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('fond-modal-overlay').remove()" style="padding:10px 20px;border:1.5px solid #e5e7eb;border-radius:10px;background:white;font-weight:600;cursor:pointer;">Annuler</button>
+        <button onclick="saveFondCaisseModal('${type}')" style="padding:10px 20px;background:${color};color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;">Confirmer</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function saveFondCaisseModal(type) {
+  var date    = (document.getElementById('fm-date').value||'').trim();
+  var montant = parseFloat(document.getElementById('fm-montant').value)||0;
+  var note    = (document.getElementById('fm-note').value||'').trim();
+  if (!date)    { toast('Date requise','error'); return; }
+  if (!montant) { toast('Montant requis','error'); return; }
+  initCompta();
+  var solde = getFondCaisse();
+  if (type==='retrait' && montant > solde) {
+    if (!confirm('Le retrait ('+fmtEuro(montant)+') dépasse le solde ('+fmtEuro(solde)+'). Confirmer quand même ?')) return;
+  }
+  saveComptaMouvement({ id:'mv-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), date:date, type:type, montant:montant, note:note, createdAt:Date.now() });
+  document.getElementById('fond-modal-overlay').remove();
+  toast(type==='approvisionnement'?'Caisse approvisionnée ✓':'Retrait enregistré ✓','success');
+  showPage('admin-compta');
+}
+
+// ── Modal Remise en banque ─────────────────────────────────────
+function openRemiseBanqueModal() {
+  initCompta();
+  var attente = (DB.compta.ecritures||[]).filter(function(e){return e.statut==='en_attente';});
+  var cheqs   = attente.filter(function(e){return e.type==='cheque';});
+  var esps    = attente.filter(function(e){return e.type==='especes';});
+  var today = (function(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+
+  var modal = document.createElement('div');
+  modal.id = 'remise-modal-overlay';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;';
+  var listHtml = function(arr, typeSel) {
+    if (arr.length===0) return '<div style="color:#9ca3af;font-size:.82rem;padding:8px 0;">Aucune écriture en attente</div>';
+    return arr.map(function(e){
+      return '<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;cursor:pointer;margin-bottom:6px;background:#f9fafb;">'
+        +'<input type="checkbox" name="remise-ec" value="'+e.id+'" class="remise-cb" checked style="width:15px;height:15px;flex-shrink:0;">'
+        +'<div style="flex:1;min-width:0;">'
+          +'<div style="font-weight:600;font-size:.83rem;">'+e.client+'</div>'
+          +'<div style="font-size:.73rem;color:#6b7280;">'+fmtDateFR2(e.date||'')+' · '+(e.produit||'')+(e.contrat?' · '+e.contrat:'')+'</div>'
+        +'</div>'
+        +'<div style="font-weight:700;color:#1d4ed8;font-size:.88rem;">'+fmtEuro(e.montant||0)+'</div>'
+      +'</label>';
+    }).join('');
+  };
+
+  modal.innerHTML = `
+  <div style="background:white;border-radius:18px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div style="background:linear-gradient(135deg,#1e3a5f,#1d4ed8);color:#fff;padding:16px 20px;border-radius:18px 18px 0 0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;">
+      <div style="font-weight:800;font-size:1rem;">🏦 Remise en banque</div>
+      <button onclick="document.getElementById('remise-modal-overlay').remove()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Date de remise *</label>
+          <input type="date" id="rm-date" value="${today}" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Note</label>
+          <input type="text" id="rm-note" placeholder="Référence bordereau…" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;box-sizing:border-box;">
+        </div>
+      </div>
+
+      ${cheqs.length>0?`
+      <div>
+        <div style="font-weight:700;font-size:.88rem;color:#7c3aed;margin-bottom:8px;">📝 Chèques en attente (${cheqs.length})</div>
+        <div id="rm-cheques">${listHtml(cheqs,'cheque')}</div>
+      </div>`:''}
+
+      ${esps.length>0?`
+      <div>
+        <div style="font-weight:700;font-size:.88rem;color:#059669;margin-bottom:8px;">💵 Espèces en attente (${esps.length})</div>
+        <div id="rm-especes">${listHtml(esps,'especes')}</div>
+      </div>`:''}
+
+      ${attente.length===0?'<div style="padding:24px;text-align:center;color:#9ca3af;">Aucune écriture en attente de remise.</div>':''}
+
+      ${attente.length>0?`
+      <div style="background:#f0f9ff;border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:.85rem;font-weight:600;color:#0369a1;">Total sélectionné</span>
+        <span id="rm-total" style="font-size:1.2rem;font-weight:800;color:#1d4ed8;">${fmtEuro(attente.reduce(function(s,e){return s+(e.montant||0);},0))}</span>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('remise-modal-overlay').remove()" style="padding:10px 20px;border:1.5px solid #e5e7eb;border-radius:10px;background:white;font-weight:600;cursor:pointer;">Annuler</button>
+        <button onclick="saveRemiseBanqueModal()" style="padding:10px 22px;background:#1d4ed8;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;">🏦 Valider la remise</button>
+      </div>`:''}
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  // Live total update
+  modal.querySelectorAll('.remise-cb').forEach(function(cb){
+    cb.addEventListener('change', function(){
+      initCompta();
+      var ids = Array.from(modal.querySelectorAll('.remise-cb:checked')).map(function(c){return c.value;});
+      var tot = ids.reduce(function(s,id){ var e=(DB.compta.ecritures||[]).find(function(x){return x.id===id;}); return s+(e?e.montant||0:0); },0);
+      var el=document.getElementById('rm-total'); if(el) el.textContent=fmtEuro(tot);
+    });
+  });
+}
+
+function saveRemiseBanqueModal() {
+  var date = (document.getElementById('rm-date').value||'').trim();
+  var note = (document.getElementById('rm-note').value||'').trim();
+  if (!date) { toast('Date requise','error'); return; }
+  var cbs  = document.querySelectorAll('#remise-modal-overlay .remise-cb:checked');
+  var ids  = Array.from(cbs).map(function(c){return c.value;});
+  if (ids.length===0) { toast('Sélectionnez au moins une écriture','error'); return; }
+  initCompta();
+  var total = 0, totalEsp = 0;
+  ids.forEach(function(id){
+    var e = (DB.compta.ecritures||[]).find(function(x){return x.id===id;});
+    if (!e) return;
+    e.statut   = 'remis';
+    e.remiseId = 'rm-'+Date.now();
+    total += e.montant||0;
+    if (e.type==='especes') totalEsp += e.montant||0;
+  });
+  saveDB(DB);
+  // Remise object
+  saveComptaRemise({ id:'rm-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), date:date, ecrituresIds:ids, montantTotal:total, note:note, createdAt:Date.now() });
+  // Si espèces → mouvement fond de caisse -X
+  if (totalEsp>0) {
+    saveComptaMouvement({ id:'mv-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), date:date, type:'remise_banque', montant:totalEsp, note:'Remise banque espèces · '+note, createdAt:Date.now() });
+  }
+  document.getElementById('remise-modal-overlay').remove();
+  toast('Remise enregistrée ✓ — '+ids.length+' écriture(s) · '+fmtEuro(total),'success');
+  showPage('admin-compta');
+}
 
 </script>
