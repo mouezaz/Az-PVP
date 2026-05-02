@@ -11569,7 +11569,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.1.7";',
+      'var CACHE="allianz-v3.1.8";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
@@ -12857,20 +12857,26 @@ function renderComptaTable(ecritures, zoneId, isAdmin) {
     var typeColor = e.type==='cheque' ? '#7c3aed' : '#059669';
     var typeBg    = e.type==='cheque' ? '#f5f3ff' : '#ecfdf5';
     var typeLabel = e.type==='cheque' ? '📝 Chèque' : '💵 Espèces';
-    var statutMap = { 'en_attente':{ label:'⏳ En attente', color:'#d97706', bg:'#fffbeb' }, 'remis':{ label:'✅ Remis', color:'#059669', bg:'#ecfdf5' } };
+    var statutMap = { 'en_attente':{ label:'⏳ En attente', color:'#d97706', bg:'#fffbeb' }, 'differe':{ label:'🔒 À autoriser', color:'#dc2626', bg:'#fef2f2' }, 'remis':{ label:'✅ Remis', color:'#059669', bg:'#ecfdf5' } };
     var s = statutMap[e.statut] || statutMap['en_attente'];
+    var typeMap = { 'cheque':{ label:'📝 Chèque', color:'#7c3aed', bg:'#f5f3ff' }, 'especes':{ label:'💵 Espèces', color:'#059669', bg:'#ecfdf5' }, 'virement':{ label:'🏦 Virement', color:'#1d4ed8', bg:'#eff6ff' }, 'mixte':{ label:'🔀 Mixte', color:'#d97706', bg:'#fffbeb' } };
+    var tm = typeMap[e.type] || typeMap['cheque'];
     var canEdit = isAdmin || e.createdBy === currentUser.name;
     var actions = '';
     actions += '<button onclick="printRecu(\''+e.id+'\')" title="Imprimer le reçu" style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;margin-right:4px;">🖨️</button>';
+    if (isAdmin && e.statut==='differe') actions += '<button onclick="autoriserCheque(\''+e.id+'\')" title="Autoriser l\'encaissement" style="background:#fef9c3;border:1px solid #fde047;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;font-weight:700;margin-right:4px;">✅ Autoriser</button>';
     if (canEdit) actions += '<button onclick="openContaModal(\''+e.id+'\')" title="Modifier" style="background:#f1f5f9;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;margin-right:4px;">✏️</button>';
     if (isAdmin) actions += '<button onclick="annulerEcriture(\''+e.id+'\')" title="Supprimer définitivement" style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">🗑️</button>';
-    return '<tr style="border-bottom:1px solid #f1f5f9;">'
+    var montantDetail = e.type==='mixte'
+      ? '<div style="font-size:.7rem;color:#9ca3af;margin-top:2px;">💵 '+fmtEuro(e.montantEspeces||0)+' + 📝 '+fmtEuro(e.montantCheque||0)+'</div>'
+      : (e.renduMonnaie>0 ? '<div style="font-size:.7rem;color:#d97706;margin-top:2px;">Rendu '+fmtEuro(e.renduMonnaie)+'</div>' : '');
+    return '<tr style="border-bottom:1px solid #f1f5f9;'+(e.statut==='differe'?'background:#fff5f5;':'')+';">'
       +'<td style="padding:10px 14px;color:#374151;font-size:12px;white-space:nowrap;">'+fmtDateFR2(e.date||'')+'</td>'
       +(isAdmin?'<td style="padding:10px 14px;font-weight:600;font-size:12px;color:#374151;">'+e.collaborateur+'</td>':'')
-      +'<td style="padding:10px 14px;white-space:nowrap;"><span style="background:'+typeBg+';color:'+typeColor+';padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;">'+typeLabel+'</span></td>'
+      +'<td style="padding:10px 14px;white-space:nowrap;"><span style="background:'+tm.bg+';color:'+tm.color+';padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;">'+tm.label+'</span></td>'
       +'<td style="padding:10px 14px;font-weight:600;color:#111;">'+e.client+'</td>'
       +'<td style="padding:10px 14px;font-size:12px;color:#6b7280;">'+(e.produit||'')+(e.contrat?' · <span style="font-family:monospace;font-size:11px;">'+e.contrat+'</span>':'')+(e.note?'<br><span style="font-size:.72rem;color:#9ca3af;">'+e.note+'</span>':'')+'</td>'
-      +'<td style="padding:10px 14px;text-align:right;font-weight:800;color:#1d4ed8;font-size:14px;white-space:nowrap;">'+fmtEuro(e.montant||0)+'</td>'
+      +'<td style="padding:10px 14px;text-align:right;white-space:nowrap;"><div style="font-weight:800;color:#1d4ed8;font-size:14px;">'+fmtEuro(e.montant||0)+'</div>'+montantDetail+'</td>'
       +'<td style="padding:10px 14px;text-align:center;white-space:nowrap;"><span style="background:'+s.bg+';color:'+s.color+';padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;">'+s.label+'</span></td>'
       +'<td style="padding:10px 14px;text-align:center;white-space:nowrap;">'+actions+'</td>'
       +'</tr>';
@@ -12919,21 +12925,47 @@ function printRecu(id) {
   initCompta();
   var e = (DB.compta.ecritures||[]).find(function(x){return x.id===id;});
   if (!e) return;
-  var isEsp = e.type === 'especes';
-  var num   = (isEsp?'ESP':'CHQ')+'-'+e.date.replace(/-/g,'')+(e.id||'').slice(-4).toUpperCase();
+  var type = e.type || 'cheque';
+  var prefixMap = { cheque:'CHQ', especes:'ESP', virement:'VIR', mixte:'MIX' };
+  var num = (prefixMap[type]||'REC')+'-'+e.date.replace(/-/g,'')+(e.id||'').slice(-4).toUpperCase();
   var lettres = montantEnLettres(e.montant||0);
   var rendu   = e.renduMonnaie||0;
   var sommeRemise = e.sommeRemise||0;
-  var accentColor = isEsp ? '#065f46' : '#1e3a5f';
-  var accentLight = isEsp ? '#f0fdf4' : '#eff6ff';
-  var accentBorder= isEsp ? '#059669' : '#3b82f6';
-  var modeLabel   = isEsp ? '💵 Espèces' : '📝 Chèque';
-  var titreRecu   = isEsp ? 'Reçu espèces' : 'Reçu de paiement';
 
+  // Couleurs et labels selon le type
+  var accentColor, accentLight, accentBorder, modeLabel, titreRecu, footerNote;
+  if (type==='especes') {
+    accentColor='#065f46'; accentLight='#f0fdf4'; accentBorder='#059669';
+    modeLabel='💵 Espèces'; titreRecu='Reçu espèces';
+    footerNote='Ce reçu atteste la réception de la somme indiquée en espèces.';
+  } else if (type==='virement') {
+    accentColor='#1d4ed8'; accentLight='#eff6ff'; accentBorder='#3b82f6';
+    modeLabel='🏦 Virement'; titreRecu='Reçu de virement';
+    footerNote='Ce reçu atteste la réception de la somme indiquée par virement bancaire.';
+  } else if (type==='mixte') {
+    accentColor='#92400e'; accentLight='#fffbeb'; accentBorder='#f59e0b';
+    modeLabel='🔀 Mixte (espèces + chèque)'; titreRecu='Reçu de paiement mixte';
+    footerNote='Ce reçu atteste la réception de la somme indiquée (paiement partiel espèces + chèque).';
+  } else {
+    accentColor='#1e3a5f'; accentLight='#eff6ff'; accentBorder='#3b82f6';
+    modeLabel='📝 Chèque'; titreRecu='Reçu de paiement';
+    footerNote='Ce reçu atteste la réception de la somme indiquée par chèque.';
+  }
+
+  // Détail montant pour mixte
+  var mixteDetailHtml = '';
+  if (type==='mixte') {
+    mixteDetailHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">'
+      +'<div class="field" style="background:#f0fdf4;"><div class="lbl">Part espèces</div><div class="val" style="color:#065f46;">'+fmtEuro(e.montantEspeces||0)+'</div></div>'
+      +'<div class="field" style="background:#eff6ff;"><div class="lbl">Part chèque</div><div class="val" style="color:#1e3a5f;">'+fmtEuro(e.montantCheque||0)+'</div></div>'
+      +'</div>';
+  }
+
+  // Rendu monnaie pour espèces et mixte
   var renduHtml = '';
-  if (isEsp && sommeRemise>0) {
+  if ((type==='especes'||type==='mixte') && sommeRemise>0) {
     renduHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">'
-      +'<div class="field"><div class="lbl">Somme remise</div><div class="val">'+fmtEuro(sommeRemise)+'</div></div>'
+      +'<div class="field"><div class="lbl">Somme remise (espèces)</div><div class="val">'+fmtEuro(sommeRemise)+'</div></div>'
       +'<div class="field" style="background:#fffbeb;"><div class="lbl">Rendu monnaie</div><div class="val" style="color:#d97706;font-size:16px;">'+fmtEuro(rendu)+'</div></div>'
       +'</div>';
   }
@@ -12973,6 +13005,7 @@ function printRecu(id) {
     +'<div class="receipt-label"><div class="big">'+titreRecu+'</div><div class="num">N° '+num+'</div><div class="dt">'+fmtDateFR2(e.date||'')+'</div></div>'
   +'</div>'
   +'<div class="amount-box"><div class="euros">'+fmtEuro(e.montant||0)+'</div><div class="lettres">'+lettres+'</div></div>'
+  + mixteDetailHtml
   +'<div class="grid">'
     +'<div class="field full"><div class="lbl">Reçu de (client)</div><div class="val">'+e.client+'</div></div>'
     +'<div class="field"><div class="lbl">Produit</div><div class="val">'+(e.produit||'—')+'</div></div>'
@@ -12986,7 +13019,7 @@ function printRecu(id) {
     +'<div class="sig-box"><div class="sig-label">Signature du client</div><div class="sig-space"></div><div class="sig-name">'+e.client+'</div></div>'
     +'<div class="sig-box"><div class="sig-label">Signature agence</div><div class="sig-space"></div><div class="sig-name">'+(e.collaborateur||'')+'</div></div>'
   +'</div>'
-  +'<div class="footer">Allianz · MOUEZ ESSID EI — Ce reçu atteste la réception de la somme indiquée par '+(isEsp?'espèces':'chèque')+'.<br>Conservez ce document comme justificatif de paiement.</div>'
+  +'<div class="footer">Allianz · MOUEZ ESSID EI — '+footerNote+'<br>Conservez ce document comme justificatif de paiement.</div>'
   +'<div class="no-print" style="text-align:center;margin-top:18px;">'
     +'<button onclick="window.print()" style="background:'+accentColor+';color:white;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ Imprimer</button>'
     +'<button onclick="window.close()" style="margin-left:10px;background:#f1f5f9;color:#374151;border:none;border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;">Fermer</button>'
@@ -13035,14 +13068,45 @@ function openContaModal(id) {
           <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Type *</label>
           <select id="cm-type" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;background:white;box-sizing:border-box;">
             <option value="cheque" ${(!ex||ex.type==='cheque')?'selected':''}>📝 Chèque</option>
-            <option value="especes" ${isEsp?'selected':''}>💵 Espèces</option>
+            <option value="especes" ${ex&&ex.type==='especes'?'selected':''}>💵 Espèces</option>
+            <option value="virement" ${ex&&ex.type==='virement'?'selected':''}>🏦 Virement</option>
+            <option value="mixte" ${ex&&ex.type==='mixte'?'selected':''}>🔀 Mixte (esp. + chèque)</option>
           </select>
         </div>
       </div>
-      <div>
-        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Montant dû (€) *</label>
-        <input type="number" id="cm-montant" value="${ex?ex.montant:''}" placeholder="0.00" min="0" step="0.01"
+
+      <!-- Bloc montant unique (chèque / espèces / virement) -->
+      <div id="cm-montant-bloc">
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Montant (€) *</label>
+        <input type="number" id="cm-montant" value="${ex&&ex.type!=='mixte'?ex.montant:''}" placeholder="0.00" min="0" step="0.01"
           style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.88rem;box-sizing:border-box;">
+      </div>
+
+      <!-- Bloc mixte : part espèces + part chèque -->
+      <div id="cm-mixte-bloc" style="display:none;background:#fffbeb;border:1.5px solid #fde68a;border-radius:12px;padding:14px 16px;">
+        <div style="font-size:.82rem;font-weight:700;color:#92400e;margin-bottom:10px;">🔀 Paiement mixte</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Part espèces (€)</label>
+            <input type="number" id="cm-montant-esp" value="${ex&&ex.type==='mixte'?ex.montantEspeces||'':''}" placeholder="0.00" min="0" step="0.01"
+              style="width:100%;padding:8px 10px;border:1.5px solid #fde68a;border-radius:8px;font-size:.88rem;box-sizing:border-box;background:white;">
+          </div>
+          <div>
+            <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Part chèque (€)</label>
+            <input type="number" id="cm-montant-cheq" value="${ex&&ex.type==='mixte'?ex.montantCheque||'':''}" placeholder="0.00" min="0" step="0.01"
+              style="width:100%;padding:8px 10px;border:1.5px solid #fde68a;border-radius:8px;font-size:.88rem;box-sizing:border-box;background:white;">
+          </div>
+        </div>
+        <div id="cm-mixte-total" style="margin-top:10px;text-align:right;font-size:.9rem;font-weight:700;color:#92400e;">Total : —</div>
+      </div>
+
+      <!-- Bloc chèque différé (chèque uniquement) -->
+      <div id="cm-differe-bloc" style="display:none;background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;padding:12px 16px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.85rem;font-weight:600;color:#dc2626;">
+          <input type="checkbox" id="cm-differe" ${ex&&ex.statut==='differe'?'checked':''} style="width:16px;height:16px;accent-color:#dc2626;">
+          🔒 Encaissement différé (nécessite mon autorisation)
+        </label>
+        <div style="font-size:.75rem;color:#6b7280;margin-top:6px;">Le chèque sera visible en attente d'autorisation.</div>
       </div>
       <div>
         <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Client *</label>
@@ -13103,56 +13167,64 @@ function openContaModal(id) {
 
   document.body.appendChild(modal);
 
-  // Attacher les écouteurs APRÈS injection dans le DOM
-  var typeEl   = document.getElementById('cm-type');
-  var montEl   = document.getElementById('cm-montant');
-  var sommeEl  = document.getElementById('cm-somme-remise');
+  // ── Attacher les écouteurs après injection DOM ──
+  var typeEl  = document.getElementById('cm-type');
+  var montEl  = document.getElementById('cm-montant');
+  var espEl   = document.getElementById('cm-montant-esp');
+  var cheqEl2 = document.getElementById('cm-montant-cheq');
+  var sommeEl = document.getElementById('cm-somme-remise');
 
   function _toggle() {
-    var bloc = document.getElementById('cm-rendu-bloc');
-    if (bloc) bloc.style.display = (typeEl && typeEl.value==='especes') ? 'block' : 'none';
-    calcRenduMonnaie();
+    var t    = typeEl ? typeEl.value : 'cheque';
+    var renduB  = document.getElementById('cm-rendu-bloc');
+    var mixteB  = document.getElementById('cm-mixte-bloc');
+    var singleB = document.getElementById('cm-montant-bloc');
+    var differeB= document.getElementById('cm-differe-bloc');
+    if (singleB) singleB.style.display = (t==='mixte') ? 'none' : 'block';
+    if (mixteB)  mixteB.style.display  = (t==='mixte') ? 'block' : 'none';
+    if (renduB)  renduB.style.display  = (t==='especes'||t==='mixte') ? 'block' : 'none';
+    if (differeB)differeB.style.display= (t==='cheque') ? 'block' : 'none';
+    _calc();
   }
-  function _calc() { calcRenduMonnaie(); }
-
+  function _calc() {
+    // Montant espèces à utiliser pour le rendu
+    var t = typeEl ? typeEl.value : 'cheque';
+    var montEsp = t==='mixte'
+      ? (parseFloat((espEl||{}).value)||0)
+      : (parseFloat((montEl||{}).value)||0);
+    var remise  = parseFloat((sommeEl||{}).value)||0;
+    var disp    = document.getElementById('cm-rendu-display');
+    var warn    = document.getElementById('cm-rendu-warn');
+    // Mise à jour total mixte
+    if (t==='mixte') {
+      var mCheq = parseFloat((cheqEl2||{}).value)||0;
+      var tot   = document.getElementById('cm-mixte-total');
+      if (tot) { tot.textContent = 'Total : '+(montEsp+mCheq>0?fmtEuro(montEsp+mCheq):'—'); }
+    }
+    if (!disp) return;
+    if (!remise) { disp.textContent='—'; disp.style.color='#065f46'; if(warn) warn.style.display='none'; return; }
+    var rendu = Math.round((remise - montEsp)*100)/100;
+    if (rendu < 0) {
+      disp.textContent='⚠ Insuffisant'; disp.style.color='#dc2626';
+      if(warn){warn.textContent='Somme remise ('+fmtEuro(remise)+') < montant espèces ('+fmtEuro(montEsp)+').';warn.style.display='block';}
+    } else {
+      disp.textContent=fmtEuro(rendu); disp.style.color=rendu===0?'#065f46':'#d97706';
+      if(warn) warn.style.display='none';
+    }
+  }
   if (typeEl)  typeEl.addEventListener('change', _toggle);
   if (montEl)  montEl.addEventListener('input',  _calc);
+  if (espEl)   espEl.addEventListener('input',   _calc);
+  if (cheqEl2) cheqEl2.addEventListener('input', _calc);
   if (sommeEl) sommeEl.addEventListener('input',  _calc);
-
-  // Initialiser l'état correct dès l'ouverture
-  _toggle();
+  _toggle(); // état initial
 }
 
-function toggleRenduMonnaie() {
-  var t = document.getElementById('cm-type');
-  var b = document.getElementById('cm-rendu-bloc');
-  if (b) b.style.display = (t && t.value==='especes') ? 'block' : 'none';
-  calcRenduMonnaie();
-}
-
-function calcRenduMonnaie() {
-  var montant = parseFloat((document.getElementById('cm-montant')||{}).value)||0;
-  var remise  = parseFloat((document.getElementById('cm-somme-remise')||{}).value)||0;
-  var disp    = document.getElementById('cm-rendu-display');
-  var warn    = document.getElementById('cm-rendu-warn');
-  if (!disp) return;
-  if (!remise) { disp.textContent='—'; disp.style.color='#065f46'; if(warn) warn.style.display='none'; return; }
-  var rendu = Math.round((remise - montant)*100)/100;
-  if (rendu < 0) {
-    disp.textContent = '⚠ Insuffisant';
-    disp.style.color = '#dc2626';
-    if (warn) { warn.textContent = 'La somme remise ('+fmtEuro(remise)+') est inférieure au montant dû ('+fmtEuro(montant)+').'; warn.style.display='block'; }
-  } else {
-    disp.textContent = fmtEuro(rendu);
-    disp.style.color = rendu===0 ? '#065f46' : '#d97706';
-    if (warn) warn.style.display='none';
-  }
-}
+function calcRenduMonnaie() { /* no-op — géré par _calc dans openContaModal */ }
 
 function saveContaModal(existingId) {
   var date    = (document.getElementById('cm-date').value||'').trim();
   var type    = document.getElementById('cm-type').value;
-  var montant = parseFloat(document.getElementById('cm-montant').value)||0;
   var client  = (document.getElementById('cm-client').value||'').trim();
   var produit = document.getElementById('cm-produit').value;
   var contrat = (document.getElementById('cm-contrat').value||'').trim();
@@ -13160,16 +13232,38 @@ function saveContaModal(existingId) {
   var note    = (document.getElementById('cm-note').value||'').trim();
   var statutEl= document.getElementById('cm-statut');
   var statut  = statutEl ? statutEl.value : 'en_attente';
-  var sommeRemise = 0, renduMonnaie = 0;
-  if (type === 'especes') {
-    sommeRemise = parseFloat((document.getElementById('cm-somme-remise')||{}).value)||0;
-    if (sommeRemise > 0) renduMonnaie = Math.round((sommeRemise - montant)*100)/100;
-    if (sommeRemise > 0 && renduMonnaie < 0) { toast('Somme remise insuffisante','error'); return; }
+
+  // Montant selon type
+  var montant=0, montantEspeces=0, montantCheque=0;
+  if (type==='mixte') {
+    montantEspeces = parseFloat((document.getElementById('cm-montant-esp')||{}).value)||0;
+    montantCheque  = parseFloat((document.getElementById('cm-montant-cheq')||{}).value)||0;
+    montant = montantEspeces + montantCheque;
+    if (!montantEspeces && !montantCheque) { toast('Saisir au moins un montant','error'); return; }
+  } else {
+    montant = parseFloat((document.getElementById('cm-montant')||{}).value)||0;
+    if (!montant) { toast('Montant requis','error'); return; }
   }
+
+  // Rendu monnaie (espèces/mixte)
+  var sommeRemise=0, renduMonnaie=0;
+  if (type==='especes'||type==='mixte') {
+    sommeRemise = parseFloat((document.getElementById('cm-somme-remise')||{}).value)||0;
+    var baseEsp = type==='mixte' ? montantEspeces : montant;
+    if (sommeRemise>0) {
+      renduMonnaie = Math.round((sommeRemise - baseEsp)*100)/100;
+      if (renduMonnaie<0) { toast('Somme remise insuffisante pour la part espèces','error'); return; }
+    }
+  }
+
+  // Chèque différé
+  var differeEl = document.getElementById('cm-differe');
+  if (type==='cheque' && differeEl && differeEl.checked) statut = 'differe';
+
   if (!date)   { toast('Date requise','error'); return; }
-  if (!montant){ toast('Montant requis','error'); return; }
   if (!client) { toast('Client requis','error'); return; }
   initCompta();
+
   var obj;
   if (existingId) {
     obj = (DB.compta.ecritures||[]).find(function(x){return x.id===existingId;});
@@ -13177,27 +13271,49 @@ function saveContaModal(existingId) {
     obj.date=date; obj.type=type; obj.montant=montant; obj.client=client;
     obj.produit=produit; obj.contrat=contrat; obj.collaborateur=collab; obj.note=note;
     obj.sommeRemise=sommeRemise; obj.renduMonnaie=renduMonnaie;
+    obj.montantEspeces=montantEspeces; obj.montantCheque=montantCheque;
     if (statutEl) obj.statut=statut;
   } else {
-    obj = { id:'ec-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), date:date, type:type, montant:montant, client:client, produit:produit, contrat:contrat, collaborateur:collab, note:note, statut:'en_attente', remiseId:null, sommeRemise:sommeRemise, renduMonnaie:renduMonnaie, createdAt:Date.now(), createdBy:currentUser.name };
+    obj = { id:'ec-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
+      date,type,montant,client,produit,contrat,collaborateur:collab,note,
+      statut,remiseId:null,sommeRemise,renduMonnaie,montantEspeces,montantCheque,
+      createdAt:Date.now(),createdBy:currentUser.name };
   }
   saveComptaEcriture(obj);
-  // Si espèces avec rendu → mouvement caisse automatique -rendu
-  if (type==='especes' && renduMonnaie>0 && !existingId) {
-    saveComptaMouvement({ id:'mv-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), date:date, type:'retrait', montant:renduMonnaie, note:'Rendu monnaie — '+client+' ('+fmtEuro(montant)+')', createdAt:Date.now() });
+
+  // Mouvement caisse automatique si rendu espèces
+  var baseEsp2 = type==='mixte' ? montantEspeces : (type==='especes'?montant:0);
+  if (baseEsp2>0 && renduMonnaie>0 && !existingId) {
+    saveComptaMouvement({ id:'mv-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), date, type:'retrait', montant:renduMonnaie, note:'Rendu monnaie — '+client+' ('+fmtEuro(baseEsp2)+')', createdAt:Date.now() });
   }
+
   document.getElementById('conta-modal-overlay').remove();
   if (currentPage==='collab-compta') showPage('collab-compta');
   if (currentPage==='admin-compta')  showPage('admin-compta');
-  // Bannière impression
+
+  // Bannière avec rendu et bouton reçu
+  var msg = statut==='differe' ? '🔒 Chèque différé enregistré'
+    : (renduMonnaie>0 ? '✅ Rendu : <strong>'+fmtEuro(renduMonnaie)+'</strong>' : '✅ Écriture enregistrée');
   var div = document.createElement('div');
   div.id = 'recu-prompt';
-  div.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#065f46;color:#fff;border-radius:14px;padding:14px 20px;display:flex;align-items:center;gap:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);z-index:9999;font-size:.9rem;max-width:460px;white-space:nowrap;';
-  div.innerHTML = '<span>✅ '+(type==='especes'&&renduMonnaie>0?'Rendu : <strong>'+fmtEuro(renduMonnaie)+'</strong>':'Écriture enregistrée')+'</span>'
-    + '<button onclick="printRecu(\''+obj.id+'\');document.getElementById(\'recu-prompt\').remove()" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:700;cursor:pointer;font-size:.85rem;">🖨️ Imprimer le reçu</button>'
-    + '<button onclick="document.getElementById(\'recu-prompt\').remove()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:.85rem;">✕</button>';
+  div.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#065f46;color:#fff;border-radius:14px;padding:14px 20px;display:flex;align-items:center;gap:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);z-index:9999;font-size:.9rem;max-width:480px;';
+  div.innerHTML='<span>'+msg+'</span>'
+    +'<button onclick="printRecu(\''+obj.id+'\');document.getElementById(\'recu-prompt\').remove()" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:700;cursor:pointer;font-size:.85rem;white-space:nowrap;">🖨️ Imprimer le reçu</button>'
+    +'<button onclick="document.getElementById(\'recu-prompt\').remove()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:.85rem;">✕</button>';
   document.body.appendChild(div);
-  setTimeout(function(){ var el=document.getElementById('recu-prompt'); if(el) el.remove(); }, 10000);
+  setTimeout(function(){ var el=document.getElementById('recu-prompt'); if(el) el.remove(); },10000);
+}
+
+function autoriserCheque(id) {
+  initCompta();
+  var e = (DB.compta.ecritures||[]).find(function(x){return x.id===id;});
+  if (!e) return;
+  e.statut = 'en_attente';
+  e.autoriseBy = currentUser.name;
+  e.autoriseLe = new Date().toISOString();
+  saveDB(DB);
+  toast('Chèque autorisé — en attente de remise ✓','success');
+  showPage('admin-compta');
 }
 
 function annulerEcriture(id) {
