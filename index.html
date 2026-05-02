@@ -11575,7 +11575,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.2.4";',
+      'var CACHE="allianz-v3.2.5";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
@@ -12655,36 +12655,8 @@ function saveComptaEcriture(obj) {
   syncComptaToLocalStorage();
 }
 
-// ── Sync vers cabinet_dashboard (même domaine, même localStorage) ──
-function syncComptaToLocalStorage() {
-  try {
-    initCompta();
-    var typeLabel = { cheque:'Chèque', especes:'Espèces', virement:'Virement' };
-    var ecritures = (DB.compta.ecritures||[]).filter(function(e){
-      return e.statut !== 'differe'; // chèques non autorisés exclus
-    });
-    var sync = {};
-    ecritures.forEach(function(e) {
-      if (!e.date) return;
-      var yr = e.date.slice(0,4);
-      var mo = +e.date.slice(5,7);
-      if (!sync[yr]) sync[yr] = {};
-      if (!sync[yr][mo]) sync[yr][mo] = [];
-      var desc = e.client
-        + (e.produit ? ' — ' + e.produit : '')
-        + (e.contrat ? ' n°' + e.contrat : '');
-      if (e.type === 'mixte') {
-        if ((e.montantEspeces||0) > 0)
-          sync[yr][mo].push({ type:'Espèces', desc:desc+' (esp.)', amount:e.montantEspeces, _auto:true });
-        if ((e.montantCheque||0) > 0)
-          sync[yr][mo].push({ type:'Chèque',  desc:desc+' (chq.)', amount:e.montantCheque,  _auto:true });
-      } else {
-        sync[yr][mo].push({ type:typeLabel[e.type]||'Chèque', desc:desc, amount:e.montant||0, _auto:true });
-      }
-    });
-    localStorage.setItem('az_compta_sync', JSON.stringify(sync));
-  } catch(x) {}
-}
+// ── Sync vers cabinet_dashboard — no-op, les données sont dans Firebase ──
+function syncComptaToLocalStorage() { /* données déjà dans Firebase */ }
 
 function saveComptaMouvement(obj) {
   initCompta();

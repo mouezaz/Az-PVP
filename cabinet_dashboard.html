@@ -7,6 +7,9 @@
 <title>Cabinet — Agent Général</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<!-- Firebase SDK (compat) — même base que l'application principale -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9;color:#1e293b;display:flex;height:100dvh;overflow:hidden}
@@ -517,6 +520,52 @@ const REV_DETAIL_2026={
   2:{iard:[{desc:'Commission principale',amount:29538.34},{desc:'',amount:48.28}],vie:[{desc:'',amount:714.14},{desc:'',amount:142.48},{desc:'',amount:1609.55},{desc:'',amount:6679.07}]},
   3:{iard:[{desc:'Commission principale',amount:23620.10}],vie:[{desc:'',amount:586.09},{desc:'',amount:143.26}]}
 };
+
+// ================================================================
+// FIREBASE — lecture compta depuis la même base que l'application
+// ================================================================
+const FB_CONFIG={
+  apiKey:"AIzaSyDW7KjKtg5ahFkj-mO8VJETxFBFfpVSJd4",
+  authDomain:"allianz-perf.firebaseapp.com",
+  databaseURL:"https://allianz-perf-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"allianz-perf"
+};
+let _fbApp=null, _fbDb=null, _comptaSyncData={}; // { yr: { mo: [{type,desc,amount}] } }
+
+function initFirebaseCompta(){
+  try{
+    if(!firebase.apps.length) _fbApp=firebase.initializeApp(FB_CONFIG);
+    else _fbApp=firebase.apps[0];
+    _fbDb=firebase.database(_fbApp);
+    // Listener temps réel sur les écritures compta
+    _fbDb.ref('allianz_db_v4/compta/ecritures').on('value',function(snap){
+      const ecritures=snap.val()||[];
+      const list=Array.isArray(ecritures)?ecritures:Object.values(ecritures);
+      _buildComptaSync(list);
+      // Rafraîchir la vue trésorerie si elle est active
+      if(document.getElementById('view-tresorerie')?.classList.contains('active')) buildTresoForm();
+    });
+  }catch(e){ console.warn('Firebase compta init error',e); }
+}
+
+function _buildComptaSync(ecritures){
+  const typeLabel={cheque:'Chèque',especes:'Espèces',virement:'Virement'};
+  const sync={};
+  (ecritures||[]).filter(e=>e&&e.statut!=='differe'&&e.date).forEach(function(e){
+    const yr=e.date.slice(0,4);
+    const mo=+e.date.slice(5,7);
+    if(!sync[yr]) sync[yr]={};
+    if(!sync[yr][mo]) sync[yr][mo]=[];
+    const desc=e.client+(e.produit?' — '+e.produit:'')+(e.contrat?' n°'+e.contrat:'');
+    if(e.type==='mixte'){
+      if((e.montantEspeces||0)>0) sync[yr][mo].push({type:'Espèces',desc:desc+' (esp.)',amount:e.montantEspeces,_auto:true});
+      if((e.montantCheque||0)>0)  sync[yr][mo].push({type:'Chèque', desc:desc+' (chq.)',amount:e.montantCheque, _auto:true});
+    }else{
+      sync[yr][mo].push({type:typeLabel[e.type]||'Chèque',desc,amount:e.montant||0,_auto:true});
+    }
+  });
+  _comptaSyncData=sync;
+}
 
 // ================================================================
 // MÉMOIRE UTILISATEUR
@@ -1242,9 +1291,9 @@ function buildTresoMonthNav(){
 }
 function getTresoData(yr,mo){return TRESO[yr]?.[mo]||{encaissements:[],paiements:[]};}
 
-// ── Sync depuis index.html (même domaine) ──────────────────────
+// ── Données compta temps réel depuis Firebase ──────────────────
 function getComptaSync(yr,mo){
-  try{const raw=localStorage.getItem('az_compta_sync');if(!raw)return[];const s=JSON.parse(raw);return(s[yr]&&s[yr][mo])||[];}catch(e){return[];}
+  return(_comptaSyncData[yr]&&_comptaSyncData[yr][mo])||[];
 }
 function tresoEncRowAuto(r){
   const colors={'Chèque':'#1e3a5f','Espèces':'#065f46','Virement':'#1d4ed8'};
@@ -1528,6 +1577,7 @@ async function pollCloud(){
 
 // Init avec chargement cloud
 async function initApp(){
+  initFirebaseCompta(); // connexion temps réel à la base compta
   loadLocal();
   if(getSyncId()){
     updateSyncStatus(true);
