@@ -128,9 +128,13 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .dg-hd:hover{background:#f0f4f8}
 .dg-hd .dg-ttl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#475569;display:flex;align-items:center;gap:6px}
 .dg-hd .dg-arr{font-size:10px;color:#94a3b8;transition:transform .2s}
+.dg-hd .dg-right{display:flex;align-items:center;gap:8px}
+.dg-hd .dg-tot{font-size:13px;font-weight:700;color:#dc2626}
 .dg.col .dg-arr{transform:rotate(-90deg)}
 .dg-bd{padding:10px 12px}
 .dg.col .dg-bd{display:none}
+.m1{font-size:11px;color:#94a3b8;background:#f1f5f9;padding:2px 7px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.m1-hd{font-size:11px;color:#94a3b8;font-weight:500;background:#e2e8f0;padding:2px 7px;border-radius:4px;white-space:nowrap}
 /* Drawer items */
 .di{display:flex;align-items:center;gap:8px;margin-bottom:7px}
 .di label{flex:1;font-size:12.5px;color:#374151;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
@@ -1890,10 +1894,16 @@ function renderExploitCharges(){
     const card=document.createElement('div');
     card.className='fcard';
     card.id=`eacc-${cat}`;
+    const mo1=exploit_mo+1;
+    const m1tot=m1CatTot(exploit_yr,mo1,cat);
     card.innerHTML=`
       <div class="fcard-hd" onclick="toggleExploitAcc('${cat}')">
         <div class="title"><span style="font-size:16px">${CATS[cat].icon}</span>${CATS[cat].label}</div>
-        <div class="right"><span class="ftot" id="eacc-tot-${cat}" style="color:${tot>0?'#dc2626':'#94a3b8'}">${tot>0?fmt(tot,2):'—'}</span><span class="arr">▾</span></div>
+        <div class="right" style="gap:8px">
+          <span class="ftot" id="eacc-tot-${cat}" style="color:${tot>0?'#dc2626':'#94a3b8'}">${tot>0?fmt(tot,2):'—'}</span>
+          ${m1tot>0?`<span class="m1">M-1: ${fmt(m1tot,2)}</span>`:''}
+          <span class="arr">▾</span>
+        </div>
       </div>
       <div class="fcard-bd" id="eacc-body-${cat}"></div>`;
     container.appendChild(card);
@@ -1911,6 +1921,22 @@ function toggleExploitAcc(cat){
   }
 }
 
+// Helpers M-1
+function getM1Ctx(yr,mo1){const pm=mo1-1;return pm<=0?{yr:yr-1,mo1:12}:{yr,mo1:pm};}
+function m1CatTot(yr,mo1,cat){const p=getM1Ctx(yr,mo1);return catTotal(p.yr,cat,p.mo1-1);}
+function m1Item(yr,mo1,cat,key){const p=getM1Ctx(yr,mo1);return getDetail(p.yr,p.mo1)?.[cat]?.[key]||0;}
+function m1FixesItem(yr,mo1,key){const p=getM1Ctx(yr,mo1);const d=getDetail(p.yr,p.mo1)?.fixes||{};return d[key]||0;}
+function m1FixesSub(yr,mo1,subKey,item){const p=getM1Ctx(yr,mo1);return getFixesDetail(p.yr,p.mo1)?.[subKey]?.[item]||0;}
+function dgHd(title,tot,m1tot){
+  const totHtml=tot>0?`<span class="dg-tot">${fmt(tot,2)}</span>`:'';
+  const m1Html=m1tot>0?`<span class="m1-hd">M-1: ${fmt(m1tot,2)}</span>`:'';
+  return `<div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">${title}</span><div class="dg-right">${totHtml}${m1Html}<span class="dg-arr">▾</span></div></div>`;
+}
+function diRow(label,inputAttr,val,m1val,cat){
+  const m1html=m1val>0?`<span class="m1">M-1: ${fmt(m1val,2)}</span>`:'';
+  return `<div class="di"><label>${label}</label><input type="number" ${inputAttr} step="0.01" value="${val>0?val.toFixed(2):''}" placeholder="0,00" oninput="exploitCatUpdate('${cat}')">${m1html}</div>`;
+}
+
 function buildExploitCatContent(cat,yr,mo1){
   if(cat==='fixes') return buildExploitFixesContent(yr,mo1);
   return buildExploitSimpleContent(cat,yr,mo1);
@@ -1922,35 +1948,49 @@ function buildExploitSimpleContent(cat,yr,mo1){
   const def=CATS[cat];
   let items=def.items||[];
   if(cat==='salariale'&&(yr>2026||(yr===2026&&mo1>=3))) items=items.filter(it=>it!=='Salaire YF');
-  const rows=items.map(it=>`<div class="di"><label>${it}</label><input type="number" data-ekey="${it}" step="0.01" value="${(vals[it]||0)>0?(vals[it]).toFixed(2):''}" placeholder="0,00" oninput="exploitCatUpdate('${cat}')"></div>`).join('');
-  return `<div class="dg open"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">Détail</span><span class="dg-arr">▾</span></div><div class="dg-bd">${rows}</div></div>`;
+  const subTot=items.reduce((s,it)=>s+(vals[it]||0),0);
+  const m1tot=m1CatTot(yr,mo1,cat);
+  const rows=items.map(it=>diRow(it,`data-ekey="${it}"`,vals[it]||0,m1Item(yr,mo1,cat,it),cat)).join('');
+  return `<div class="dg open">${dgHd('Détail',subTot,m1tot)}<div class="dg-bd">${rows}</div></div>`;
 }
 
 function buildExploitFixesContent(yr,mo1){
   const d=getDetail(yr,mo1)?.fixes||{};
   const fd=getFixesDetail(yr,mo1)||{};
-  const cat='fixes';
   let html='';
-  const simpleRows=FIXES_SIMPLE.map(it=>`<div class="di"><label>${it}</label><input type="number" data-fixes-item="${it}" step="0.01" value="${(d[it]||0)>0?(d[it]).toFixed(2):''}" placeholder="0,00" oninput="exploitCatUpdate('fixes')"></div>`).join('');
-  html+=`<div class="dg open"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">🏢 Postes récurrents</span><span class="dg-arr">▾</span></div><div class="dg-bd">${simpleRows}</div></div>`;
+  // Postes simples
+  const simpTot=FIXES_SIMPLE.reduce((s,it)=>s+(d[it]||0),0);
+  const simpM1=FIXES_SIMPLE.reduce((s,it)=>s+m1FixesItem(yr,mo1,it),0);
+  const simpleRows=FIXES_SIMPLE.map(it=>diRow(it,`data-fixes-item="${it}"`,d[it]||0,m1FixesItem(yr,mo1,it),'fixes')).join('');
+  html+=`<div class="dg open">${dgHd('🏢 Postes récurrents',simpTot,simpM1)}<div class="dg-bd">${simpleRows}</div></div>`;
+  // Sous-rubriques (assurances, téléphonie, abonnements)
   Object.entries(FIXES_SUBS).forEach(([key,def])=>{
     const sub=fd[key]||{};
-    const rows=def.items.map(it=>`<div class="di"><label>${it}</label><input type="number" data-fixes-sub="${key}" data-key="${it}" step="0.01" value="${(sub[it]||0)>0?(sub[it]).toFixed(2):''}" placeholder="0,00" oninput="exploitCatUpdate('fixes')"></div>`).join('');
-    html+=`<div class="dg open"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">${def.label}</span><span class="dg-arr">▾</span></div><div class="dg-bd">${rows}</div></div>`;
+    const subTot=def.items.reduce((s,it)=>s+(sub[it]||0),0);
+    const subM1=def.items.reduce((s,it)=>s+m1FixesSub(yr,mo1,key,it),0);
+    const rows=def.items.map(it=>diRow(it,`data-fixes-sub="${key}" data-key="${it}"`,sub[it]||0,m1FixesSub(yr,mo1,key,it),'fixes')).join('');
+    html+=`<div class="dg open">${dgHd(def.label,subTot,subM1)}<div class="dg-bd">${rows}</div></div>`;
   });
+  // Déjeuners
   const dej=fd.dejeuners||[];
+  const dejTot=dej.reduce((s,v)=>s+v,0);
+  const p1=getM1Ctx(yr,mo1);const m1dej=(getFixesDetail(p1.yr,p1.mo1)||{}).dejeuners||[];const dejM1=m1dej.reduce((s,v)=>s+v,0);
   const dejRows=dej.map(v=>`<tr><td><input type="number" data-da step="0.01" value="${v>0?v.toFixed(2):''}" placeholder="0,00" oninput="exploitCatUpdate('fixes')"></td><td class="dc"><button class="ddel" onclick="eDelRow(this,'fixes')">×</button></td></tr>`).join('');
-  html+=`<div class="dg open"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">🍽 Déjeuners</span><span class="dg-arr">▾</span></div>
+  html+=`<div class="dg open">${dgHd('🍽 Déjeuners',dejTot,dejM1)}
     <div class="dg-bd"><table class="dt-tbl" id="eacc-dyn-dejeuners">
       <thead><tr><th>Montant</th><th></th></tr></thead>
       <tbody>${dejRows||'<tr><td><input type="number" data-da step="0.01" placeholder="0,00" oninput="exploitCatUpdate(\'fixes\')"></td><td class="dc"><button class="ddel" onclick="eDelRow(this,\'fixes\')">×</button></td></tr>'}</tbody>
     </table><button class="dadd" onclick="eAddDej()">+ Ajouter un déjeuner</button></div></div>`;
+  // Voyages + Achats
   ['voyages','achats'].forEach(key=>{
     const arr=fd[key]||[];
+    const arrTot=arr.reduce((s,r)=>s+(r.amount||0),0);
+    const m1arr=(getFixesDetail(p1.yr,p1.mo1)||{})[key]||[];
+    const arrM1=m1arr.reduce((s,r)=>s+(r.amount||0),0);
     const icon=key==='voyages'?'✈':'🛒';
     const lbl=key==='voyages'?'Voyages & Déplacements':'Achats';
     const rows2=arr.map(r=>`<tr><td><input type="text" data-dd value="${(r.desc||'').replace(/"/g,'&quot;')}" placeholder="Description" oninput="exploitCatUpdate('fixes')"></td><td><input type="number" data-da step="0.01" value="${(r.amount||0)>0?r.amount.toFixed(2):''}" placeholder="0,00" oninput="exploitCatUpdate('fixes')"></td><td class="dc"><button class="ddel" onclick="eDelRow(this,'fixes')">×</button></td></tr>`).join('');
-    html+=`<div class="dg open"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">${icon} ${lbl}</span><span class="dg-arr">▾</span></div>
+    html+=`<div class="dg open">${dgHd(icon+' '+lbl,arrTot,arrM1)}
       <div class="dg-bd"><table class="dt-tbl" id="eacc-dyn-${key}">
         <thead><tr><th>Description</th><th>Montant</th><th></th></tr></thead>
         <tbody>${rows2||`<tr><td><input type="text" data-dd placeholder="Description" oninput="exploitCatUpdate('fixes')"></td><td><input type="number" data-da step="0.01" placeholder="0,00" oninput="exploitCatUpdate('fixes')"></td><td class="dc"><button class="ddel" onclick="eDelRow(this,'fixes')">×</button></td></tr>`}</tbody>
@@ -1994,9 +2034,25 @@ function exploitCatUpdate(cat){
     USER[yr][mo1][cat]=obj;
     if(BASE[yr]?.[cat]) BASE[yr][cat][exploit_mo]=total;
   }
-  // Mettre à jour le total dans l'en-tête de l'accordéon
+  // Mettre à jour le total dans l'en-tête de l'accordéon (niveau 1)
   const totEl=document.getElementById(`eacc-tot-${cat}`);
   if(totEl){totEl.textContent=total>0?fmt(total,2):'—';totEl.style.color=total>0?'#dc2626':'#94a3b8';}
+  // Mettre à jour les sous-totaux (niveau 2 - dg-tot)
+  const body=document.getElementById(`eacc-body-${cat}`);
+  if(body&&cat==='fixes'){
+    // Recalc sub-totals live
+    const d2=USER[exploit_yr]?.[exploit_mo+1]?.fixes||{};
+    const fd2=USER_FD[exploit_yr]?.[exploit_mo+1]||{};
+    body.querySelectorAll('.dg').forEach(dg=>{
+      const totSpan=dg.querySelector('.dg-tot');
+      if(!totSpan) return;
+      let sub=0;
+      dg.querySelectorAll('[data-fixes-item]').forEach(inp=>sub+=(+inp.value||0));
+      dg.querySelectorAll('[data-key]').forEach(inp=>sub+=(+inp.value||0));
+      dg.querySelectorAll('[data-da]').forEach(inp=>sub+=(+inp.value||0));
+      if(sub>0){totSpan.textContent=fmt(sub,2);}else{totSpan.textContent='';}
+    });
+  }
   saveLocal();
   updateExploitTotals();
 }
