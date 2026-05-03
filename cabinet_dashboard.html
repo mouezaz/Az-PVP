@@ -520,7 +520,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 
       <!-- Solde -->
       <div style="background:#0f172a;border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <span style="color:#94a3b8;font-size:13px;font-weight:600">Solde Compte Exploitation</span>
+        <span style="color:#94a3b8;font-size:13px;font-weight:600">⚖️ Résultat net (Commissions - Charges)</span>
         <span style="font-size:22px;font-weight:800" id="exploit-solde">—</span>
       </div>
       <div style="display:flex;gap:8px">
@@ -2230,10 +2230,12 @@ function eAddRow(tableId){
 
 function updateExploitTotals(){
   const mo1=exploit_mo+1; const yr=exploit_yr;
-  const virManuel=+(document.getElementById('exploit-vir-input')?.value)||0;
+  // Rentabilité = Commissions (IARD + VIE) + Courtage direct — le virement est une info trésorerie
+  const iardComm=catTotal(yr,'iard',exploit_mo);
+  const vieComm=catTotal(yr,'vie',exploit_mo);
   let courtageTotal=0;
   document.querySelectorAll('#exploit-courtage-body tr input[type="number"]').forEach(el=>courtageTotal+=(+el.value||0));
-  const totalIn=virManuel+courtageTotal;
+  const totalIn=iardComm+vieComm+courtageTotal;
   const totalChg=CHG_CATS.reduce((s,c)=>s+catTotal(yr,c,exploit_mo),0);
   const solde=totalIn-totalChg;
   document.getElementById('exploit-in-tot').textContent=fmt(totalIn,2);
@@ -2270,17 +2272,15 @@ function renderExploitKpi(){
   const yr=exploit_yr, limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
   let totIn=0,totChg=0,months=0;
   for(let m=0;m<limit;m++){
-    const mo1=m+1;
-    const vir=EXPLOIT_DATA[yr]?.[mo1]?.virement_recu||0;
-    const court=(EXPLOIT_DATA[yr]?.[mo1]?.courtage||[]).reduce((s,l)=>s+(+l.amount||0),0);
-    const chg=CHG_CATS.reduce((s,c)=>s+catTotal(yr,c,m),0);
-    if(vir||court||chg){totIn+=vir+court;totChg+=chg;months++;}
+    const comm=monthComm(yr,m);
+    const chg=monthChg(yr,m);
+    if(comm||chg){totIn+=comm;totChg+=chg;months++;}
   }
   const solde=totIn-totChg;
   document.getElementById('exploitKpi').innerHTML=`
-    <div class="kc k1"><div class="lbl">📥 Total Entrées ${yr}</div><div class="val">${fmt(totIn)}</div></div>
+    <div class="kc k1"><div class="lbl">💰 Commissions ${yr}</div><div class="val">${fmt(totIn)}</div></div>
     <div class="kc k2"><div class="lbl">📤 Total Charges ${yr}</div><div class="val">${fmt(totChg)}</div></div>
-    <div class="kc k3"><div class="lbl">⚖️ Solde net</div><div class="val" style="color:${solde>=0?'#059669':'#dc2626'}">${fmt(solde)}</div></div>
+    <div class="kc k3"><div class="lbl">⚖️ Résultat net</div><div class="val" style="color:${solde>=0?'#059669':'#dc2626'}">${fmt(solde)}</div></div>
     <div class="kc k4"><div class="lbl">📅 Mois actifs</div><div class="val" style="font-size:28px">${months} / ${limit}</div></div>`;
 }
 
