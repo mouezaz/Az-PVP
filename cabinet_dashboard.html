@@ -2052,35 +2052,33 @@ function renderExploitRecap(){
     return `<tr class="r-sec"><td colspan="${cols.length+2}">${label}</td></tr>`;
   }
 
+  // Entrées Exploitation = Virement reçu + Courtage (données sauvegardées)
+  function getVir(y,m){return EXPLOIT_DATA[y]?.[m+1]?.virement_recu||0;}
+  function getCourt(y,m){return(EXPLOIT_DATA[y]?.[m+1]?.courtage||[]).reduce((s,l)=>s+(+l.amount||0),0);}
+  function getIn(y,m){return getVir(y,m)+getCourt(y,m);}
+
   let rows='';
-  rows+=secRow('▸ REVENUS');
-  REV_CATS.forEach(cat=>rows+=dataRow(CATS[cat].icon,CATS[cat].label.replace('Commissions Allianz ',''),
-    (y,m)=>catTotal(y,cat,m)));
-  rows+=totRow('r-rev-tot','TOTAL REVENUS',(y,m)=>monthComm(y,m));
+  rows+=secRow('▸ ENTRÉES');
+  rows+=dataRow('💳','Virement Mandat reçu',(y,m)=>getVir(y,m));
+  rows+=dataRow('🤝','Courtage direct',(y,m)=>getCourt(y,m));
+  rows+=totRow('r-rev-tot','TOTAL ENTRÉES',(y,m)=>getIn(y,m));
 
   rows+=secRow('▸ CHARGES');
   CHG_CATS.forEach(cat=>rows+=dataRow(CATS[cat].icon,CATS[cat].label.replace('Charges ','').replace('Masse Salariale','Salaires'),
     (y,m)=>catTotal(y,cat,m)));
   rows+=totRow('r-chg-tot','TOTAL CHARGES',(y,m)=>monthChg(y,m));
 
-  // Résultat net par mois + cumul
-  let cumul=0,rSolde=`<tr class="r-solde"><td>⚖️ RÉSULTAT NET</td>`;
+  // Solde net par mois + cumul
+  let cumul=0;
+  let rSolde=`<tr class="r-solde"><td>⚖️ SOLDE NET</td>`;
   cols.forEach(m=>{
-    const v=monthSolde(yr,m);
-    const hasData=monthComm(yr,m)>0||monthChg(yr,m)>0;
-    if(hasData) cumul+=v;
-    rSolde+=`<td class="${m===exploit_mo?'rcur':''}">${hasData?fvColor(v).replace('span>','td>').replace('<span','<td').replace('</span>',''):'—'}</td>`;
-  });
-  // Rewrite proprement sans hack
-  rSolde=`<tr class="r-solde"><td>⚖️ RÉSULTAT NET</td>`;
-  cumul=0;
-  cols.forEach(m=>{
-    const v=monthSolde(yr,m);
-    const hasData=monthComm(yr,m)>0||monthChg(yr,m)>0;
+    const inp=getIn(yr,m);
+    const chg=monthChg(yr,m);
+    const v=inp-chg;
+    const hasData=inp>0||chg>0;
     if(hasData) cumul+=v;
     const color=hasData?(v>=0?'#6ee7b7':'#f87171'):'#475569';
-    const txt=hasData?fmtN(Math.round(v)):'—';
-    rSolde+=`<td class="${m===exploit_mo?'rcur':''}" style="color:${color};font-weight:700">${txt}</td>`;
+    rSolde+=`<td class="${m===exploit_mo?'rcur':''}" style="color:${color};font-weight:700">${hasData?fmtN(Math.round(v)):'—'}</td>`;
   });
   const cumulColor=cumul>=0?'#6ee7b7':'#f87171';
   rSolde+=`<td style="background:#1e293b;color:${cumulColor};font-weight:800;font-size:14px">${fmtN(Math.round(cumul))}</td></tr>`;
@@ -2335,20 +2333,29 @@ function saveExploit(){
   renderExploitKpi();
 }
 
+function getExploitIn(yr,mo1){
+  // Entrées réelles du compte Exploitation = virement reçu + courtage
+  const d=EXPLOIT_DATA[yr]?.[mo1]||{};
+  const vir=d.virement_recu||0;
+  const court=(d.courtage||[]).reduce((s,l)=>s+(+l.amount||0),0);
+  return vir+court;
+}
+
 function renderExploitKpi(){
   const yr=exploit_yr, limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
   let totIn=0,totChg=0,months=0;
   for(let m=0;m<limit;m++){
-    const comm=monthComm(yr,m);
+    const mo1=m+1;
+    const inp=getExploitIn(yr,mo1);
     const chg=monthChg(yr,m);
-    if(comm||chg){totIn+=comm;totChg+=chg;months++;}
+    if(inp||chg){totIn+=inp;totChg+=chg;months++;}
   }
   const solde=totIn-totChg;
   document.getElementById('exploitKpi').innerHTML=`
-    <div class="kc k1"><div class="lbl">💰 Commissions ${yr}</div><div class="val">${fmt(totIn)}</div></div>
+    <div class="kc k1"><div class="lbl">📥 Entrées ${yr} (Virt+Court)</div><div class="val">${fmt(totIn)}</div></div>
     <div class="kc k2"><div class="lbl">📤 Total Charges ${yr}</div><div class="val">${fmt(totChg)}</div></div>
-    <div class="kc k3"><div class="lbl">⚖️ Résultat net</div><div class="val" style="color:${solde>=0?'#059669':'#dc2626'}">${fmt(solde)}</div></div>
-    <div class="kc k4"><div class="lbl">📅 Mois actifs</div><div class="val" style="font-size:28px">${months} / ${limit}</div></div>`;
+    <div class="kc k3"><div class="lbl">⚖️ Solde net</div><div class="val" style="color:${solde>=0?'#059669':'#dc2626'}">${fmt(solde)}</div></div>
+    <div class="kc k4"><div class="lbl">📅 Mois saisis</div><div class="val" style="font-size:28px">${months} / ${limit}</div></div>`;
 }
 
 // ================================================================
