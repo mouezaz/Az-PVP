@@ -482,9 +482,19 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
           <div class="right"><span class="ftot" id="exploit-in-tot">—</span><span class="arr">▾</span></div>
         </div>
         <div class="fcard-bd">
-          <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:13px;color:#1e40af;font-weight:600">💳 Virement reçu du Compte Mandat</span>
-            <span style="font-size:15px;font-weight:700;color:#1d4ed8" id="exploit-vir-auto">—</span>
+          <!-- Commissions Mandat remontées (info) -->
+          <div style="background:#f0fdf4;border-radius:8px;padding:8px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:12px;color:#166534;font-weight:600">🏥 Commissions IARD (Mandat)</span>
+            <span style="font-size:14px;font-weight:700;color:#15803d" id="exploit-iard-info">—</span>
+          </div>
+          <div style="background:#f0fdf4;border-radius:8px;padding:8px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:12px;color:#166534;font-weight:600">🌿 Commissions VIE (Mandat)</span>
+            <span style="font-size:14px;font-weight:700;color:#15803d" id="exploit-vie-info">—</span>
+          </div>
+          <!-- Virement manuel Mandat → Exploitation -->
+          <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+            <span style="font-size:13px;color:#1e40af;font-weight:600;white-space:nowrap">💳 Virement Mandat → Exploitation</span>
+            <input type="number" step="0.01" id="exploit-vir-input" placeholder="0,00" style="width:120px;text-align:right;font-size:15px;font-weight:700;color:#1d4ed8;border:1.5px solid #bfdbfe;border-radius:6px;padding:4px 8px;background:#fff" oninput="updateExploitTotals()">
           </div>
           <p style="font-size:12px;color:#64748b;margin:0 0 8px;font-weight:600">🤝 Courtage (hors Allianz) :</p>
           <table class="dyn-table">
@@ -1890,9 +1900,14 @@ function renderExploit(){
   // Réinitialiser les accordéons (nouveau mois)
   CHG_CATS.forEach(cat=>{const b=document.getElementById(`eacc-body-${cat}`);if(b) delete b.dataset.loaded;});
   const data=EXPLOIT_DATA[exploit_yr]?.[mo1]||{courtage:[],virement_recu:0};
-  // Virement auto depuis Compte Mandat
-  const virAuto=MANDAT_DATA[exploit_yr]?.[mo1]?.virement||data.virement_recu||0;
-  document.getElementById('exploit-vir-auto').textContent=fmt(virAuto,2);
+  // Commissions IARD/VIE depuis BASE/USER_RD (info seulement)
+  const iardComm=catTotal(exploit_yr,'iard',exploit_mo);
+  const vieComm=catTotal(exploit_yr,'vie',exploit_mo);
+  document.getElementById('exploit-iard-info').textContent=iardComm>0?fmt(iardComm,2):'—';
+  document.getElementById('exploit-vie-info').textContent=vieComm>0?fmt(vieComm,2):'—';
+  // Virement manuel sauvegardé
+  const virInput=document.getElementById('exploit-vir-input');
+  if(virInput) virInput.value=data.virement_recu>0?data.virement_recu.toFixed(2):'';
   // Courtage
   const body=document.getElementById('exploit-courtage-body');
   body.innerHTML='';
@@ -2199,10 +2214,10 @@ function eAddRow(tableId){
 
 function updateExploitTotals(){
   const mo1=exploit_mo+1; const yr=exploit_yr;
-  const virAuto=MANDAT_DATA[yr]?.[mo1]?.virement||EXPLOIT_DATA[yr]?.[mo1]?.virement_recu||0;
+  const virManuel=+(document.getElementById('exploit-vir-input')?.value)||0;
   let courtageTotal=0;
   document.querySelectorAll('#exploit-courtage-body tr input[type="number"]').forEach(el=>courtageTotal+=(+el.value||0));
-  const totalIn=virAuto+courtageTotal;
+  const totalIn=virManuel+courtageTotal;
   const totalChg=CHG_CATS.reduce((s,c)=>s+catTotal(yr,c,exploit_mo),0);
   const solde=totalIn-totalChg;
   document.getElementById('exploit-in-tot').textContent=fmt(totalIn,2);
@@ -2223,8 +2238,8 @@ function saveExploit(){
     if(label||amount){courtage.push({label,amount});courtageObj[label]=amount;}
   });
   if(!EXPLOIT_DATA[yr]) EXPLOIT_DATA[yr]={};
-  const virAuto=MANDAT_DATA[yr]?.[mo1]?.virement||0;
-  EXPLOIT_DATA[yr][mo1]={courtage,virement_recu:virAuto};
+  const virManuel=+(document.getElementById('exploit-vir-input')?.value)||0;
+  EXPLOIT_DATA[yr][mo1]={courtage,virement_recu:virManuel};
   // Sync vers USER pour cohérence Grille
   if(!USER[yr]) USER[yr]={};
   if(!USER[yr][mo1]) USER[yr][mo1]={};
@@ -2240,7 +2255,7 @@ function renderExploitKpi(){
   let totIn=0,totChg=0,months=0;
   for(let m=0;m<limit;m++){
     const mo1=m+1;
-    const vir=MANDAT_DATA[yr]?.[mo1]?.virement||0;
+    const vir=EXPLOIT_DATA[yr]?.[mo1]?.virement_recu||0;
     const court=(EXPLOIT_DATA[yr]?.[mo1]?.courtage||[]).reduce((s,l)=>s+(+l.amount||0),0);
     const chg=CHG_CATS.reduce((s,c)=>s+catTotal(yr,c,m),0);
     if(vir||court||chg){totIn+=vir+court;totChg+=chg;months++;}
