@@ -419,10 +419,11 @@ const REV_DETAIL_2026={
 // MÉMOIRE UTILISATEUR + PERSISTANCE
 // ================================================================
 let USER={}, USER_FD={}, USER_RD={}, TRESO={};
+let KSU_DATA={}, MANDAT_DATA={}, EXPLOIT_DATA={};
 const LS_KEY='cab_v1';
 
 function saveLocal(){
-  try{localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,_ts:Date.now()}));}catch(e){}
+  try{localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,KSU_DATA,MANDAT_DATA,EXPLOIT_DATA,_ts:Date.now()}));}catch(e){}
   if(typeof cloudSave==='function') cloudSave();
 }
 function loadLocal(){
@@ -430,10 +431,13 @@ function loadLocal(){
     const raw=localStorage.getItem(LS_KEY);
     if(!raw) return;
     const d=JSON.parse(raw);
-    if(d.USER)    USER=d.USER;
-    if(d.USER_FD) USER_FD=d.USER_FD;
-    if(d.USER_RD) USER_RD=d.USER_RD;
-    if(d.TRESO)   TRESO=d.TRESO;
+    if(d.USER)         USER=d.USER;
+    if(d.USER_FD)      USER_FD=d.USER_FD;
+    if(d.USER_RD)      USER_RD=d.USER_RD;
+    if(d.TRESO)        TRESO=d.TRESO;
+    if(d.KSU_DATA)     KSU_DATA=d.KSU_DATA;
+    if(d.MANDAT_DATA)  MANDAT_DATA=d.MANDAT_DATA;
+    if(d.EXPLOIT_DATA) EXPLOIT_DATA=d.EXPLOIT_DATA;
     YRS.forEach(yr=>{
       Object.keys(BASE[yr]||{}).forEach(cat=>{
         for(let mo=0;mo<12;mo++){
@@ -444,9 +448,19 @@ function loadLocal(){
     });
   }catch(e){}
 }
+function ksuCatTotal(yr,mo1,cat){
+  const d=KSU_DATA[yr]?.[mo1];
+  if(!d) return 0;
+  const lines=Array.isArray(d)?d:(d.lines||[]);
+  const key=cat.toLowerCase();
+  return lines.filter(l=>l.label&&l.label.toLowerCase().includes(key))
+              .reduce((s,l)=>s+(+l.amount||0),0);
+}
 function catTotalFromUser(yr,cat,mo){
   const mo1=mo+1;
   if(cat==='iard'||cat==='vie'){
+    const ksu=ksuCatTotal(yr,mo1,cat);
+    if(ksu>0) return ksu;
     const rd=USER_RD[yr]?.[mo1];
     if(rd&&rd[cat]&&rd[cat].length) return rd[cat].reduce((s,r)=>s+(+r.amount||0),0);
     return null;
@@ -464,7 +478,12 @@ function getFixesDetail(yr,mo){if(USER_FD[yr]?.[mo]) return USER_FD[yr][mo]; if(
 function getRevDetail(yr,mo){if(USER_RD[yr]?.[mo]) return USER_RD[yr][mo]; if(yr===2026&&mo>=1&&mo<=3) return REV_DETAIL_2026[mo]||null; return null;}
 
 function catTotal(yr,cat,mo){
-  if(cat==='iard'||cat==='vie'){const rd=getRevDetail(yr,mo+1);if(rd&&rd[cat]&&rd[cat].length) return rd[cat].reduce((s,r)=>s+(+r.amount||0),0);}
+  if(cat==='iard'||cat==='vie'){
+    const ksu=ksuCatTotal(yr,mo+1,cat);
+    if(ksu>0) return ksu;
+    const rd=getRevDetail(yr,mo+1);
+    if(rd&&rd[cat]&&rd[cat].length) return rd[cat].reduce((s,r)=>s+(+r.amount||0),0);
+  }
   const d=getDetail(yr,mo+1);
   if(d&&d[cat]) return Object.values(d[cat]).reduce((s,v)=>s+(+v||0),0);
   return BASE[yr]?.[cat]?.[mo]||0;
@@ -1101,7 +1120,7 @@ function getSyncId(){return localStorage.getItem(SYNC_KEY);}
 
 async function cloudSave(){
   const id=getSyncId(); if(!id) return;
-  const content=JSON.stringify({USER,USER_FD,USER_RD,TRESO,_ts:Date.now()});
+  const content=JSON.stringify({USER,USER_FD,USER_RD,TRESO,KSU_DATA,MANDAT_DATA,EXPLOIT_DATA,_ts:Date.now()});
   try{
     const r=await fetch(`https://api.github.com/gists/${id}`,{
       method:'PATCH',
@@ -1126,11 +1145,14 @@ async function cloudLoad(){
     const localTs=localRaw?JSON.parse(localRaw)._ts||0:0;
     const cloudTs=data._ts||0;
     if(localTs>cloudTs){updateSyncStatusTop(true);return true;}
-    if(data.USER) USER=data.USER;
-    if(data.USER_FD) USER_FD=data.USER_FD;
-    if(data.USER_RD) USER_RD=data.USER_RD;
-    if(data.TRESO) TRESO=data.TRESO;
-    localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,_ts:cloudTs}));
+    if(data.USER)         USER=data.USER;
+    if(data.USER_FD)      USER_FD=data.USER_FD;
+    if(data.USER_RD)      USER_RD=data.USER_RD;
+    if(data.TRESO)        TRESO=data.TRESO;
+    if(data.KSU_DATA)     KSU_DATA=data.KSU_DATA;
+    if(data.MANDAT_DATA)  MANDAT_DATA=data.MANDAT_DATA;
+    if(data.EXPLOIT_DATA) EXPLOIT_DATA=data.EXPLOIT_DATA;
+    localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,KSU_DATA,MANDAT_DATA,EXPLOIT_DATA,_ts:cloudTs}));
     YRS.forEach(yr=>{Object.keys(BASE[yr]||{}).forEach(cat=>{for(let mo=0;mo<12;mo++){const v=catTotalFromUser(yr,cat,mo);if(v!==null) BASE[yr][cat][mo]=v;}});});
     return true;
   }catch(e){return false;}
