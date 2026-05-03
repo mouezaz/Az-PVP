@@ -1946,14 +1946,30 @@ function renderExploit(){
 
 function exploitMakeCourtageRow(label='',amount=''){
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td><input type="text" value="${label.replace(/"/g,'&quot;')}" placeholder="April, SGS, Tetris…" oninput="updateExploitTotals()"></td>
-    <td><input type="number" step="0.01" class="amt" value="${amount>0?amount:''}" placeholder="0,00" oninput="updateExploitTotals()"></td>
-    <td class="del-cell"><button class="dyn-del" onclick="this.closest('tr').remove();updateExploitTotals()">×</button></td>`;
+  tr.innerHTML=`<td><input type="text" value="${label.replace(/"/g,'&quot;')}" placeholder="April, SGS, Tetris…" oninput="exploitCourtageSync()"></td>
+    <td><input type="number" step="0.01" class="amt" value="${amount>0?amount:''}" placeholder="0,00" oninput="exploitCourtageSync()"></td>
+    <td class="del-cell"><button class="dyn-del" onclick="this.closest('tr').remove();exploitCourtageSync()">×</button></td>`;
   return tr;
 }
 
 function exploitAddCourtage(){
   document.getElementById('exploit-courtage-body').appendChild(exploitMakeCourtageRow());
+  exploitCourtageSync();
+}
+
+function exploitCourtageSync(){
+  // Sync en mémoire vers USER pour cohérence avec Dashboard/Analyse
+  const mo1=exploit_mo+1; const yr=exploit_yr;
+  const courtageObj={};
+  document.querySelectorAll('#exploit-courtage-body tr').forEach(row=>{
+    const inputs=row.querySelectorAll('input');
+    const label=inputs[0]?.value.trim()||'';
+    const amount=+inputs[1]?.value||0;
+    if(label&&amount) courtageObj[label]=amount;
+  });
+  if(!USER[yr]) USER[yr]={};
+  if(!USER[yr][mo1]) USER[yr][mo1]={};
+  USER[yr][mo1].courtage=courtageObj;
   updateExploitTotals();
 }
 
@@ -2230,12 +2246,8 @@ function eAddRow(tableId){
 
 function updateExploitTotals(){
   const mo1=exploit_mo+1; const yr=exploit_yr;
-  // Rentabilité = Commissions (IARD + VIE) + Courtage direct — le virement est une info trésorerie
-  const iardComm=catTotal(yr,'iard',exploit_mo);
-  const vieComm=catTotal(yr,'vie',exploit_mo);
-  let courtageTotal=0;
-  document.querySelectorAll('#exploit-courtage-body tr input[type="number"]').forEach(el=>courtageTotal+=(+el.value||0));
-  const totalIn=iardComm+vieComm+courtageTotal;
+  // Rentabilité = monthComm (IARD + VIE + Courtage) — cohérent avec Dashboard/Analyse
+  const totalIn=monthComm(yr,exploit_mo);
   const totalChg=CHG_CATS.reduce((s,c)=>s+catTotal(yr,c,exploit_mo),0);
   const solde=totalIn-totalChg;
   document.getElementById('exploit-in-tot').textContent=fmt(totalIn,2);
