@@ -173,8 +173,9 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .treso-kc{background:white;border-radius:12px;padding:14px 16px;text-align:center}
 .treso-kc .tlbl{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
 .treso-kc .tval{font-size:20px;font-weight:800;color:#1e293b}
-.fcard{background:white;border-radius:12px;margin-bottom:8px;overflow:hidden}
-.fcard-hd{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;transition:background .15s}
+.fcard{background:white;border-radius:12px;margin-bottom:8px}
+.fcard-hd{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;transition:background .15s;background:white;border-radius:12px}
+.fcard.open .fcard-hd{border-radius:12px 12px 0 0;border-bottom:1px solid #f1f5f9;box-shadow:0 2px 6px rgba(0,0,0,.06)}
 .fcard-hd:hover{background:#fafafa}
 .fcard-hd .title{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px}
 .fcard-hd .right{display:flex;align-items:center;gap:8px}
@@ -182,8 +183,35 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .ftot{font-size:15px;font-weight:800;color:#0284c7}
 .arr{color:#94a3b8;font-size:11px;transition:transform .2s}
 .fcard.open .arr{transform:rotate(180deg)}
-.fcard-bd{display:none;padding:4px 16px 16px}
+.fcard-bd{display:none;padding:4px 16px 16px;border-radius:0 0 12px 12px}
 .fcard.open .fcard-bd{display:block}
+/* Headers sticky pour les sous-catégories du Compte Exploitation */
+#exploit-chg-cards .fcard-hd{position:sticky;top:0;z-index:4}
+#exploit-chg-cards .fcard.open .fcard-hd{box-shadow:0 3px 8px rgba(0,0,0,.1)}
+/* Récapitulatif multi-mois */
+.recap-wrap{background:white;border-radius:12px;overflow:hidden;margin-bottom:14px;border:1px solid #e2e8f0}
+.recap-hd{padding:10px 16px;background:#1e293b;color:white;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.recap-hd-title{font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#cbd5e1}
+.recap-body{overflow-x:auto}
+.recap-tbl{width:100%;border-collapse:collapse;font-size:12.5px;min-width:400px}
+.recap-tbl th{background:#f8fafc;padding:7px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#64748b;border-bottom:1px solid #e2e8f0;text-align:right;white-space:nowrap}
+.recap-tbl th:first-child{text-align:left;min-width:155px;position:sticky;left:0;z-index:2;background:#f8fafc}
+.recap-tbl th.rcur{background:#eff6ff;color:#1d4ed8}
+.recap-tbl td{padding:6px 10px;border-bottom:1px solid #f8fafc;text-align:right;color:#374151;font-weight:500;white-space:nowrap}
+.recap-tbl td:first-child{text-align:left;font-size:12px;position:sticky;left:0;z-index:1;background:white}
+.recap-tbl tr:hover td{background:#f8fafc}.recap-tbl tr:hover td:first-child{background:#f0f4f8}
+.recap-tbl .r-sec td{background:#f1f5f9;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#94a3b8;padding:4px 10px;border-bottom:1px solid #e2e8f0}
+.recap-tbl .r-sec td:first-child{background:#f1f5f9}
+.recap-tbl .r-rev-tot td{background:#eff6ff;font-weight:700;color:#1d4ed8;border-top:1.5px solid #bfdbfe;border-bottom:1.5px solid #bfdbfe}
+.recap-tbl .r-rev-tot td:first-child{background:#eff6ff}
+.recap-tbl .r-chg-tot td{background:#fff7ed;font-weight:700;color:#ea580c;border-top:1.5px solid #fed7aa;border-bottom:1.5px solid #fed7aa}
+.recap-tbl .r-chg-tot td:first-child{background:#fff7ed}
+.recap-tbl .r-solde td{background:#0f172a;color:#6ee7b7;font-weight:800}
+.recap-tbl .r-solde td:first-child{background:#0f172a;color:#94a3b8}
+.recap-tbl .rcur{background:#f0f9ff}
+.recap-tbl .r-rev-tot .rcur,.recap-tbl .r-chg-tot .rcur{background:inherit}
+.recap-nav{background:none;border:none;cursor:pointer;font-size:10px;color:#93c5fd;padding:2px 6px;border-radius:4px;transition:background .15s}
+.recap-nav:hover{background:rgba(255,255,255,.15)}
 .dyn-table{width:100%;border-collapse:collapse;font-size:13px}
 .dyn-table th{background:#f8fafc;padding:7px 10px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b}
 .dyn-table td{padding:6px 8px;border-bottom:1px solid #f8fafc;vertical-align:middle}
@@ -433,6 +461,9 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
         <div id="exploitMonths" class="months-nav"></div>
       </div>
       <div class="krow" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px" id="exploitKpi"></div>
+
+      <!-- Récapitulatif mois précédents -->
+      <div id="exploit-recap" style="margin-bottom:14px"></div>
 
       <!-- Entrées -->
       <div class="fcard open" style="margin-bottom:10px">
@@ -1868,6 +1899,7 @@ function renderExploit(){
   }
   // Charges depuis USER/USER_FD
   renderExploitCharges();
+  renderExploitRecap();
   updateExploitTotals();
   renderExploitKpi();
 }
@@ -1883,6 +1915,80 @@ function exploitMakeCourtageRow(label='',amount=''){
 function exploitAddCourtage(){
   document.getElementById('exploit-courtage-body').appendChild(exploitMakeCourtageRow());
   updateExploitTotals();
+}
+
+function renderExploitRecap(){
+  const yr=exploit_yr, mo=exploit_mo;
+  // Colonnes : M-3, M-2, M-1, mois actuel
+  const cols=[];
+  for(let i=3;i>=0;i--){
+    let m=mo-i, y=yr;
+    while(m<0){m+=12;y--;}
+    cols.push({yr:y,mo:m,isCurrent:i===0});
+  }
+  const el=document.getElementById('exploit-recap');
+  if(!el) return;
+
+  let th=`<th>Poste</th>`;
+  cols.forEach(c=>{
+    const label=MO[c.mo].substring(0,3)+(c.yr!==yr?' '+c.yr:'');
+    const nav=!c.isCurrent?` onclick="exploit_mo=${c.mo};${c.yr!==yr?'exploit_yr='+c.yr+';':''}buildExploitMonthNav();renderExploit()" style="cursor:pointer" title="Aller à ${MO[c.mo]} ${c.yr}"`:'';
+    th+=`<th class="${c.isCurrent?'rcur':''}"${nav}>${label}${c.isCurrent?'<br><span style="font-size:9px;font-weight:500;color:#2563eb;display:block">▶ actuel</span>':''}</th>`;
+  });
+
+  function dataRow(icon,label,fn){
+    let r=`<tr><td>${icon} ${label}</td>`;
+    cols.forEach(c=>{
+      const v=fn(c.yr,c.mo);
+      r+=`<td class="${c.isCurrent?'rcur':''}">${v>0?fmtN(Math.round(v)):'—'}</td>`;
+    });
+    return r+'</tr>';
+  }
+  function totRow(cls,label,fn){
+    let r=`<tr class="${cls}"><td>${label}</td>`;
+    cols.forEach(c=>{
+      const v=fn(c.yr,c.mo);
+      r+=`<td class="${c.isCurrent?'rcur':''}">${v>0?fmtN(Math.round(v)):'—'}</td>`;
+    });
+    return r+'</tr>';
+  }
+  function secRow(label){
+    return `<tr class="r-sec"><td colspan="${cols.length+1}">${label}</td></tr>`;
+  }
+
+  let rows='';
+  rows+=secRow('▸ REVENUS');
+  REV_CATS.forEach(cat=>rows+=dataRow(CATS[cat].icon,CATS[cat].label.replace('Commissions Allianz ',''),
+    (y,m)=>catTotal(y,cat,m)));
+  rows+=totRow('r-rev-tot','TOTAL REVENUS',(y,m)=>monthComm(y,m));
+
+  rows+=secRow('▸ CHARGES');
+  CHG_CATS.forEach(cat=>rows+=dataRow(CATS[cat].icon,CATS[cat].label.replace('Charges ','').replace('Masse Salariale','Salaires'),
+    (y,m)=>catTotal(y,cat,m)));
+  rows+=totRow('r-chg-tot','TOTAL CHARGES',(y,m)=>monthChg(y,m));
+
+  // Solde
+  let rSolde=`<tr class="r-solde"><td>💰 SOLDE NET</td>`;
+  cols.forEach(c=>{
+    const v=monthSolde(c.yr,c.mo);
+    const comm=monthComm(c.yr,c.mo);
+    const color=comm>0?(v>=0?'#6ee7b7':'#f87171'):'#475569';
+    rSolde+=`<td class="${c.isCurrent?'rcur':''}" style="color:${color}">${comm>0?fmtN(Math.round(v)):'—'}</td>`;
+  });
+  rSolde+='</tr>';
+  rows+=rSolde;
+
+  // État du toggle (ouvert par défaut)
+  const wasOpen=el.dataset.open!=='0';
+  el.innerHTML=`<div class="recap-wrap">
+    <div class="recap-hd" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';document.getElementById('exploit-recap').dataset.open=this.nextElementSibling.style.display==='none'?'0':'1'">
+      <span class="recap-hd-title">📊 Récapitulatif — 3 mois précédents</span>
+      <span style="color:#64748b;font-size:11px">▾ cliquer sur un mois pour y aller</span>
+    </div>
+    <div class="recap-body" style="${wasOpen?'':'display:none'}">
+      <table class="recap-tbl"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>
+    </div>
+  </div>`;
 }
 
 function renderExploitCharges(){
