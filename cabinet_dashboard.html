@@ -465,8 +465,8 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
         <span style="font-size:22px;font-weight:800" id="exploit-solde">—</span>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-p" onclick="saveExploit()">💾 Enregistrer</button>
-        <button class="btn btn-g" onclick="initExploit()">↺ Annuler</button>
+        <button class="btn btn-p" onclick="saveExploit()">💾 Enregistrer courtage</button>
+        <button class="btn btn-g" onclick="initExploit()">↺ Rafraîchir</button>
       </div>
     </div>
 
@@ -1040,9 +1040,6 @@ function closeDrawer(){
   if(activeView==='view-exploitation') renderExploit();
   else if(activeView==='view-grille') renderGrille();
   d_cat=null;
-}
-function openDrawerExploit(cat){
-  openDrawer(cat,exploit_yr,exploit_mo);
 }
 
 function buildDrawerContent(cat,yr,mo){
@@ -1846,6 +1843,8 @@ function buildExploitMonthNav(){
 
 function renderExploit(){
   const mo1=exploit_mo+1;
+  // Réinitialiser les accordéons (nouveau mois)
+  CHG_CATS.forEach(cat=>{const b=document.getElementById(`eacc-body-${cat}`);if(b) delete b.dataset.loaded;});
   const data=EXPLOIT_DATA[exploit_yr]?.[mo1]||{courtage:[],virement_recu:0};
   // Virement auto depuis Compte Mandat
   const virAuto=MANDAT_DATA[exploit_yr]?.[mo1]?.virement||data.virement_recu||0;
@@ -1884,24 +1883,138 @@ function exploitAddCourtage(){
 
 function renderExploitCharges(){
   const mo1=exploit_mo+1; const yr=exploit_yr;
-  let html='';
+  const container=document.getElementById('exploit-chg-cards');
+  container.innerHTML='';
   CHG_CATS.forEach(cat=>{
     const tot=catTotal(yr,cat,exploit_mo);
-    const hasData=tot>0;
-    html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:18px">${CATS[cat].icon}</span>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:#374151">${CATS[cat].label}</div>
-          <div style="font-size:12px;color:${hasData?'#dc2626':'#94a3b8'};font-weight:${hasData?'700':'400'}">${hasData?fmt(tot,2):'Non saisi'}</div>
-        </div>
+    const card=document.createElement('div');
+    card.className='fcard';
+    card.id=`eacc-${cat}`;
+    card.innerHTML=`
+      <div class="fcard-hd" onclick="toggleExploitAcc('${cat}')">
+        <div class="title"><span style="font-size:16px">${CATS[cat].icon}</span>${CATS[cat].label}</div>
+        <div class="right"><span class="ftot" id="eacc-tot-${cat}" style="color:${tot>0?'#dc2626':'#94a3b8'}">${tot>0?fmt(tot,2):'—'}</span><span class="arr">▾</span></div>
       </div>
-      <button onclick="openDrawerExploit('${cat}')" style="background:${hasData?'#f0fdf4':'#eff6ff'};color:${hasData?'#059669':'#1d4ed8'};border:1.5px solid ${hasData?'#86efac':'#bfdbfe'};padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">
-        ${hasData?'✏️ Modifier':'✏️ Saisir'}
-      </button>
-    </div>`;
+      <div class="fcard-bd" id="eacc-body-${cat}"></div>`;
+    container.appendChild(card);
   });
-  document.getElementById('exploit-chg-cards').innerHTML=html;
+}
+
+function toggleExploitAcc(cat){
+  const card=document.getElementById(`eacc-${cat}`);
+  const body=document.getElementById(`eacc-body-${cat}`);
+  const wasOpen=card.classList.contains('open');
+  card.classList.toggle('open');
+  if(!wasOpen && !body.dataset.loaded){
+    body.innerHTML=buildExploitCatContent(cat,exploit_yr,exploit_mo+1);
+    body.dataset.loaded='1';
+  }
+}
+
+function buildExploitCatContent(cat,yr,mo1){
+  if(cat==='fixes') return buildExploitFixesContent(yr,mo1);
+  return buildExploitSimpleContent(cat,yr,mo1);
+}
+
+function buildExploitSimpleContent(cat,yr,mo1){
+  const d=getDetail(yr,mo1);
+  const vals=d?.[cat]||{};
+  const def=CATS[cat];
+  let items=def.items||[];
+  if(cat==='salariale'&&(yr>2026||(yr===2026&&mo1>=3))) items=items.filter(it=>it!=='Salaire YF');
+  const rows=items.map(it=>`<div class="di"><label>${it}</label><input type="number" data-ekey="${it}" step="0.01" value="${(vals[it]||0)>0?(vals[it]).toFixed(2):''}" placeholder="0,00" oninput="exploitCatUpdate('${cat}')"></div>`).join('');
+  return `<div class="dg open"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">Détail</span><span class="dg-arr">▾</span></div><div class="dg-bd">${rows}</div></div>`;
+}
+
+function buildExploitFixesContent(yr,mo1){
+  const d=getDetail(yr,mo1)?.fixes||{};
+  const fd=getFixesDetail(yr,mo1)||{};
+  const cat='fixes';
+  let html='';
+  const simpleRows=FIXES_SIMPLE.map(it=>`<div class="di"><label>${it}</label><input type="number" data-fixes-item="${it}" step="0.01" value="${(d[it]||0)>0?(d[it]).toFixed(2):''}" placeholder="0,00" oninput="exploitCatUpdate('fixes')"></div>`).join('');
+  html+=`<div class="dg open"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">🏢 Postes récurrents</span><span class="dg-arr">▾</span></div><div class="dg-bd">${simpleRows}</div></div>`;
+  Object.entries(FIXES_SUBS).forEach(([key,def])=>{
+    const sub=fd[key]||{};
+    const rows=def.items.map(it=>`<div class="di"><label>${it}</label><input type="number" data-fixes-sub="${key}" data-key="${it}" step="0.01" value="${(sub[it]||0)>0?(sub[it]).toFixed(2):''}" placeholder="0,00" oninput="exploitCatUpdate('fixes')"></div>`).join('');
+    html+=`<div class="dg open"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">${def.label}</span><span class="dg-arr">▾</span></div><div class="dg-bd">${rows}</div></div>`;
+  });
+  const dej=fd.dejeuners||[];
+  const dejRows=dej.map(v=>`<tr><td><input type="number" data-da step="0.01" value="${v>0?v.toFixed(2):''}" placeholder="0,00" oninput="exploitCatUpdate('fixes')"></td><td class="dc"><button class="ddel" onclick="eDelRow(this,'fixes')">×</button></td></tr>`).join('');
+  html+=`<div class="dg open"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">🍽 Déjeuners</span><span class="dg-arr">▾</span></div>
+    <div class="dg-bd"><table class="dt-tbl" id="eacc-dyn-dejeuners">
+      <thead><tr><th>Montant</th><th></th></tr></thead>
+      <tbody>${dejRows||'<tr><td><input type="number" data-da step="0.01" placeholder="0,00" oninput="exploitCatUpdate(\'fixes\')"></td><td class="dc"><button class="ddel" onclick="eDelRow(this,\'fixes\')">×</button></td></tr>'}</tbody>
+    </table><button class="dadd" onclick="eAddDej()">+ Ajouter un déjeuner</button></div></div>`;
+  ['voyages','achats'].forEach(key=>{
+    const arr=fd[key]||[];
+    const icon=key==='voyages'?'✈':'🛒';
+    const lbl=key==='voyages'?'Voyages & Déplacements':'Achats';
+    const rows2=arr.map(r=>`<tr><td><input type="text" data-dd value="${(r.desc||'').replace(/"/g,'&quot;')}" placeholder="Description" oninput="exploitCatUpdate('fixes')"></td><td><input type="number" data-da step="0.01" value="${(r.amount||0)>0?r.amount.toFixed(2):''}" placeholder="0,00" oninput="exploitCatUpdate('fixes')"></td><td class="dc"><button class="ddel" onclick="eDelRow(this,'fixes')">×</button></td></tr>`).join('');
+    html+=`<div class="dg open"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">${icon} ${lbl}</span><span class="dg-arr">▾</span></div>
+      <div class="dg-bd"><table class="dt-tbl" id="eacc-dyn-${key}">
+        <thead><tr><th>Description</th><th>Montant</th><th></th></tr></thead>
+        <tbody>${rows2||`<tr><td><input type="text" data-dd placeholder="Description" oninput="exploitCatUpdate('fixes')"></td><td><input type="number" data-da step="0.01" placeholder="0,00" oninput="exploitCatUpdate('fixes')"></td><td class="dc"><button class="ddel" onclick="eDelRow(this,'fixes')">×</button></td></tr>`}</tbody>
+      </table><button class="dadd" onclick="eAddRow('eacc-dyn-${key}')">+ Ajouter</button></div></div>`;
+  });
+  return html;
+}
+
+function exploitCatUpdate(cat){
+  const yr=exploit_yr, mo1=exploit_mo+1;
+  const body=document.getElementById(`eacc-body-${cat}`);
+  if(!body) return;
+  let total=0;
+  if(cat==='fixes'){
+    if(!USER[yr]) USER[yr]={};
+    if(!USER[yr][mo1]) USER[yr][mo1]={};
+    if(!USER_FD[yr]) USER_FD[yr]={};
+    if(!USER_FD[yr][mo1]) USER_FD[yr][mo1]={};
+    const fixesObj={};
+    FIXES_SIMPLE.forEach(it=>{const v=+body.querySelector(`[data-fixes-item="${it}"]`)?.value||0;fixesObj[it]=v;total+=v;});
+    Object.entries(FIXES_SUBS).forEach(([key,def])=>{
+      const sub={};let subT=0;
+      def.items.forEach(it=>{const v=+body.querySelector(`[data-fixes-sub="${key}"][data-key="${it}"]`)?.value||0;sub[it]=v;subT+=v;});
+      USER_FD[yr][mo1][key]=sub;fixesObj[def.label]=subT;total+=subT;
+    });
+    const dej=[];body.querySelectorAll('#eacc-dyn-dejeuners tbody tr').forEach(row=>{const v=+row.querySelector('[data-da]')?.value||0;if(v>0) dej.push(v);});
+    USER_FD[yr][mo1].dejeuners=dej;fixesObj['Déjeuners']=dej.reduce((s,v)=>s+v,0);total+=fixesObj['Déjeuners'];
+    ['voyages','achats'].forEach(key=>{
+      const arr=[];body.querySelectorAll(`#eacc-dyn-${key} tbody tr`).forEach(row=>{const desc=row.querySelector('[data-dd]')?.value||'';const amount=+row.querySelector('[data-da]')?.value||0;if(amount>0||desc) arr.push({desc,amount});});
+      USER_FD[yr][mo1][key]=arr;const t=arr.reduce((s,r)=>s+r.amount,0);fixesObj[key==='voyages'?'Voyages':'Achats']=t;total+=t;
+    });
+    USER[yr][mo1].fixes=fixesObj;
+    if(BASE[yr]?.fixes) BASE[yr].fixes[exploit_mo]=total;
+  } else {
+    const obj={};
+    let items=CATS[cat].items||[];
+    if(cat==='salariale'&&(yr>2026||(yr===2026&&mo1>=3))) items=items.filter(it=>it!=='Salaire YF');
+    items.forEach(it=>{const v=+body.querySelector(`[data-ekey="${it}"]`)?.value||0;obj[it]=v;total+=v;});
+    if(!USER[yr]) USER[yr]={};
+    if(!USER[yr][mo1]) USER[yr][mo1]={};
+    USER[yr][mo1][cat]=obj;
+    if(BASE[yr]?.[cat]) BASE[yr][cat][exploit_mo]=total;
+  }
+  // Mettre à jour le total dans l'en-tête de l'accordéon
+  const totEl=document.getElementById(`eacc-tot-${cat}`);
+  if(totEl){totEl.textContent=total>0?fmt(total,2):'—';totEl.style.color=total>0?'#dc2626':'#94a3b8';}
+  saveLocal();
+  updateExploitTotals();
+}
+
+function eDelRow(btn,cat){btn.closest('tr').remove();exploitCatUpdate(cat);}
+function eAddDej(){
+  const tb=document.querySelector('#eacc-dyn-dejeuners tbody');
+  if(!tb) return;
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input type="number" data-da step="0.01" placeholder="0,00" oninput="exploitCatUpdate('fixes')"></td><td class="dc"><button class="ddel" onclick="eDelRow(this,'fixes')">×</button></td>`;
+  tb.appendChild(tr);
+}
+function eAddRow(tableId){
+  const tb=document.querySelector(`#${tableId} tbody`);
+  if(!tb) return;
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input type="text" data-dd placeholder="Description" oninput="exploitCatUpdate('fixes')"></td><td><input type="number" data-da step="0.01" placeholder="0,00" oninput="exploitCatUpdate('fixes')"></td><td class="dc"><button class="ddel" onclick="eDelRow(this,'fixes')">×</button></td>`;
+  tb.appendChild(tr);exploitCatUpdate('fixes');
 }
 
 function updateExploitTotals(){
