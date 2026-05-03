@@ -157,7 +157,10 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 /* Treso */
 .sbar{display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
 .sbar select{padding:7px 11px;border-radius:8px;border:1.5px solid #e2e8f0;font-size:13px;background:white;font-weight:500}
-.months-nav{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px}
+.months-nav{display:flex;gap:5px;flex-wrap:wrap}
+.mnav-btn{padding:6px 11px;border-radius:20px;border:1.5px solid #e2e8f0;background:white;cursor:pointer;font-size:12px;font-weight:600;color:#64748b;transition:all .15s}
+.mnav-btn:hover:not(.active){border-color:#1d4ed8;color:#1d4ed8}
+.mnav-btn.active{background:#1d4ed8;color:white;border-color:#1d4ed8}
 .mchip{padding:6px 11px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid #e2e8f0;background:white;color:#64748b;transition:all .15s}
 .mchip.active{background:#1d4ed8;color:white;border-color:#1d4ed8}
 .mchip.has-data{border-color:#10b981;color:#065f46;background:#f0fdf4}
@@ -239,9 +242,11 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
   <div class="sb-logo"><h2>🏢 Cabinet<br>Tableau de Bord</h2><small>Agent Général</small></div>
   <nav>
     <a class="active" onclick="go('dashboard')"><span class="ic">🏠</span>Tableau de bord</a>
+    <a onclick="go('ksu')"><span class="ic">🏦</span>KSU / Allianz</a>
+    <a onclick="go('mandat')"><span class="ic">💳</span>Compte Mandat</a>
+    <a onclick="go('exploitation')"><span class="ic">🏢</span>Compte Exploitation</a>
     <a onclick="go('grille')"><span class="ic">📊</span>Grille de saisie</a>
     <a onclick="go('analyse')"><span class="ic">📋</span>Analyse détaillée</a>
-    <a onclick="go('tresorerie')"><span class="ic">💳</span>Trésorerie Allianz</a>
   </nav>
   <div class="sb-info">
     <span class="sb-badge">📅 Avril 2026</span>
@@ -328,18 +333,146 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
       </div>
     </div>
 
-    <!-- TRÉSORERIE -->
-    <div class="view" id="view-tresorerie">
+    <!-- KSU / ALLIANZ -->
+    <div class="view" id="view-ksu">
       <div class="sbar">
-        <select id="tYear" onchange="initTreso()"></select>
-        <div id="tMonths" class="months-nav"></div>
+        <select id="ksuYear" onchange="ksu_yr=+this.value;ksu_mo=0;initKsu()"></select>
+        <div id="ksuMonths" class="months-nav"></div>
       </div>
-      <div class="treso-summary" id="tresoKpi"></div>
-      <div id="tresoForm"></div>
-      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-        <button class="btn btn-p" onclick="saveTreso()">💾 Enregistrer</button>
-        <button class="btn btn-g" onclick="initTreso()">↺ Annuler</button>
+      <div class="krow" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px" id="ksuKpi"></div>
+      <div class="fcard open" style="margin-bottom:12px">
+        <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
+          <div class="title"><span class="ic2">🏦</span>Mouvements KSU — <span id="ksu-mo-label">Janvier 2026</span></div>
+          <div class="right"><span class="ftot" id="ksu-net-top">—</span><span class="arr">▾</span></div>
+        </div>
+        <div class="fcard-bd">
+          <p style="font-size:12px;color:#64748b;margin:0 0 10px">Saisir toutes les lignes du relevé KSU (montants positifs = entrées, négatifs = prélèvements)</p>
+          <table class="dyn-table">
+            <thead><tr><th style="width:55%">Libellé</th><th>Montant (€)</th><th class="del-cell"></th></tr></thead>
+            <tbody id="ksu-body"></tbody>
+          </table>
+          <button class="btn-add-row" onclick="ksuAddRow()">+ Ajouter une ligne</button>
+        </div>
       </div>
+      <div style="background:#0f172a;border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <span style="color:#94a3b8;font-size:13px;font-weight:600">Net versé sur Compte Mandat</span>
+        <span style="color:#6ee7b7;font-size:22px;font-weight:800" id="ksu-net-final">—</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-p" onclick="saveKsu()">💾 Enregistrer</button>
+        <button class="btn btn-g" onclick="initKsu()">↺ Annuler</button>
+      </div>
+    </div>
+
+    <!-- COMPTE MANDAT -->
+    <div class="view" id="view-mandat">
+      <div class="sbar">
+        <select id="mandatYear" onchange="mandat_yr=+this.value;mandat_mo=0;initMandat()"></select>
+        <div id="mandatMonths" class="months-nav"></div>
+      </div>
+      <div class="krow" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px" id="mandatKpi"></div>
+
+      <!-- Entrées -->
+      <div class="fcard open" style="margin-bottom:10px">
+        <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
+          <div class="title"><span class="ic2">📥</span>Entrées Compte Mandat</div>
+          <div class="right"><span class="ftot" id="mandat-in-tot">—</span><span class="arr">▾</span></div>
+        </div>
+        <div class="fcard-bd">
+          <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;color:#1e40af;font-weight:600">🏦 Net KSU reçu</span>
+            <span style="font-size:15px;font-weight:700;color:#1d4ed8" id="mandat-ksu-auto">—</span>
+          </div>
+          <p style="font-size:12px;color:#64748b;margin:0 0 8px;font-weight:600">Encaissements clients directs :</p>
+          <table class="dyn-table">
+            <thead><tr><th style="width:25%">Mode</th><th>Client / Description</th><th>Montant</th><th class="del-cell"></th></tr></thead>
+            <tbody id="mandat-enc-body"></tbody>
+          </table>
+          <button class="btn-add-row" onclick="mandatAddEnc()">+ Ajouter encaissement</button>
+        </div>
+      </div>
+
+      <!-- Sorties -->
+      <div class="fcard open" style="margin-bottom:10px">
+        <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
+          <div class="title"><span class="ic2">📤</span>Sorties Compte Mandat</div>
+          <div class="right"><span class="ftot" id="mandat-out-tot">—</span><span class="arr">▾</span></div>
+        </div>
+        <div class="fcard-bd">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
+            <div>
+              <label style="font-size:12px;color:#374151;font-weight:600;display:block;margin-bottom:4px">📤 Remontée fonds Allianz <span style="font-weight:400;color:#94a3b8">(tableur Allianz)</span></label>
+              <input type="number" id="mandat-remontee" step="0.01" placeholder="0,00" style="width:100%;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:700;text-align:right" oninput="updateMandatTotals()">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#374151;font-weight:600;display:block;margin-bottom:4px">🏢 Virement Compte Exploitation</label>
+              <input type="number" id="mandat-virement" step="0.01" placeholder="0,00" style="width:100%;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:700;text-align:right" oninput="updateMandatTotals()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Solde -->
+      <div style="background:#0f172a;border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <span style="color:#94a3b8;font-size:13px;font-weight:600">Solde Compte Mandat</span>
+        <span style="font-size:22px;font-weight:800" id="mandat-solde">—</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-p" onclick="saveMandat()">💾 Enregistrer</button>
+        <button class="btn btn-g" onclick="initMandat()">↺ Annuler</button>
+      </div>
+    </div>
+
+    <!-- COMPTE EXPLOITATION -->
+    <div class="view" id="view-exploitation">
+      <div class="sbar">
+        <select id="exploitYear" onchange="exploit_yr=+this.value;exploit_mo=0;initExploit()"></select>
+        <div id="exploitMonths" class="months-nav"></div>
+      </div>
+      <div class="krow" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px" id="exploitKpi"></div>
+
+      <!-- Entrées -->
+      <div class="fcard open" style="margin-bottom:10px">
+        <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
+          <div class="title"><span class="ic2">📥</span>Entrées Compte Exploitation</div>
+          <div class="right"><span class="ftot" id="exploit-in-tot">—</span><span class="arr">▾</span></div>
+        </div>
+        <div class="fcard-bd">
+          <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;color:#1e40af;font-weight:600">💳 Virement reçu du Compte Mandat</span>
+            <span style="font-size:15px;font-weight:700;color:#1d4ed8" id="exploit-vir-auto">—</span>
+          </div>
+          <p style="font-size:12px;color:#64748b;margin:0 0 8px;font-weight:600">Courtage (hors Allianz) :</p>
+          <table class="dyn-table">
+            <thead><tr><th style="width:55%">Organisme</th><th>Montant</th><th class="del-cell"></th></tr></thead>
+            <tbody id="exploit-courtage-body"></tbody>
+          </table>
+          <button class="btn-add-row" onclick="exploitAddCourtage()">+ Ajouter courtage</button>
+        </div>
+      </div>
+
+      <!-- Charges -->
+      <div class="fcard open" style="margin-bottom:10px" id="fc-exploit-chg">
+        <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
+          <div class="title"><span class="ic2">📤</span>Charges Compte Exploitation</div>
+          <div class="right"><span class="ftot" id="exploit-chg-tot">—</span><span class="arr">▾</span></div>
+        </div>
+        <div class="fcard-bd" id="exploit-chg-body"></div>
+      </div>
+
+      <!-- Solde -->
+      <div style="background:#0f172a;border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <span style="color:#94a3b8;font-size:13px;font-weight:600">Solde Compte Exploitation</span>
+        <span style="font-size:22px;font-weight:800" id="exploit-solde">—</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-p" onclick="saveExploit()">💾 Enregistrer</button>
+        <button class="btn btn-g" onclick="initExploit()">↺ Annuler</button>
+      </div>
+    </div>
+
+    <!-- TRÉSORERIE (conservé pour compatibilité) -->
+    <div class="view" id="view-tresorerie" style="display:none">
     </div>
   </div>
 </div>
@@ -347,9 +480,10 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 <!-- Mobile nav -->
 <div id="mob-nav"><div class="mnav">
   <a class="active" onclick="go('dashboard')"><span class="mi">🏠</span>Bord</a>
+  <a onclick="go('ksu')"><span class="mi">🏦</span>KSU</a>
+  <a onclick="go('mandat')"><span class="mi">💳</span>Mandat</a>
+  <a onclick="go('exploitation')"><span class="mi">🏢</span>Exploit.</a>
   <a onclick="go('grille')"><span class="mi">📊</span>Grille</a>
-  <a onclick="go('analyse')"><span class="mi">📋</span>Analyse</a>
-  <a onclick="go('tresorerie')"><span class="mi">💳</span>Tréso.</a>
 </div></div>
 
 <!-- Drawer -->
@@ -572,6 +706,10 @@ function _buildComptaSync(ecritures){
 // MÉMOIRE UTILISATEUR
 // ================================================================
 let USER={}, USER_FD={}, USER_RD={}, TRESO={};
+// Nouvelles structures
+let KSU_DATA={};   // {yr:{mo:[{label,amount}]}}
+let MANDAT_DATA={}; // {yr:{mo:{enc:[{type,desc,amount}],remontee:0,virement:0}}}
+let EXPLOIT_DATA={}; // {yr:{mo:{courtage:[{label,amount}],virement_recu:0}}}
 
 // ================================================================
 // PERSISTANCE LOCALE (localStorage)
@@ -579,7 +717,7 @@ let USER={}, USER_FD={}, USER_RD={}, TRESO={};
 const LS_KEY='cab_v1';
 function saveLocal(){
   try{
-    localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,_ts:Date.now()}));
+    localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,KSU_DATA,MANDAT_DATA,EXPLOIT_DATA,_ts:Date.now()}));
   }catch(e){}
   cloudSave();
 }
@@ -588,10 +726,13 @@ function loadLocal(){
     const raw=localStorage.getItem(LS_KEY);
     if(!raw) return;
     const d=JSON.parse(raw);
-    if(d.USER)    USER=d.USER;
-    if(d.USER_FD) USER_FD=d.USER_FD;
-    if(d.USER_RD) USER_RD=d.USER_RD;
-    if(d.TRESO)   TRESO=d.TRESO;
+    if(d.USER)        USER=d.USER;
+    if(d.USER_FD)     USER_FD=d.USER_FD;
+    if(d.USER_RD)     USER_RD=d.USER_RD;
+    if(d.TRESO)       TRESO=d.TRESO;
+    if(d.KSU_DATA)    KSU_DATA=d.KSU_DATA;
+    if(d.MANDAT_DATA) MANDAT_DATA=d.MANDAT_DATA;
+    if(d.EXPLOIT_DATA)EXPLOIT_DATA=d.EXPLOIT_DATA;
     // Re-synchronise BASE avec les données USER (pour cohérence des graphiques)
     YRS.forEach(yr=>{
       Object.keys(BASE[yr]||{}).forEach(cat=>{
@@ -665,12 +806,14 @@ function go(v){
   document.querySelectorAll('nav a,#mob-nav a').forEach(e=>e.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
   document.querySelectorAll(`[onclick="go('${v}')"]`).forEach(e=>e.classList.add('active'));
-  const titles={dashboard:'Tableau de Bord',grille:'Grille de Saisie',analyse:'Analyse Détaillée',tresorerie:'Trésorerie Allianz'};
+  const titles={dashboard:'Tableau de Bord',ksu:'KSU / Allianz',mandat:'Compte Mandat',exploitation:'Compte Exploitation',grille:'Grille de Saisie',analyse:'Analyse Détaillée'};
   document.getElementById('bartitle').textContent=titles[v]||v;
-  if(v==='dashboard') renderDash();
-  if(v==='grille')    initGrille();
-  if(v==='analyse')   renderAnalyse();
-  if(v==='tresorerie') initTreso();
+  if(v==='dashboard')   renderDash();
+  if(v==='ksu')         initKsu();
+  if(v==='mandat')      initMandat();
+  if(v==='exploitation')initExploit();
+  if(v==='grille')      initGrille();
+  if(v==='analyse')     renderAnalyse();
 }
 function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 
@@ -1436,7 +1579,376 @@ function saveTreso(){
   showNotif('💾 Trésorerie enregistrée et synchronisée !');
   buildTresoMonthNav();
 }
-function toggleCard(id){document.getElementById(id).classList.toggle('open');}
+function toggleCard(el){if(typeof el==='string') el=document.getElementById(el); if(el) el.classList.toggle('open');}
+
+// ================================================================
+// KSU / ALLIANZ
+// ================================================================
+let ksu_yr=CURRENT_YEAR, ksu_mo=CURRENT_MONTH-1; // mo 0-based
+
+function initKsu(){
+  const sel=document.getElementById('ksuYear');
+  if(!sel.options.length) YRS.forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=y+(y===CURRENT_YEAR?' ★':'');sel.appendChild(o);});
+  sel.value=ksu_yr;
+  buildKsuMonthNav();
+  renderKsu();
+}
+
+function buildKsuMonthNav(){
+  const c=document.getElementById('ksuMonths'); c.innerHTML='';
+  const limit=ksu_yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  for(let i=0;i<limit;i++){
+    const b=document.createElement('button');
+    b.className='mnav-btn'+(i===ksu_mo?' active':'');
+    b.textContent=MO[i].substring(0,3);
+    b.onclick=(()=>{const m=i;return()=>{ksu_mo=m;buildKsuMonthNav();renderKsu();};})();
+    c.appendChild(b);
+  }
+  document.getElementById('ksu-mo-label').textContent=MO[ksu_mo]+' '+ksu_yr;
+}
+
+function ksuGetLines(){
+  return KSU_DATA[ksu_yr]?.[ksu_mo+1]||[];
+}
+
+function renderKsu(){
+  const lines=ksuGetLines();
+  const body=document.getElementById('ksu-body');
+  body.innerHTML='';
+  // Lignes existantes ou lignes par défaut
+  const defaultLines=lines.length?lines:[
+    {label:'Commissions IARD',amount:''},
+    {label:'Commissions VIE',amount:''},
+    {label:'',amount:''}
+  ];
+  defaultLines.forEach(l=>body.appendChild(ksuMakeRow(l.label||'',l.amount||'')));
+  updateKsuTotal();
+  // KPIs annuels
+  renderKsuKpi();
+}
+
+function ksuMakeRow(label='',amount=''){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input type="text" value="${label.replace(/"/g,'&quot;')}" placeholder="ex: Commissions IARD, Reprises, Bonus…" oninput="updateKsuTotal()"></td>
+    <td><input type="number" step="0.01" class="amt" value="${amount!==''&&amount!==0?amount:''}" placeholder="0,00 (négatif si prélèvement)" oninput="updateKsuTotal()"></td>
+    <td class="del-cell"><button class="dyn-del" onclick="this.closest('tr').remove();updateKsuTotal()">×</button></td>`;
+  return tr;
+}
+
+function ksuAddRow(){
+  document.getElementById('ksu-body').appendChild(ksuMakeRow());
+  updateKsuTotal();
+}
+
+function updateKsuTotal(){
+  let net=0;
+  document.querySelectorAll('#ksu-body tr').forEach(row=>{
+    const amt=+row.querySelectorAll('input')[1]?.value||0;
+    net+=amt;
+  });
+  const s=fmt(net,2);
+  document.getElementById('ksu-net-top').textContent=s;
+  document.getElementById('ksu-net-final').textContent=s;
+  document.getElementById('ksu-net-final').style.color=net>=0?'#6ee7b7':'#f87171';
+}
+
+function saveKsu(){
+  const lines=[];
+  document.querySelectorAll('#ksu-body tr').forEach(row=>{
+    const inputs=row.querySelectorAll('input');
+    const label=inputs[0]?.value.trim()||'';
+    const amount=+inputs[1]?.value||0;
+    if(label||amount) lines.push({label,amount});
+  });
+  if(!KSU_DATA[ksu_yr]) KSU_DATA[ksu_yr]={};
+  KSU_DATA[ksu_yr][ksu_mo+1]=lines;
+  // Sync vers USER_RD pour cohérence Grille/Analyse
+  const iardLine=lines.find(l=>l.label.toLowerCase().includes('iard'));
+  const vieLine=lines.find(l=>l.label.toLowerCase().includes('vie'));
+  if(iardLine||vieLine){
+    if(!USER_RD[ksu_yr]) USER_RD[ksu_yr]={};
+    if(!USER_RD[ksu_yr][ksu_mo+1]) USER_RD[ksu_yr][ksu_mo+1]={};
+    if(iardLine) USER_RD[ksu_yr][ksu_mo+1].iard=[{desc:iardLine.label,amount:iardLine.amount}];
+    if(vieLine)  USER_RD[ksu_yr][ksu_mo+1].vie=[{desc:vieLine.label,amount:vieLine.amount}];
+  }
+  saveLocal();
+  showNotif('✅ KSU enregistré');
+  renderKsuKpi();
+}
+
+function getKsuNet(yr,mo1){
+  const lines=KSU_DATA[yr]?.[mo1]||[];
+  return lines.reduce((s,l)=>s+(+l.amount||0),0);
+}
+
+function renderKsuKpi(){
+  const yr=ksu_yr;
+  const limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  let total=0, months=0;
+  for(let m=1;m<=limit;m++){if(KSU_DATA[yr]?.[m]?.length){total+=getKsuNet(yr,m);months++;}}
+  const avg=months?total/months:0;
+  document.getElementById('ksuKpi').innerHTML=`
+    <div class="kc k1"><div class="lbl">💰 Net KSU ${yr} (${months} mois)</div><div class="val">${fmt(total)}</div></div>
+    <div class="kc k3"><div class="lbl">📊 Moyenne mensuelle</div><div class="val">${fmt(avg)}</div></div>
+    <div class="kc k4"><div class="lbl">📅 Mois saisis</div><div class="val" style="font-size:28px">${months} / ${limit}</div></div>`;
+}
+
+// ================================================================
+// COMPTE MANDAT
+// ================================================================
+let mandat_yr=CURRENT_YEAR, mandat_mo=CURRENT_MONTH-1;
+
+function initMandat(){
+  const sel=document.getElementById('mandatYear');
+  if(!sel.options.length) YRS.forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=y+(y===CURRENT_YEAR?' ★':'');sel.appendChild(o);});
+  sel.value=mandat_yr;
+  buildMandatMonthNav();
+  renderMandat();
+}
+
+function buildMandatMonthNav(){
+  const c=document.getElementById('mandatMonths'); c.innerHTML='';
+  const limit=mandat_yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  for(let i=0;i<limit;i++){
+    const b=document.createElement('button');
+    b.className='mnav-btn'+(i===mandat_mo?' active':'');
+    b.textContent=MO[i].substring(0,3);
+    b.onclick=(()=>{const m=i;return()=>{mandat_mo=m;buildMandatMonthNav();renderMandat();};})();
+    c.appendChild(b);
+  }
+}
+
+function renderMandat(){
+  const mo1=mandat_mo+1;
+  const data=MANDAT_DATA[mandat_yr]?.[mo1]||{enc:[],remontee:0,virement:0};
+  // Net KSU auto
+  const ksuNet=getKsuNet(mandat_yr,mo1);
+  document.getElementById('mandat-ksu-auto').textContent=fmt(ksuNet,2);
+  // Encaissements clients
+  const body=document.getElementById('mandat-enc-body');
+  body.innerHTML='';
+  const encs=data.enc&&data.enc.length?data.enc:[{type:'Chèque',desc:'',amount:''}];
+  encs.forEach(e=>body.appendChild(mandatMakeEncRow(e.type||'Chèque',e.desc||'',e.amount||'')));
+  // Sorties
+  document.getElementById('mandat-remontee').value=data.remontee>0?data.remontee:'';
+  document.getElementById('mandat-virement').value=data.virement>0?data.virement:'';
+  updateMandatTotals();
+  renderMandatKpi();
+}
+
+function mandatMakeEncRow(type='Chèque',desc='',amount=''){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><select onchange="updateMandatTotals()">
+    <option${type==='Chèque'?' selected':''}>Chèque</option>
+    <option${type==='Virement'?' selected':''}>Virement</option>
+    <option${type==='Espèces'?' selected':''}>Espèces</option>
+  </select></td>
+  <td><input type="text" value="${desc.replace(/"/g,'&quot;')}" placeholder="Client / description" oninput="updateMandatTotals()"></td>
+  <td><input type="number" step="0.01" class="amt" value="${amount>0?amount:''}" placeholder="0,00" oninput="updateMandatTotals()"></td>
+  <td class="del-cell"><button class="dyn-del" onclick="this.closest('tr').remove();updateMandatTotals()">×</button></td>`;
+  return tr;
+}
+
+function mandatAddEnc(){
+  document.getElementById('mandat-enc-body').appendChild(mandatMakeEncRow());
+  updateMandatTotals();
+}
+
+function updateMandatTotals(){
+  const mo1=mandat_mo+1;
+  const ksuNet=getKsuNet(mandat_yr,mo1);
+  let encClients=0;
+  document.querySelectorAll('#mandat-enc-body tr input[type="number"]').forEach(el=>encClients+=(+el.value||0));
+  const totalIn=ksuNet+encClients;
+  const remontee=+document.getElementById('mandat-remontee')?.value||0;
+  const virement=+document.getElementById('mandat-virement')?.value||0;
+  const totalOut=remontee+virement;
+  const solde=totalIn-totalOut;
+  document.getElementById('mandat-in-tot').textContent=fmt(totalIn,2);
+  document.getElementById('mandat-out-tot').textContent=fmt(totalOut,2);
+  const soldeEl=document.getElementById('mandat-solde');
+  soldeEl.textContent=fmt(solde,2);
+  soldeEl.style.color=solde>=0?'#6ee7b7':'#f87171';
+}
+
+function saveMandat(){
+  const mo1=mandat_mo+1;
+  const enc=[];
+  document.querySelectorAll('#mandat-enc-body tr').forEach(row=>{
+    const sel=row.querySelector('select');
+    const inputs=row.querySelectorAll('input');
+    const type=sel?.value||'Chèque';
+    const desc=inputs[0]?.value.trim()||'';
+    const amount=+inputs[1]?.value||0;
+    if(amount>0||desc) enc.push({type,desc,amount});
+  });
+  const remontee=+document.getElementById('mandat-remontee')?.value||0;
+  const virement=+document.getElementById('mandat-virement')?.value||0;
+  if(!MANDAT_DATA[mandat_yr]) MANDAT_DATA[mandat_yr]={};
+  MANDAT_DATA[mandat_yr][mo1]={enc,remontee,virement};
+  // Sync virement vers EXPLOIT_DATA
+  if(!EXPLOIT_DATA[mandat_yr]) EXPLOIT_DATA[mandat_yr]={};
+  if(!EXPLOIT_DATA[mandat_yr][mo1]) EXPLOIT_DATA[mandat_yr][mo1]={courtage:[],virement_recu:0};
+  EXPLOIT_DATA[mandat_yr][mo1].virement_recu=virement;
+  saveLocal();
+  showNotif('✅ Compte Mandat enregistré');
+  renderMandatKpi();
+}
+
+function renderMandatKpi(){
+  const yr=mandat_yr, limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  let totIn=0,totOut=0,months=0;
+  for(let m=1;m<=limit;m++){
+    const d=MANDAT_DATA[yr]?.[m];
+    if(d){
+      const kNet=getKsuNet(yr,m);
+      const enc=(d.enc||[]).reduce((s,e)=>s+(+e.amount||0),0);
+      totIn+=kNet+enc;
+      totOut+=(d.remontee||0)+(d.virement||0);
+      months++;
+    }
+  }
+  const solde=totIn-totOut;
+  document.getElementById('mandatKpi').innerHTML=`
+    <div class="kc k1"><div class="lbl">📥 Total Entrées ${yr}</div><div class="val">${fmt(totIn)}</div></div>
+    <div class="kc k2"><div class="lbl">📤 Total Sorties ${yr}</div><div class="val">${fmt(totOut)}</div></div>
+    <div class="kc k3"><div class="lbl">⚖️ Solde cumulé</div><div class="val" style="color:${solde>=0?'#059669':'#dc2626'}">${fmt(solde)}</div></div>
+    <div class="kc k4"><div class="lbl">📅 Mois saisis</div><div class="val" style="font-size:28px">${months} / ${limit}</div></div>`;
+}
+
+// ================================================================
+// COMPTE EXPLOITATION
+// ================================================================
+let exploit_yr=CURRENT_YEAR, exploit_mo=CURRENT_MONTH-1;
+
+function initExploit(){
+  const sel=document.getElementById('exploitYear');
+  if(!sel.options.length) YRS.forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=y+(y===CURRENT_YEAR?' ★':'');sel.appendChild(o);});
+  sel.value=exploit_yr;
+  buildExploitMonthNav();
+  renderExploit();
+}
+
+function buildExploitMonthNav(){
+  const c=document.getElementById('exploitMonths'); c.innerHTML='';
+  const limit=exploit_yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  for(let i=0;i<limit;i++){
+    const b=document.createElement('button');
+    b.className='mnav-btn'+(i===exploit_mo?' active':'');
+    b.textContent=MO[i].substring(0,3);
+    b.onclick=(()=>{const m=i;return()=>{exploit_mo=m;buildExploitMonthNav();renderExploit();};})();
+    c.appendChild(b);
+  }
+}
+
+function renderExploit(){
+  const mo1=exploit_mo+1;
+  const data=EXPLOIT_DATA[exploit_yr]?.[mo1]||{courtage:[],virement_recu:0};
+  // Virement auto depuis Compte Mandat
+  const virAuto=MANDAT_DATA[exploit_yr]?.[mo1]?.virement||data.virement_recu||0;
+  document.getElementById('exploit-vir-auto').textContent=fmt(virAuto,2);
+  // Courtage
+  const body=document.getElementById('exploit-courtage-body');
+  body.innerHTML='';
+  const courtageItems=CATS.courtage.items;
+  // Utiliser USER existant pour courtage si disponible
+  const existCourtage=USER[exploit_yr]?.[mo1]?.courtage||{};
+  const savedCourtage=data.courtage&&data.courtage.length?data.courtage:
+    courtageItems.map(k=>({label:k,amount:existCourtage[k]||0})).filter(l=>l.amount>0);
+  if(savedCourtage.length){
+    savedCourtage.forEach(l=>body.appendChild(exploitMakeCourtageRow(l.label,l.amount)));
+  } else {
+    body.appendChild(exploitMakeCourtageRow('',''));
+  }
+  // Charges depuis USER/USER_FD
+  renderExploitCharges();
+  updateExploitTotals();
+  renderExploitKpi();
+}
+
+function exploitMakeCourtageRow(label='',amount=''){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input type="text" value="${label.replace(/"/g,'&quot;')}" placeholder="April, SGS, Tetris…" oninput="updateExploitTotals()"></td>
+    <td><input type="number" step="0.01" class="amt" value="${amount>0?amount:''}" placeholder="0,00" oninput="updateExploitTotals()"></td>
+    <td class="del-cell"><button class="dyn-del" onclick="this.closest('tr').remove();updateExploitTotals()">×</button></td>`;
+  return tr;
+}
+
+function exploitAddCourtage(){
+  document.getElementById('exploit-courtage-body').appendChild(exploitMakeCourtageRow());
+  updateExploitTotals();
+}
+
+function renderExploitCharges(){
+  const mo1=exploit_mo+1; const yr=exploit_yr;
+  let html='';
+  CHG_CATS.forEach(cat=>{
+    const tot=catTotal(yr,cat,exploit_mo);
+    if(tot>0||cat==='fixes'){
+      html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9">
+        <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px"><span>${CATS[cat].icon}</span>${CATS[cat].label}</span>
+        <span style="font-size:13px;font-weight:700;color:#dc2626">${fmt(tot,2)}</span>
+      </div>`;
+    }
+  });
+  document.getElementById('exploit-chg-body').innerHTML=html||'<p style="color:#94a3b8;font-size:12px;padding:8px 0">Aucune charge saisie pour ce mois — utilisez la Grille de saisie</p>';
+}
+
+function updateExploitTotals(){
+  const mo1=exploit_mo+1; const yr=exploit_yr;
+  const virAuto=MANDAT_DATA[yr]?.[mo1]?.virement||EXPLOIT_DATA[yr]?.[mo1]?.virement_recu||0;
+  let courtageTotal=0;
+  document.querySelectorAll('#exploit-courtage-body tr input[type="number"]').forEach(el=>courtageTotal+=(+el.value||0));
+  const totalIn=virAuto+courtageTotal;
+  const totalChg=CHG_CATS.reduce((s,c)=>s+catTotal(yr,c,exploit_mo),0);
+  const solde=totalIn-totalChg;
+  document.getElementById('exploit-in-tot').textContent=fmt(totalIn,2);
+  document.getElementById('exploit-chg-tot').textContent=fmt(totalChg,2);
+  const soldeEl=document.getElementById('exploit-solde');
+  soldeEl.textContent=fmt(solde,2);
+  soldeEl.style.color=solde>=0?'#6ee7b7':'#f87171';
+}
+
+function saveExploit(){
+  const mo1=exploit_mo+1; const yr=exploit_yr;
+  const courtage=[];
+  const courtageObj={};
+  document.querySelectorAll('#exploit-courtage-body tr').forEach(row=>{
+    const inputs=row.querySelectorAll('input');
+    const label=inputs[0]?.value.trim()||'';
+    const amount=+inputs[1]?.value||0;
+    if(label||amount){courtage.push({label,amount});courtageObj[label]=amount;}
+  });
+  if(!EXPLOIT_DATA[yr]) EXPLOIT_DATA[yr]={};
+  const virAuto=MANDAT_DATA[yr]?.[mo1]?.virement||0;
+  EXPLOIT_DATA[yr][mo1]={courtage,virement_recu:virAuto};
+  // Sync vers USER pour cohérence Grille
+  if(!USER[yr]) USER[yr]={};
+  if(!USER[yr][mo1]) USER[yr][mo1]={};
+  USER[yr][mo1].courtage=courtageObj;
+  if(BASE[yr]?.courtage) BASE[yr].courtage[exploit_mo]=Object.values(courtageObj).reduce((s,v)=>s+v,0);
+  saveLocal();
+  showNotif('✅ Compte Exploitation enregistré');
+  renderExploitKpi();
+}
+
+function renderExploitKpi(){
+  const yr=exploit_yr, limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  let totIn=0,totChg=0,months=0;
+  for(let m=0;m<limit;m++){
+    const mo1=m+1;
+    const vir=MANDAT_DATA[yr]?.[mo1]?.virement||0;
+    const court=(EXPLOIT_DATA[yr]?.[mo1]?.courtage||[]).reduce((s,l)=>s+(+l.amount||0),0);
+    const chg=CHG_CATS.reduce((s,c)=>s+catTotal(yr,c,m),0);
+    if(vir||court||chg){totIn+=vir+court;totChg+=chg;months++;}
+  }
+  const solde=totIn-totChg;
+  document.getElementById('exploitKpi').innerHTML=`
+    <div class="kc k1"><div class="lbl">📥 Total Entrées ${yr}</div><div class="val">${fmt(totIn)}</div></div>
+    <div class="kc k2"><div class="lbl">📤 Total Charges ${yr}</div><div class="val">${fmt(totChg)}</div></div>
+    <div class="kc k3"><div class="lbl">⚖️ Solde net</div><div class="val" style="color:${solde>=0?'#059669':'#dc2626'}">${fmt(solde)}</div></div>
+    <div class="kc k4"><div class="lbl">📅 Mois actifs</div><div class="val" style="font-size:28px">${months} / ${limit}</div></div>`;
+}
 
 // ================================================================
 // UTILS
@@ -1492,11 +2004,14 @@ async function cloudLoad(){
     const localTs=localRaw?JSON.parse(localRaw)._ts||0:0;
     const cloudTs=data._ts||0;
     if(localTs>cloudTs){updateSyncStatus(true);return true;}// local plus récent, on garde
-    if(data.USER) USER=data.USER;
-    if(data.USER_FD) USER_FD=data.USER_FD;
-    if(data.USER_RD) USER_RD=data.USER_RD;
-    if(data.TRESO) TRESO=data.TRESO;
-    localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,_ts:cloudTs}));
+    if(data.USER)        USER=data.USER;
+    if(data.USER_FD)     USER_FD=data.USER_FD;
+    if(data.USER_RD)     USER_RD=data.USER_RD;
+    if(data.TRESO)       TRESO=data.TRESO;
+    if(data.KSU_DATA)    KSU_DATA=data.KSU_DATA;
+    if(data.MANDAT_DATA) MANDAT_DATA=data.MANDAT_DATA;
+    if(data.EXPLOIT_DATA)EXPLOIT_DATA=data.EXPLOIT_DATA;
+    localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,KSU_DATA,MANDAT_DATA,EXPLOIT_DATA,_ts:cloudTs}));
     YRS.forEach(yr=>{Object.keys(BASE[yr]||{}).forEach(cat=>{for(let mo=0;mo<12;mo++){const v=catTotalFromUser(yr,cat,mo);if(v!==null) BASE[yr][cat][mo]=v;}});});
     return true;
   }catch(e){return false;}
@@ -1597,11 +2112,14 @@ async function pollCloud(){
     const cloudTs=data._ts||0;
     if(cloudTs>localTs){
       // Nouvelles données disponibles depuis un autre appareil
-      if(data.USER) USER=data.USER;
-      if(data.USER_FD) USER_FD=data.USER_FD;
-      if(data.USER_RD) USER_RD=data.USER_RD;
-      if(data.TRESO) TRESO=data.TRESO;
-      localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,_ts:cloudTs}));
+      if(data.USER)        USER=data.USER;
+      if(data.USER_FD)     USER_FD=data.USER_FD;
+      if(data.USER_RD)     USER_RD=data.USER_RD;
+      if(data.TRESO)       TRESO=data.TRESO;
+      if(data.KSU_DATA)    KSU_DATA=data.KSU_DATA;
+      if(data.MANDAT_DATA) MANDAT_DATA=data.MANDAT_DATA;
+      if(data.EXPLOIT_DATA)EXPLOIT_DATA=data.EXPLOIT_DATA;
+      localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,KSU_DATA,MANDAT_DATA,EXPLOIT_DATA,_ts:cloudTs}));
       YRS.forEach(yr=>{Object.keys(BASE[yr]||{}).forEach(cat=>{for(let mo=0;mo<12;mo++){const v=catTotalFromUser(yr,cat,mo);if(v!==null) BASE[yr][cat][mo]=v;}});});
       updateSyncStatus(true);
       showNotif('☁️ Données synchronisées depuis un autre appareil');
