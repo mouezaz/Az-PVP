@@ -1974,42 +1974,46 @@ function exploitCourtageSync(){
 }
 
 function renderExploitRecap(){
-  const yr=exploit_yr, mo=exploit_mo;
-  // Colonnes : M-3, M-2, M-1, mois actuel
-  const cols=[];
-  for(let i=3;i>=0;i--){
-    let m=mo-i, y=yr;
-    while(m<0){m+=12;y--;}
-    cols.push({yr:y,mo:m,isCurrent:i===0});
-  }
+  const yr=exploit_yr;
+  const limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
   const el=document.getElementById('exploit-recap');
   if(!el) return;
 
-  let th=`<th>Poste</th>`;
-  cols.forEach(c=>{
-    const label=MO[c.mo].substring(0,3)+(c.yr!==yr?' '+c.yr:'');
-    const nav=!c.isCurrent?` onclick="exploit_mo=${c.mo};${c.yr!==yr?'exploit_yr='+c.yr+';':''}buildExploitMonthNav();renderExploit()" style="cursor:pointer" title="Aller à ${MO[c.mo]} ${c.yr}"`:'';
-    th+=`<th class="${c.isCurrent?'rcur':''}"${nav}>${label}${c.isCurrent?'<br><span style="font-size:9px;font-weight:500;color:#2563eb;display:block">▶ actuel</span>':''}</th>`;
+  // Colonnes = tous les mois de l'année (Jan → mois courant)
+  const cols=[];
+  for(let m=0;m<limit;m++) cols.push(m);
+
+  function fv(v){return v!==0?fmtN(Math.round(v)):'—';}
+  function fvColor(v){
+    if(v===0) return `<span style="color:#475569">—</span>`;
+    return `<span style="color:${v>=0?'#6ee7b7':'#f87171'};font-weight:700">${fmtN(Math.round(v))}</span>`;
+  }
+
+  // En-tête
+  let th=`<th style="min-width:130px">Poste</th>`;
+  cols.forEach(m=>{
+    const isCur=m===exploit_mo;
+    const nav=` onclick="exploit_mo=${m};buildExploitMonthNav();renderExploit()" style="cursor:pointer"`;
+    th+=`<th class="${isCur?'rcur':''}"${nav}>${MO[m].substring(0,3)}${isCur?'<br><span style="font-size:9px;font-weight:500;color:#2563eb">▶</span>':''}</th>`;
   });
+  th+=`<th style="background:#1e293b;color:#e2e8f0;font-weight:700">CUMUL</th>`;
 
   function dataRow(icon,label,fn){
+    let tot=0;
     let r=`<tr><td>${icon} ${label}</td>`;
-    cols.forEach(c=>{
-      const v=fn(c.yr,c.mo);
-      r+=`<td class="${c.isCurrent?'rcur':''}">${v>0?fmtN(Math.round(v)):'—'}</td>`;
-    });
+    cols.forEach(m=>{const v=fn(yr,m);tot+=v;r+=`<td class="${m===exploit_mo?'rcur':''}">${fv(v)}</td>`;});
+    r+=`<td style="background:#1e293b;color:#e2e8f0;font-weight:600">${fv(tot)}</td>`;
     return r+'</tr>';
   }
   function totRow(cls,label,fn){
+    let tot=0;
     let r=`<tr class="${cls}"><td>${label}</td>`;
-    cols.forEach(c=>{
-      const v=fn(c.yr,c.mo);
-      r+=`<td class="${c.isCurrent?'rcur':''}">${v>0?fmtN(Math.round(v)):'—'}</td>`;
-    });
+    cols.forEach(m=>{const v=fn(yr,m);tot+=v;r+=`<td class="${m===exploit_mo?'rcur':''}">${fv(v)}</td>`;});
+    r+=`<td style="background:#1e293b;color:#e2e8f0;font-weight:700">${fv(tot)}</td>`;
     return r+'</tr>';
   }
   function secRow(label){
-    return `<tr class="r-sec"><td colspan="${cols.length+1}">${label}</td></tr>`;
+    return `<tr class="r-sec"><td colspan="${cols.length+2}">${label}</td></tr>`;
   }
 
   let rows='';
@@ -2023,26 +2027,38 @@ function renderExploitRecap(){
     (y,m)=>catTotal(y,cat,m)));
   rows+=totRow('r-chg-tot','TOTAL CHARGES',(y,m)=>monthChg(y,m));
 
-  // Solde
-  let rSolde=`<tr class="r-solde"><td>💰 SOLDE NET</td>`;
-  cols.forEach(c=>{
-    const v=monthSolde(c.yr,c.mo);
-    const comm=monthComm(c.yr,c.mo);
-    const color=comm>0?(v>=0?'#6ee7b7':'#f87171'):'#475569';
-    rSolde+=`<td class="${c.isCurrent?'rcur':''}" style="color:${color}">${comm>0?fmtN(Math.round(v)):'—'}</td>`;
+  // Résultat net par mois + cumul
+  let cumul=0,rSolde=`<tr class="r-solde"><td>⚖️ RÉSULTAT NET</td>`;
+  cols.forEach(m=>{
+    const v=monthSolde(yr,m);
+    const hasData=monthComm(yr,m)>0||monthChg(yr,m)>0;
+    if(hasData) cumul+=v;
+    rSolde+=`<td class="${m===exploit_mo?'rcur':''}">${hasData?fvColor(v).replace('span>','td>').replace('<span','<td').replace('</span>',''):'—'}</td>`;
   });
-  rSolde+='</tr>';
+  // Rewrite proprement sans hack
+  rSolde=`<tr class="r-solde"><td>⚖️ RÉSULTAT NET</td>`;
+  cumul=0;
+  cols.forEach(m=>{
+    const v=monthSolde(yr,m);
+    const hasData=monthComm(yr,m)>0||monthChg(yr,m)>0;
+    if(hasData) cumul+=v;
+    const color=hasData?(v>=0?'#6ee7b7':'#f87171'):'#475569';
+    const txt=hasData?fmtN(Math.round(v)):'—';
+    rSolde+=`<td class="${m===exploit_mo?'rcur':''}" style="color:${color};font-weight:700">${txt}</td>`;
+  });
+  const cumulColor=cumul>=0?'#6ee7b7':'#f87171';
+  rSolde+=`<td style="background:#1e293b;color:${cumulColor};font-weight:800;font-size:14px">${fmtN(Math.round(cumul))}</td></tr>`;
   rows+=rSolde;
 
-  // État du toggle (ouvert par défaut)
   const wasOpen=el.dataset.open!=='0';
   el.innerHTML=`<div class="recap-wrap">
     <div class="recap-hd" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';document.getElementById('exploit-recap').dataset.open=this.nextElementSibling.style.display==='none'?'0':'1'">
-      <span class="recap-hd-title">📊 Récapitulatif — 3 mois précédents</span>
-      <span style="color:#64748b;font-size:11px">▾ cliquer sur un mois pour y aller</span>
+      <span class="recap-hd-title">📊 Récapitulatif ${yr} — cliquer un mois pour y aller</span>
     </div>
     <div class="recap-body" style="${wasOpen?'':'display:none'}">
-      <table class="recap-tbl"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>
+      <div style="overflow-x:auto">
+        <table class="recap-tbl"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>
+      </div>
     </div>
   </div>`;
 }
