@@ -245,7 +245,6 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
     <a onclick="go('ksu')"><span class="ic">🏦</span>KSU / Allianz</a>
     <a onclick="go('mandat')"><span class="ic">💳</span>Compte Mandat</a>
     <a onclick="go('exploitation')"><span class="ic">🏢</span>Compte Exploitation</a>
-    <a onclick="go('grille')"><span class="ic">📊</span>Grille de saisie</a>
     <a onclick="go('analyse')"><span class="ic">📋</span>Analyse détaillée</a>
   </nav>
   <div class="sb-info">
@@ -434,7 +433,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
       <!-- Entrées -->
       <div class="fcard open" style="margin-bottom:10px">
         <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
-          <div class="title"><span class="ic2">📥</span>Entrées Compte Exploitation</div>
+          <div class="title"><span class="ic2">📥</span>Entrées</div>
           <div class="right"><span class="ftot" id="exploit-in-tot">—</span><span class="arr">▾</span></div>
         </div>
         <div class="fcard-bd">
@@ -442,7 +441,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
             <span style="font-size:13px;color:#1e40af;font-weight:600">💳 Virement reçu du Compte Mandat</span>
             <span style="font-size:15px;font-weight:700;color:#1d4ed8" id="exploit-vir-auto">—</span>
           </div>
-          <p style="font-size:12px;color:#64748b;margin:0 0 8px;font-weight:600">Courtage (hors Allianz) :</p>
+          <p style="font-size:12px;color:#64748b;margin:0 0 8px;font-weight:600">🤝 Courtage (hors Allianz) :</p>
           <table class="dyn-table">
             <thead><tr><th style="width:55%">Organisme</th><th>Montant</th><th class="del-cell"></th></tr></thead>
             <tbody id="exploit-courtage-body"></tbody>
@@ -451,13 +450,13 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
         </div>
       </div>
 
-      <!-- Charges -->
-      <div class="fcard open" style="margin-bottom:10px" id="fc-exploit-chg">
+      <!-- Charges — saisie intégrée par catégorie -->
+      <div class="fcard open" style="margin-bottom:10px">
         <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
-          <div class="title"><span class="ic2">📤</span>Charges Compte Exploitation</div>
+          <div class="title"><span class="ic2">📤</span>Charges</div>
           <div class="right"><span class="ftot" id="exploit-chg-tot">—</span><span class="arr">▾</span></div>
         </div>
-        <div class="fcard-bd" id="exploit-chg-body"></div>
+        <div class="fcard-bd" id="exploit-chg-cards"></div>
       </div>
 
       <!-- Solde -->
@@ -483,7 +482,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
   <a onclick="go('ksu')"><span class="mi">🏦</span>KSU</a>
   <a onclick="go('mandat')"><span class="mi">💳</span>Mandat</a>
   <a onclick="go('exploitation')"><span class="mi">🏢</span>Exploit.</a>
-  <a onclick="go('grille')"><span class="mi">📊</span>Grille</a>
+  <a onclick="go('analyse')"><span class="mi">📋</span>Analyse</a>
 </div></div>
 
 <!-- Drawer -->
@@ -806,13 +805,12 @@ function go(v){
   document.querySelectorAll('nav a,#mob-nav a').forEach(e=>e.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
   document.querySelectorAll(`[onclick="go('${v}')"]`).forEach(e=>e.classList.add('active'));
-  const titles={dashboard:'Tableau de Bord',ksu:'KSU / Allianz',mandat:'Compte Mandat',exploitation:'Compte Exploitation',grille:'Grille de Saisie',analyse:'Analyse Détaillée'};
+  const titles={dashboard:'Tableau de Bord',ksu:'KSU / Allianz',mandat:'Compte Mandat',exploitation:'Compte Exploitation',analyse:'Analyse Détaillée'};
   document.getElementById('bartitle').textContent=titles[v]||v;
   if(v==='dashboard')   renderDash();
   if(v==='ksu')         initKsu();
   if(v==='mandat')      initMandat();
   if(v==='exploitation')initExploit();
-  if(v==='grille')      initGrille();
   if(v==='analyse')     renderAnalyse();
 }
 function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
@@ -1037,9 +1035,14 @@ function openDrawer(cat,yr,mo){
 function closeDrawer(){
   document.getElementById('drw').classList.remove('open');
   document.getElementById('d-ov').style.display='none';
-  // Refresh grid
-  renderGrille();
+  // Rafraîchir la vue active
+  const activeView=document.querySelector('.view.active')?.id;
+  if(activeView==='view-exploitation') renderExploit();
+  else if(activeView==='view-grille') renderGrille();
   d_cat=null;
+}
+function openDrawerExploit(cat){
+  openDrawer(cat,exploit_yr,exploit_mo);
 }
 
 function buildDrawerContent(cat,yr,mo){
@@ -1884,14 +1887,21 @@ function renderExploitCharges(){
   let html='';
   CHG_CATS.forEach(cat=>{
     const tot=catTotal(yr,cat,exploit_mo);
-    if(tot>0||cat==='fixes'){
-      html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9">
-        <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px"><span>${CATS[cat].icon}</span>${CATS[cat].label}</span>
-        <span style="font-size:13px;font-weight:700;color:#dc2626">${fmt(tot,2)}</span>
-      </div>`;
-    }
+    const hasData=tot>0;
+    html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:18px">${CATS[cat].icon}</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#374151">${CATS[cat].label}</div>
+          <div style="font-size:12px;color:${hasData?'#dc2626':'#94a3b8'};font-weight:${hasData?'700':'400'}">${hasData?fmt(tot,2):'Non saisi'}</div>
+        </div>
+      </div>
+      <button onclick="openDrawerExploit('${cat}')" style="background:${hasData?'#f0fdf4':'#eff6ff'};color:${hasData?'#059669':'#1d4ed8'};border:1.5px solid ${hasData?'#86efac':'#bfdbfe'};padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">
+        ${hasData?'✏️ Modifier':'✏️ Saisir'}
+      </button>
+    </div>`;
   });
-  document.getElementById('exploit-chg-body').innerHTML=html||'<p style="color:#94a3b8;font-size:12px;padding:8px 0">Aucune charge saisie pour ce mois — utilisez la Grille de saisie</p>';
+  document.getElementById('exploit-chg-cards').innerHTML=html;
 }
 
 function updateExploitTotals(){
