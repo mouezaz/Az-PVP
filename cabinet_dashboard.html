@@ -2038,7 +2038,6 @@ function exploitCatUpdate(cat){
   const totEl=document.getElementById(`eacc-tot-${cat}`);
   if(totEl){totEl.textContent=total>0?fmt(total,2):'—';totEl.style.color=total>0?'#dc2626':'#94a3b8';}
   // Mettre à jour les sous-totaux (niveau 2 - dg-tot)
-  const body=document.getElementById(`eacc-body-${cat}`);
   if(body&&cat==='fixes'){
     // Recalc sub-totals live
     const d2=USER[exploit_yr]?.[exploit_mo+1]?.fixes||{};
