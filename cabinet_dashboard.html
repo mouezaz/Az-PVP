@@ -807,6 +807,9 @@ function loadLocal(){
 function catTotalFromUser(yr,cat,mo){
   const mo1=mo+1;
   if(cat==='iard'||cat==='vie'){
+    // Priorité KSU_DATA
+    const ksu=ksuCatTotal(yr,mo1,cat);
+    if(ksu>0) return ksu;
     const rd=USER_RD[yr]?.[mo1];
     if(rd&&rd[cat]&&rd[cat].length) return rd[cat].reduce((s,r)=>s+(+r.amount||0),0);
     return null;
@@ -823,8 +826,25 @@ function getDetail(yr,mo){if(USER[yr]?.[mo]) return USER[yr][mo]; if(yr===2026&&
 function getFixesDetail(yr,mo){if(USER_FD[yr]?.[mo]) return USER_FD[yr][mo]; if(yr===2026&&mo<=3) return FIXES_DETAIL_2026[mo]||null; return null;}
 function getRevDetail(yr,mo){if(USER_RD[yr]?.[mo]) return USER_RD[yr][mo]; if(yr===2026&&mo>=1&&mo<=3) return REV_DETAIL_2026[mo]||null; return null;}
 
+function ksuCatTotal(yr,mo1,cat){
+  // Lit directement les lignes KSU dont le libellé contient 'iard' ou 'vie'
+  const d=KSU_DATA[yr]?.[mo1];
+  if(!d) return 0;
+  const lines=Array.isArray(d)?d:(d.lines||[]);
+  const key=cat.toLowerCase();
+  return lines.filter(l=>l.label&&l.label.toLowerCase().includes(key))
+              .reduce((s,l)=>s+(+l.amount||0),0);
+}
+
 function catTotal(yr,cat,mo){ // mo = 0-based
-  if(cat==='iard'||cat==='vie'){const rd=getRevDetail(yr,mo+1);if(rd&&rd[cat]&&rd[cat].length) return rd[cat].reduce((s,r)=>s+(+r.amount||0),0);}
+  if(cat==='iard'||cat==='vie'){
+    // Priorité 1 : KSU_DATA (source de vérité)
+    const ksu=ksuCatTotal(yr,mo+1,cat);
+    if(ksu>0) return ksu;
+    // Priorité 2 : USER_RD (saisie manuelle hors KSU)
+    const rd=getRevDetail(yr,mo+1);
+    if(rd&&rd[cat]&&rd[cat].length) return rd[cat].reduce((s,r)=>s+(+r.amount||0),0);
+  }
   const d=getDetail(yr,mo+1);
   if(d&&d[cat]) return Object.values(d[cat]).reduce((s,v)=>s+(+v||0),0);
   return BASE[yr]?.[cat]?.[mo]||0;
