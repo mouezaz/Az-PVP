@@ -520,7 +520,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 
       <!-- Solde -->
       <div style="background:#0f172a;border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <span style="color:#94a3b8;font-size:13px;font-weight:600">⚖️ Résultat net (Commissions - Charges)</span>
+        <span style="color:#94a3b8;font-size:13px;font-weight:600">⚖️ Solde Exploitation (Virement + Courtage - Charges)</span>
         <span style="font-size:22px;font-weight:800" id="exploit-solde">—</span>
       </div>
       <div style="display:flex;gap:8px">
@@ -1429,13 +1429,29 @@ function renderAnalyse(){
     const prevTot=sum(prevVals);
     html+=`<tr class="tr-cat" id="grp_${cat}" onclick="toggleAnalyseGroup('grp_${cat}')"><td><span class="g-arr" style="display:inline-block;margin-right:6px;transition:transform .2s">▾</span>${def.icon} ${def.label}</td>${vals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td><strong>${fmtN(tot)}</strong></td>${pca(tot,total_ca)}${pca(prevTot,prev_total_ca)}${dca(tot,total_ca,prevTot,prev_total_ca,false)}</tr>`;
     if(cat==='iard'||cat==='vie'){
-      const rd0=getRevDetail(yr,idxs[0]+1);
-      if(rd0&&rd0[cat]){
-        const maxR=Math.max(...idxs.map(i=>{const rd=getRevDetail(yr,i+1);return(rd&&rd[cat])?rd[cat].length:0;}));
-        for(let ri=0;ri<maxR;ri++){
-          const rd0r=rd0[cat][ri];const lbl=(rd0r&&rd0r.desc)?rd0r.desc:`Ligne ${ri+1}`;
-          const rv=idxs.map(i=>{const rd=getRevDetail(yr,i+1);return(rd&&rd[cat]&&rd[cat][ri])?(+rd[cat][ri].amount||0):0;});
-          if(sum(rv)>0) html+=`<tr class="tr-item hr" data-group="grp_${cat}"><td>${lbl}</td>${rv.map(v=>`<td>${v>0?fmtN(v,2):'—'}</td>`).join('')}<td>${fmtN(sum(rv),2)}</td><td colspan="3"></td></tr>`;
+      // Lire les lignes directement depuis KSU_DATA
+      const ksuPerMo=idxs.map(i=>{
+        const d=KSU_DATA[yr]?.[i+1];
+        const lines=Array.isArray(d)?d:(d?.lines||[]);
+        return lines.filter(l=>l.label&&l.label.toLowerCase().includes(cat));
+      });
+      const hasKsu=ksuPerMo.some(ls=>ls.length>0);
+      if(hasKsu){
+        const labels=[...new Set(ksuPerMo.flat().map(l=>l.label))].filter(Boolean);
+        labels.forEach(label=>{
+          const rv=idxs.map((_,idx)=>ksuPerMo[idx].filter(l=>l.label===label).reduce((s,l)=>s+(+l.amount||0),0));
+          if(sum(rv)>0) html+=`<tr class="tr-item hr" data-group="grp_${cat}"><td>${label}</td>${rv.map(v=>`<td>${v>0?fmtN(v,2):'—'}</td>`).join('')}<td>${fmtN(sum(rv),2)}</td><td colspan="3"></td></tr>`;
+        });
+      } else {
+        // Fallback USER_RD / REV_DETAIL_2026
+        const rd0=getRevDetail(yr,idxs[0]+1);
+        if(rd0&&rd0[cat]){
+          const maxR=Math.max(...idxs.map(i=>{const rd=getRevDetail(yr,i+1);return(rd&&rd[cat])?rd[cat].length:0;}));
+          for(let ri=0;ri<maxR;ri++){
+            const rd0r=rd0[cat][ri];const lbl=(rd0r&&rd0r.desc)?rd0r.desc:`Ligne ${ri+1}`;
+            const rv=idxs.map(i=>{const rd=getRevDetail(yr,i+1);return(rd&&rd[cat]&&rd[cat][ri])?(+rd[cat][ri].amount||0):0;});
+            if(sum(rv)>0) html+=`<tr class="tr-item hr" data-group="grp_${cat}"><td>${lbl}</td>${rv.map(v=>`<td>${v>0?fmtN(v,2):'—'}</td>`).join('')}<td>${fmtN(sum(rv),2)}</td><td colspan="3"></td></tr>`;
+          }
         }
       }
     } else {
@@ -1451,7 +1467,7 @@ function renderAnalyse(){
   });
   const revVals=idxs.map(i=>monthComm(yr,i));const totalRev=sum(revVals);
   const prevRevVals=prevIdxs.map(i=>monthComm(prev,i));const totalPrevRev=sum(prevRevVals);
-  html+=`<tr class="tr-total"><td>TOTAL REVENUS</td>${revVals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td>${fmtN(totalRev)}</td><td>100%</td><td>100%</td><td>—</td></tr>`;
+  html+=`<tr class="tr-total" style="background:#1e3a5f;font-size:13px"><td>💰 TOTAL COMMISSIONS</td>${revVals.map(v=>`<td style="color:#6ee7b7;font-weight:700">${fmtN(v)}</td>`).join('')}<td style="color:#6ee7b7;font-weight:800;font-size:14px">${fmtN(totalRev)}</td><td>100%</td><td>100%</td><td>—</td></tr>`;
 
   html+=`<tr class="tr-sep"><td colspan="${idxs.length+5}">CHARGES</td></tr>`;
   CHG_CATS.forEach(cat=>{
@@ -2282,8 +2298,11 @@ function eAddRow(tableId){
 
 function updateExploitTotals(){
   const mo1=exploit_mo+1; const yr=exploit_yr;
-  // Rentabilité = monthComm (IARD + VIE + Courtage) — cohérent avec Dashboard/Analyse
-  const totalIn=monthComm(yr,exploit_mo);
+  // Trésorerie Exploitation = Virement reçu + Courtage direct
+  const virManuel=+(document.getElementById('exploit-vir-input')?.value)||0;
+  let courtageTotal=0;
+  document.querySelectorAll('#exploit-courtage-body tr input[type="number"]').forEach(el=>courtageTotal+=(+el.value||0));
+  const totalIn=virManuel+courtageTotal;
   const totalChg=CHG_CATS.reduce((s,c)=>s+catTotal(yr,c,exploit_mo),0);
   const solde=totalIn-totalChg;
   document.getElementById('exploit-in-tot').textContent=fmt(totalIn,2);
