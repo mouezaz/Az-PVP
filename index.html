@@ -7948,76 +7948,48 @@ function renderTelPage(mois, annee) {
   const agenceKey = 'agence_' + mois + '_' + annee;
   const agData = (DB.telStats && DB.telStats[agenceKey]) || null;
 
-  // Construire une carte par collab
-  const collabCards = collabs.map(function(name) {
+  // Totaux agence pour les ratios
+  const agEntTotal  = agData ? (agData.entTotal  || 0) : 0;
+  const agSortTotal = agData ? (agData.sortTotal  || 0) : 0;
+  const agNonTrait  = agData ? (agData.nonTraites || 0) : 0;
+  const agDecroches = agData ? (agData.entDecroches || 0) : 0;
+  const tauxDecAg   = agEntTotal > 0 ? Math.round(agDecroches / agEntTotal * 100) : null;
+
+  // Helper barre de ratio
+  function ratioBar(val, total, color) {
+    const pct = total > 0 ? Math.min(100, Math.round(val/total*100)) : 0;
+    return `<div style="background:#e5e7eb;border-radius:3px;height:5px;margin-top:5px;overflow:hidden">
+      <div style="width:${pct}%;height:5px;background:${color};border-radius:3px"></div></div>`;
+  }
+
+  // Lignes de la table par collab
+  const collabRows = collabs.map(function(name) {
     const key = name + '_' + mois + '_' + annee;
     const d = (DB.telStats && DB.telStats[key]) || null;
-    if (!d) return `
-      <div class="card" style="opacity:.55">
-        <div class="card-header"><div class="card-title">${name}</div><span class="pill" style="background:#e5e7eb;color:#6b7280">Aucune donnée</span></div>
-        <p class="muted" style="padding:8px 0">Importez un fichier Ringover pour ce mois.</p>
-      </div>`;
-    const tDecPct  = d.entTotal  > 0 ? Math.round(d.entDecroches / d.entTotal  * 100) : null;
-    const sDecPct  = d.sortTotal > 0 ? Math.round(d.sortDecroches / d.sortTotal * 100) : null;
-    const tDecColor  = tDecPct !== null ? (tDecPct >= 40 ? '#059669' : tDecPct >= 25 ? '#d97706' : '#dc2626') : '#9ca3af';
-    const sDecColor  = sDecPct !== null ? (sDecPct >= 80 ? '#059669' : sDecPct >= 60 ? '#d97706' : '#dc2626') : '#9ca3af';
-    return `
-      <div class="card">
-        <div class="card-header"><div class="card-title">${name}</div><span class="pill pill-blue">${MOIS_FULL[mois]} ${annee}</span></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:10px">
-          <!-- ENTRANTS -->
-          <div style="padding:14px 16px;border-right:1px solid #e5e7eb">
-            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#6b7280;letter-spacing:.05em;margin-bottom:8px">📥 Appels entrants</div>
-            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
-              <span style="font-size:2rem;font-weight:800;color:${tDecColor};line-height:1">${tDecPct !== null ? tDecPct+'%' : '—'}</span>
-              <span style="font-size:.8rem;color:#6b7280">décroché</span>
-            </div>
-            <div style="font-size:.82rem;color:#374151;margin-bottom:4px">
-              <strong>${d.entDecroches}</strong> décroché sur <strong>${d.entTotal}</strong> reçus
-            </div>
-            <div style="font-size:.82rem;color:#dc2626">
-              ⛔ <strong>${d.entNonTraites}</strong> non traité${d.entNonTraites>1?'s':''}
-            </div>
-            ${d.entTotal > 0 ? `<div style="background:#e5e7eb;border-radius:4px;height:6px;margin-top:8px;overflow:hidden"><div style="width:${Math.min(100, tDecPct||0)}%;height:6px;background:${tDecColor};border-radius:4px"></div></div>` : ''}
-          </div>
-          <!-- SORTANTS -->
-          <div style="padding:14px 16px">
-            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#6b7280;letter-spacing:.05em;margin-bottom:8px">📤 Appels sortants</div>
-            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
-              <span style="font-size:2rem;font-weight:800;color:#003781;line-height:1">${d.sortTotal}</span>
-              <span style="font-size:.8rem;color:#6b7280">appels total</span>
-            </div>
-            <div style="font-size:.82rem;color:#374151;margin-bottom:4px">
-              <strong>${d.sortDecroches}</strong> aboutis sur <strong>${d.sortTotal}</strong>
-            </div>
-            <div style="font-size:.82rem;color:${sDecColor};font-weight:600">
-              Taux de contact : ${sDecPct !== null ? sDecPct+'%' : '—'}
-            </div>
-            ${d.sortTotal > 0 ? `<div style="background:#e5e7eb;border-radius:4px;height:6px;margin-top:8px;overflow:hidden"><div style="width:${Math.min(100, sDecPct||0)}%;height:6px;background:${sDecColor};border-radius:4px"></div></div>` : ''}
-          </div>
-        </div>
-      </div>`;
-  }).join('');
+    if (!d) return `<tr><td style="font-weight:600;padding:12px 10px">${name}</td>
+      <td colspan="6" style="color:#9ca3af;font-size:.82rem;padding:12px 10px">Aucune donnée — importez le CSV Ringover</td></tr>`;
 
-  // Bloc agence (non traités globaux)
-  const agenceBlock = agData ? `
-    <div class="card" style="border-left:4px solid #dc2626">
-      <div class="card-header"><div class="card-title">Agence — Appels non traités</div><span class="pill" style="background:#fee2e2;color:#b91c1c">Sans collaborateur</span></div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-        <div style="text-align:center;padding:12px;background:#fef2f2;border-radius:8px">
-          <div style="font-size:2rem;font-weight:800;color:#dc2626">${agData.entTotal || 0}</div>
-          <div style="font-size:.78rem;color:#6b7280;margin-top:4px">Entrants total agence</div>
-        </div>
-        <div style="text-align:center;padding:12px;background:#fef2f2;border-radius:8px">
-          <div style="font-size:2rem;font-weight:800;color:#dc2626">${agData.nonTraites || 0}</div>
-          <div style="font-size:.78rem;color:#6b7280;margin-top:4px">Non traités (répondeur + manqué)</div>
-        </div>
-        <div style="text-align:center;padding:12px;background:#f0fdf4;border-radius:8px">
-          <div style="font-size:2rem;font-weight:800;color:#059669">${agData.entDecroches || 0}</div>
-          <div style="font-size:.78rem;color:#6b7280;margin-top:4px">Décroché toutes lignes</div>
-        </div>
-      </div>
-    </div>` : '';
+    const ratEnt  = agEntTotal  > 0 ? (d.entDecroches  / agEntTotal  * 100).toFixed(1) : null;
+    const ratSort = agSortTotal > 0 ? (d.sortTotal      / agSortTotal * 100).toFixed(1) : null;
+    const colEnt  = ratEnt  !== null ? (parseFloat(ratEnt)  >= 15 ? '#059669' : parseFloat(ratEnt)  >= 8 ? '#d97706' : '#dc2626') : '#9ca3af';
+    const colSort = ratSort !== null ? (parseFloat(ratSort) >= 25 ? '#059669' : parseFloat(ratSort) >= 15 ? '#d97706' : '#dc2626') : '#9ca3af';
+
+    return `<tr style="border-bottom:1px solid #f1f5f9">
+      <td style="font-weight:700;padding:12px 10px;font-size:.9rem">${name}</td>
+      <td style="padding:12px 10px;text-align:right;font-weight:600">${d.entDecroches}</td>
+      <td style="padding:12px 10px;min-width:120px">
+        <div style="font-size:.88rem;font-weight:700;color:${colEnt}">${ratEnt !== null ? ratEnt+'%' : '—'} <span style="font-size:.72rem;color:#6b7280;font-weight:400">du total agence</span></div>
+        ${agEntTotal ? ratioBar(d.entDecroches, agEntTotal, colEnt) : ''}
+      </td>
+      <td style="padding:12px 10px;text-align:right;font-weight:600">${d.sortTotal}</td>
+      <td style="padding:12px 10px;min-width:120px">
+        <div style="font-size:.88rem;font-weight:700;color:${colSort}">${ratSort !== null ? ratSort+'%' : '—'} <span style="font-size:.72rem;color:#6b7280;font-weight:400">du total agence</span></div>
+        ${agSortTotal ? ratioBar(d.sortTotal, agSortTotal, colSort) : ''}
+      </td>
+      <td style="padding:12px 10px;text-align:right;font-weight:600;color:#d97706">${d.sortDecroches}</td>
+      <td style="padding:12px 10px;text-align:right;font-weight:600;color:#dc2626">${d.entNonTraites || 0}</td>
+    </tr>`;
+  }).join('');
 
   // Sélecteur mois/année
   const moisOpts = MOIS_FULL.slice(1).map(function(l,i){
@@ -8031,7 +8003,7 @@ function renderTelPage(mois, annee) {
   mc.innerHTML = `
     <div class="page-header no-print">
       <h1>Téléphonie Ringover</h1>
-      <p>Statistiques par collaborateur — importées depuis le CSV Ringover</p>
+      <p>${MOIS_FULL[mois]} ${annee}</p>
     </div>
 
     <!-- Filtre + Import -->
@@ -8047,18 +8019,64 @@ function renderTelPage(mois, annee) {
       </label>
     </div>
 
-    <!-- Cards collaborateurs -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:20px">
-      ${collabCards}
-    </div>
+    ${agData ? `
+    <!-- KPI agence -->
+    <div class="kpi-grid kpi-grid-4 sep16">
+      <div class="kpi">
+        <div class="kpi-val">${agEntTotal}</div>
+        <div class="kpi-lbl">Appels entrants total</div>
+      </div>
+      <div class="kpi ${tauxDecAg!==null?(tauxDecAg>=40?'good':tauxDecAg>=25?'':'warn'):''}">
+        <div class="kpi-val">${tauxDecAg !== null ? tauxDecAg+'%' : '—'}</div>
+        <div class="kpi-lbl">Taux décroché agence</div>
+        <div class="kpi-sub">${agDecroches} décroché / ${agEntTotal}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val">${agSortTotal}</div>
+        <div class="kpi-lbl">Appels sortants total</div>
+      </div>
+      <div class="kpi warn">
+        <div class="kpi-val">${agNonTrait}</div>
+        <div class="kpi-lbl">Non traités</div>
+        <div class="kpi-sub">Répondeur + Manqué</div>
+      </div>
+    </div>` : ''}
 
-    <!-- Agence -->
-    ${agenceBlock}
-
-    ${!agData && !(DB.telStats && Object.keys(DB.telStats).some(k=>k.includes('_'+mois+'_'+annee))) ? `
-    <div class="alert alert-info" style="margin-top:8px">
-      💡 Aucune donnée pour ${MOIS_FULL[mois]} ${annee}. Importez le CSV Ringover (téléchargeable depuis votre espace Ringover → Rapports → Historique des appels → Exporter).
-    </div>` : ''}`;
+    <!-- Tableau par collaborateur -->
+    <div class="card" style="margin-top:8px">
+      <div class="card-header">
+        <div class="card-title">Détail par collaborateur</div>
+        ${agData ? `<span class="pill pill-blue">${MOIS_FULL[mois]} ${annee}</span>` : ''}
+      </div>
+      ${agData ? '' : '<div class="alert alert-info">💡 Importez le CSV Ringover pour afficher les statistiques.</div>'}
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.88rem">
+          <thead>
+            <tr style="border-bottom:2px solid #e5e7eb;background:#f9fafb">
+              <th style="text-align:left;padding:10px 10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em">Collaborateur</th>
+              <th style="text-align:right;padding:10px 10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em">Entrants<br>décroché</th>
+              <th style="padding:10px 10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em">Part agence<br>(entrants)</th>
+              <th style="text-align:right;padding:10px 10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em">Sortants<br>total</th>
+              <th style="padding:10px 10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em">Part agence<br>(sortants)</th>
+              <th style="text-align:right;padding:10px 10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em">Sortants<br>aboutis</th>
+              <th style="text-align:right;padding:10px 10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em">Non<br>traités</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${collabRows}
+            ${agData ? `<tr style="background:#f1f5f9;font-weight:700;border-top:2px solid #e5e7eb">
+              <td style="padding:12px 10px">Total agence</td>
+              <td style="padding:12px 10px;text-align:right">${agDecroches}</td>
+              <td style="padding:12px 10px;font-size:.82rem;color:#059669">${tauxDecAg !== null ? tauxDecAg+'% de décrochage global' : ''}</td>
+              <td style="padding:12px 10px;text-align:right">${agSortTotal}</td>
+              <td style="padding:12px 10px;font-size:.82rem;color:#6b7280">100%</td>
+              <td style="padding:12px 10px;text-align:right"></td>
+              <td style="padding:12px 10px;text-align:right;color:#dc2626">${agNonTrait}</td>
+            </tr>` : ''}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
 PAGES['admin-tel'] = (mc) => { renderTelPage(nowMois(), nowAnnee()); };
@@ -8084,7 +8102,7 @@ function importRingoverCSV(input, mois, annee) {
 
       // Compteurs par collab
       const stats = {}; // collab → {entTotal, entDecroches, entNonTraites, sortTotal, sortDecroches}
-      let agEntTotal=0, agNonTraites=0, agEntDecroches=0;
+      let agEntTotal=0, agNonTraites=0, agEntDecroches=0, agSortTotal=0, agSortDecroches=0;
 
       for (var i=1; i<lines.length; i++) {
         const cols = parseCSVLine(lines[i], sep);
@@ -8109,6 +8127,9 @@ function importRingoverCSV(input, mois, annee) {
           if (decroche) stats[collab].entDecroches++;
           if (nonTraite) stats[collab].entNonTraites++;
         } else if (dir === 'Sortant') {
+          // Comptage agence sortants (tous, pas seulement les collabs mappés)
+          agSortTotal++;
+          if (decroche) agSortDecroches++;
           if (!collab) continue;
           if (!stats[collab]) stats[collab] = {entTotal:0,entDecroches:0,entNonTraites:0,sortTotal:0,sortDecroches:0};
           stats[collab].sortTotal++;
@@ -8127,10 +8148,12 @@ function importRingoverCSV(input, mois, annee) {
         DB.telStats[key].decSort = stats[name].sortDecroches;
         DB.telStats[key].totSort = stats[name].sortTotal;
       });
-      // Sauvegarder agence
+      // Sauvegarder agence (entrants + sortants)
       DB.telStats['agence_' + mois + '_' + annee] = {
         entTotal: agEntTotal, entDecroches: agEntDecroches,
-        nonTraites: agNonTraites, mois, annee, importedAt: Date.now()
+        nonTraites: agNonTraites,
+        sortTotal: agSortTotal, sortDecroches: agSortDecroches,
+        mois, annee, importedAt: Date.now()
       };
 
       saveDB(DB);
@@ -12134,7 +12157,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.4.1";',
+      'var CACHE="allianz-v3.4.2";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
