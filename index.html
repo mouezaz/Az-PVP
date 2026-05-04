@@ -8183,6 +8183,64 @@ function renderEntretienForm(name, mois, annee) {
     </div>`;
 
   initStarsInEl(f);
+
+  // ── Pré-charger les données de l'entretien archivé ────────────────────────
+  if (existing) {
+    // Étoiles — téléphonie
+    setStars('et-st-accueil',  existing.tel && existing.tel.stAccueil  || 0);
+    setStars('et-st-ecoute',   existing.tel && existing.tel.stEcoute   || 0);
+    setStars('et-st-rebond',   existing.tel && existing.tel.stRebond   || 0);
+    setStars('et-st-objection',existing.tel && existing.tel.stObjection|| 0);
+    // Étoiles — activité
+    setStars('et-st-orga',     existing.activite && existing.activite.stOrga      || 0);
+    setStars('et-st-outils',   existing.activite && existing.activite.stOutils    || 0);
+    setStars('et-st-autonomie',existing.activite && existing.activite.stAutonomie || 0);
+    setStars('et-st-agence',   existing.activite && existing.activite.stAgence    || 0);
+    // Étoiles — RH
+    setStars('et-st-motiv',  existing.rh && existing.rh.stMotiv  || 0);
+    setStars('et-st-equipe', existing.rh && existing.rh.stEquipe || 0);
+    setStars('et-st-ponct',  existing.rh && existing.rh.stPonct  || 0);
+    setStars('et-st-comm',   existing.rh && existing.rh.stComm   || 0);
+    // Textareas
+    var setVal = function(id, val) { var el=document.getElementById(id); if(el && val) el.value=val; };
+    setVal('et-obs-tel',       existing.tel && existing.tel.obsTel);
+    setVal('et-obs-activite',  existing.activite && existing.activite.obsActivite);
+    setVal('et-bilan',         existing.engagements && existing.engagements.bilan);
+    setVal('et-engagements',   existing.engagements && existing.engagements.next);
+    setVal('et-notes',         existing.notes);
+    setVal('ev-formation-detail', existing.admin && existing.admin.formationDetail);
+    // Champs numériques manuels
+    setVal('ev-heures',        existing.admin && String(existing.admin.heures || ''));
+    // Cases à cocher — admin
+    var setChk = function(id, val) { var el=document.getElementById(id); if(el) el.checked=!!val; };
+    setChk('ev-avenant',   existing.admin && existing.admin.avenant);
+    setChk('ev-crm',       existing.admin && existing.admin.crm);
+    setChk('ev-sinistre',  existing.admin && existing.admin.sinistre);
+    setChk('ev-multi',     existing.admin && existing.admin.multi);
+    setChk('ev-visa',      existing.admin && existing.admin.visa);
+    setChk('ev-ims',       existing.admin && existing.admin.ims);
+    setChk('ev-formation', existing.admin && existing.admin.formation);
+    setChk('ev-abs',       existing.admin && existing.admin.abs);
+    setChk('ev-erreur',    existing.admin && existing.admin.erreur);
+    setChk('ev-relance',   existing.admin && existing.admin.relance);
+    // Cases à cocher — RH
+    setChk('rh-absent',       existing.rh && existing.rh.absent);
+    setChk('rh-retard',       existing.rh && existing.rh.retard);
+    setChk('rh-conges',       existing.rh && existing.rh.conges);
+    setChk('rh-periode-essai',existing.rh && existing.rh.essai);
+    // Tags
+    if (existing.tags) {
+      document.querySelectorAll('#et-tags .tag').forEach(function(t) {
+        var txt = t.textContent.trim();
+        if (existing.tags.pos && existing.tags.pos.indexOf(txt) !== -1) {
+          t.className = 'tag sel-pos';
+        } else if (existing.tags.warn && existing.tags.warn.indexOf(txt) !== -1) {
+          t.className = 'tag sel-warn';
+        }
+      });
+    }
+  }
+
   updateCondsPrimes();
   calcEntretienTel();
 }
@@ -11898,7 +11956,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.3.3";',
+      'var CACHE="allianz-v3.3.4";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
