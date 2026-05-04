@@ -8037,10 +8037,9 @@ function renderEntretienForm(name, mois, annee) {
     ${existingBanner}
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab('et',0,this)">📊 Performances</button>
-      <button class="tab-btn" onclick="switchTab('et',1,this)">🛡 Portefeuille</button>
-      <button class="tab-btn" onclick="switchTab('et',2,this)">📞 Téléphonie</button>
-      <button class="tab-btn" onclick="switchTab('et',3,this)">👥 RH & Axes</button>
-      <button class="tab-btn" onclick="switchTab('et',4,this)">📄 Fiche IA</button>
+      <button class="tab-btn" onclick="switchTab('et',1,this)">📞 Téléphonie</button>
+      <button class="tab-btn" onclick="switchTab('et',2,this)">👥 RH & Axes</button>
+      <button class="tab-btn" onclick="switchTab('et',3,this)">📄 Fiche IA</button>
     </div>
 
     <!-- TAB 0: PERFORMANCES -->
@@ -8073,22 +8072,8 @@ function renderEntretienForm(name, mois, annee) {
       </div>
     </div>
 
-    <!-- TAB 1: PORTEFEUILLE -->
+    <!-- TAB 1: TÉLÉPHONIE -->
     <div class="tab-panel" id="et-panel-1">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Portefeuille — Primes vs Résiliations</div></div>
-        <div class="form-row form-row-4">
-          <div class="form-group"><label class="fl">Nb résiliations <span style="font-size:.7rem;color:#6b7280;font-weight:400">(agence)</span></label><input type="number" id="et-nb-resil" value="0" min="0" oninput="updatePortAdmin()" title="Données agence — ne compte pas dans les chiffres individuels"></div>
-          <div class="form-group"><label class="fl">Prime résiliée (€) <span style="font-size:.7rem;color:#6b7280;font-weight:400">(agence)</span></label><input type="number" id="et-prime-resil" value="0" min="0" oninput="updatePortAdmin()" title="Données agence — ne compte pas dans les chiffres individuels"></div>
-          <div class="form-group"><label class="fl">Nb contrats portefeuille</label><input type="number" id="et-nb-port" value="0" min="0" oninput="updatePortAdmin()"></div>
-          <div class="form-group"><label class="fl">Prime portefeuille (€)</label><input type="number" id="et-prime-port" value="0" min="0" oninput="updatePortAdmin()"></div>
-        </div>
-        <div id="port-calc-zone"></div>
-      </div>
-    </div>
-
-    <!-- TAB 2: TÉLÉPHONIE -->
-    <div class="tab-panel" id="et-panel-2">
       <div class="card">
         <div class="card-header"><div class="card-title">Téléphonie — données pré-chargées</div></div>
         <div class="form-row form-row-4">
@@ -8127,8 +8112,8 @@ function renderEntretienForm(name, mois, annee) {
       </div>
     </div>
 
-    <!-- TAB 3: RH & AXES -->
-    <div class="tab-panel" id="et-panel-3">
+    <!-- TAB 2: RH & AXES -->
+    <div class="tab-panel" id="et-panel-2">
       <div class="card">
         <div class="card-header"><div class="card-title">Événements administratifs</div></div>
         <div class="check-grid">
@@ -8183,15 +8168,15 @@ function renderEntretienForm(name, mois, annee) {
         </div>
       </div>
       <div class="btn-group">
-        <button class="btn btn-gold" onclick="switchTab('et',4,document.querySelectorAll('.tab-btn')[4]); generateFicheIA()">✦ Générer la fiche IA →</button>
+        <button class="btn btn-gold" onclick="switchTab('et',3,document.querySelectorAll('.tab-btn')[3]); generateFicheIA()">✦ Générer la fiche IA →</button>
       </div>
     </div>
 
-    <!-- TAB 4: FICHE -->
-    <div class="tab-panel" id="et-panel-4">
+    <!-- TAB 3: FICHE -->
+    <div class="tab-panel" id="et-panel-3">
       <div id="fiche-container"></div>
       <div class="btn-group no-print" style="margin-top:20px">
-        <button class="btn btn-outline" onclick="switchTab('et',3,document.querySelectorAll('.tab-btn')[3])">← Modifier</button>
+        <button class="btn btn-outline" onclick="switchTab('et',2,document.querySelectorAll('.tab-btn')[2])">← Modifier</button>
         <button class="btn btn-success" onclick="printEntretienProfessional()">🖨 Imprimer / PDF</button>
         <button class="btn btn-primary" onclick="saveEntretienDB()">💾 Archiver l'entretien</button>
       </div>
@@ -11913,7 +11898,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.3.1";',
+      'var CACHE="allianz-v3.3.2";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
