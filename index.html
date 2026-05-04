@@ -1146,7 +1146,7 @@ function buildAdminSidebar() {
     { id: 'admin-resil',        icon: '🛡', label: 'Résiliations' },
     { id: 'admin-prospects',    icon: '🔍', label: 'Prospects & Relances' },
     { id: 'admin-tel',          icon: '📞', label: 'Téléphonie' },
-    { id: 'admin-entretien',    icon: '🤝', label: 'Entretien annuel IA' },
+    { id: 'admin-entretien',    icon: '🤝', label: 'Entretien individuel IA' },
     { id: 'admin-import',       icon: '📥', label: 'Import données' },
     { id: 'admin-settings',     icon: '⚙️', label: 'Paramètres & PIN' },
     { id: 'admin-export',       icon: '⬇',  label: 'Export & Impression' },
@@ -8178,7 +8178,7 @@ PAGES['admin-entretien'] = (mc) => {
       + '</div>';
   }).join('');
   mc.innerHTML = `
-    <div class="page-header"><h1>Entretien Performance IA</h1><p>Génération de fiche par collaboratrice</p></div>
+    <div class="page-header"><h1>Entretien Individuel IA</h1><p>Génération de fiche par collaboratrice</p></div>
     <div class="collab-selector">${collabBtns}</div>
     <div id="entretien-form" style="display:none"></div>`;
 };
@@ -12157,7 +12157,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.4.2";',
+      'var CACHE="allianz-v3.4.3";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
