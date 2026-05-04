@@ -8598,7 +8598,7 @@ function printEntretienProfessional() {
   <div class="agency-block">
     <div class="agency-name">MOUEZ ESSID EI</div>
     <div class="agency-sub">Agent Général Allianz · Paray-Vieille-Poste</div>
-    <div class="agency-sub">Tél. 01 XX XX XX XX &nbsp;·&nbsp; contact@allianz-essid.fr</div>
+    <div class="agency-sub">Tél. 01 69 05 71 00 &nbsp;·&nbsp; mouez.essid@allianz.fr</div>
   </div>
   <div class="doc-title-block">
     <div class="doc-title">ENTRETIEN INDIVIDUEL</div>
@@ -8666,7 +8666,7 @@ function printEntretienProfessional() {
   <div class="sec-body">
     <table class="data-table">
       ${re !== null ? row('Décrochage entrants', d.tel.decEnt+'/'+d.tel.totEnt+' = <strong>'+re+'%</strong>') : ''}
-      ${rs !== null ? row('Décrochage sortants', d.tel.decSort+'/'+d.tel.totSort+' = <strong>'+rs+'%</strong>') : ''}
+      ${d.tel.totSort ? row('Appels sortants (total)', '<strong>'+d.tel.totSort+'</strong> appels') : ''}
       ${d.tel.leads ? row('Leads reçus / signés', d.tel.leads+' / '+(d.tel.leadsC||0)) : ''}
     </table>
     ${d.tel.obsTel ? '<div class="axe-block" style="margin-top:8px">'+d.tel.obsTel+'</div>' : ''}
@@ -11898,7 +11898,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.3.2";',
+      'var CACHE="allianz-v3.3.3";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
