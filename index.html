@@ -8080,9 +8080,9 @@ function renderTelPage(mois, annee) {
 
     <!-- ── Comparaison multi-mois ── -->
     <div id="tel-multi-container" style="margin-top:16px"></div>
-    <script>renderTelMulti('_agence_');</script>
 
     `;
+  renderTelMulti('_agence_');
 }
 
 PAGES['admin-tel'] = (mc) => { renderTelPage(nowMois(), nowAnnee()); };
@@ -12316,7 +12316,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.4.9";',
+      'var CACHE="allianz-v3.5.0";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
