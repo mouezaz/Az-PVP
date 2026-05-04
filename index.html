@@ -7926,46 +7926,224 @@ function renderAdminResil() {
 }
 
 // ---- ADMIN: TÉLÉPHONIE ----
-PAGES['admin-tel'] = (mc) => {
-  const mois = nowMois(), annee = nowAnnee();
-  const td = DB.tel.find(t=>t.collab==='Dorina'&&t.mois===mois&&t.annee===annee)||{};
-  const tr = DB.tel.find(t=>t.collab==='Rihem'&&t.mois===mois&&t.annee===annee)||{};
-  const ratioD = td.totEntrant>0?Math.round(td.decEntrant/td.totEntrant*100):null;
-  const ratioR = tr.totEntrant>0?Math.round(tr.decEntrant/tr.totEntrant*100):null;
-  const rDsort = td.totSortant>0?Math.round(td.decSortant/td.totSortant*100):null;
-  const rRsort = tr.totSortant>0?Math.round(tr.decSortant/tr.totSortant*100):null;
-  mc.innerHTML = `
-    <div class="page-header"><h1>Téléphonie</h1><p>${MOIS_FULL[mois]} ${annee}</p></div>
-    <div class="kpi-grid kpi-grid-4 sep16">
-      <div class="kpi ${ratioD!==null?(ratioD>=40?'good':ratioD>=25?'':'warn'):''}">
-        <div class="kpi-val">${ratioD!==null?ratioD+'%':'—'}</div>
-        <div class="kpi-lbl">Dorina — entrants</div>
-        ${td.totEntrant?`<div class="kpi-sub">${td.decEntrant}/${td.totEntrant}</div>`:''}
-      </div>
-      <div class="kpi ${rDsort!==null?(rDsort>=90?'good':''):''}">
-        <div class="kpi-val">${rDsort!==null?rDsort+'%':'—'}</div>
-        <div class="kpi-lbl">Dorina — sortants</div>
-        ${td.totSortant?`<div class="kpi-sub">${td.decSortant}/${td.totSortant}</div>`:''}
-      </div>
-      <div class="kpi ${ratioR!==null?(ratioR>=40?'good':ratioR>=25?'':'warn'):''}">
-        <div class="kpi-val">${ratioR!==null?ratioR+'%':'—'}</div>
-        <div class="kpi-lbl">Rihem — entrants</div>
-        ${tr.totEntrant?`<div class="kpi-sub">${tr.decEntrant}/${tr.totEntrant}</div>`:''}
-      </div>
-      <div class="kpi ${rRsort!==null?(rRsort>=90?'good':''):''}">
-        <div class="kpi-val">${rRsort!==null?rRsort+'%':'—'}</div>
-        <div class="kpi-lbl">Rihem — sortants</div>
-        ${tr.totSortant?`<div class="kpi-sub">${tr.decSortant}/${tr.totSortant}</div>`:''}
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header"><div class="card-title">Référence Février 2026 (Ringover)</div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px">
-        <div><b>Entrants :</b> 1 038 total · 258 décroché (24,9%) · Dorina 199, Mouez 59</div>
-        <div><b>Sortants :</b> Dorina 321/332 (96,7%) · Mouez 157/159 (98,7%)</div>
-      </div>
-    </div>`;
+// ── Mapping Ringover nom complet → prénom app ────────────────────────────────
+const RINGOVER_COLLAB_MAP = {
+  'dorina savy':   'Dorina',
+  'rihem fillali': 'Rihem',
+  'mouez essid':   'Mouez',
 };
+function _ringoverCollab(name) {
+  if (!name) return null;
+  return RINGOVER_COLLAB_MAP[name.toLowerCase().trim()] || null;
+}
+
+// ── Rendu page Téléphonie ────────────────────────────────────────────────────
+function renderTelPage(mois, annee) {
+  const mc = document.getElementById('main-content');
+  if (!mc) return;
+  if (!mois)  mois  = nowMois();
+  if (!annee) annee = nowAnnee();
+
+  const collabs = getCollabNames();
+  const agenceKey = 'agence_' + mois + '_' + annee;
+  const agData = (DB.telStats && DB.telStats[agenceKey]) || null;
+
+  // Construire une carte par collab
+  const collabCards = collabs.map(function(name) {
+    const key = name + '_' + mois + '_' + annee;
+    const d = (DB.telStats && DB.telStats[key]) || null;
+    if (!d) return `
+      <div class="card" style="opacity:.55">
+        <div class="card-header"><div class="card-title">${name}</div><span class="pill" style="background:#e5e7eb;color:#6b7280">Aucune donnée</span></div>
+        <p class="muted" style="padding:8px 0">Importez un fichier Ringover pour ce mois.</p>
+      </div>`;
+    const tDecPct  = d.entTotal  > 0 ? Math.round(d.entDecroches / d.entTotal  * 100) : null;
+    const sDecPct  = d.sortTotal > 0 ? Math.round(d.sortDecroches / d.sortTotal * 100) : null;
+    const tDecColor  = tDecPct !== null ? (tDecPct >= 40 ? '#059669' : tDecPct >= 25 ? '#d97706' : '#dc2626') : '#9ca3af';
+    const sDecColor  = sDecPct !== null ? (sDecPct >= 80 ? '#059669' : sDecPct >= 60 ? '#d97706' : '#dc2626') : '#9ca3af';
+    return `
+      <div class="card">
+        <div class="card-header"><div class="card-title">${name}</div><span class="pill pill-blue">${MOIS_FULL[mois]} ${annee}</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:10px">
+          <!-- ENTRANTS -->
+          <div style="padding:14px 16px;border-right:1px solid #e5e7eb">
+            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#6b7280;letter-spacing:.05em;margin-bottom:8px">📥 Appels entrants</div>
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
+              <span style="font-size:2rem;font-weight:800;color:${tDecColor};line-height:1">${tDecPct !== null ? tDecPct+'%' : '—'}</span>
+              <span style="font-size:.8rem;color:#6b7280">décroché</span>
+            </div>
+            <div style="font-size:.82rem;color:#374151;margin-bottom:4px">
+              <strong>${d.entDecroches}</strong> décroché sur <strong>${d.entTotal}</strong> reçus
+            </div>
+            <div style="font-size:.82rem;color:#dc2626">
+              ⛔ <strong>${d.entNonTraites}</strong> non traité${d.entNonTraites>1?'s':''}
+            </div>
+            ${d.entTotal > 0 ? `<div style="background:#e5e7eb;border-radius:4px;height:6px;margin-top:8px;overflow:hidden"><div style="width:${Math.min(100, tDecPct||0)}%;height:6px;background:${tDecColor};border-radius:4px"></div></div>` : ''}
+          </div>
+          <!-- SORTANTS -->
+          <div style="padding:14px 16px">
+            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#6b7280;letter-spacing:.05em;margin-bottom:8px">📤 Appels sortants</div>
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
+              <span style="font-size:2rem;font-weight:800;color:#003781;line-height:1">${d.sortTotal}</span>
+              <span style="font-size:.8rem;color:#6b7280">appels total</span>
+            </div>
+            <div style="font-size:.82rem;color:#374151;margin-bottom:4px">
+              <strong>${d.sortDecroches}</strong> aboutis sur <strong>${d.sortTotal}</strong>
+            </div>
+            <div style="font-size:.82rem;color:${sDecColor};font-weight:600">
+              Taux de contact : ${sDecPct !== null ? sDecPct+'%' : '—'}
+            </div>
+            ${d.sortTotal > 0 ? `<div style="background:#e5e7eb;border-radius:4px;height:6px;margin-top:8px;overflow:hidden"><div style="width:${Math.min(100, sDecPct||0)}%;height:6px;background:${sDecColor};border-radius:4px"></div></div>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Bloc agence (non traités globaux)
+  const agenceBlock = agData ? `
+    <div class="card" style="border-left:4px solid #dc2626">
+      <div class="card-header"><div class="card-title">Agence — Appels non traités</div><span class="pill" style="background:#fee2e2;color:#b91c1c">Sans collaborateur</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div style="text-align:center;padding:12px;background:#fef2f2;border-radius:8px">
+          <div style="font-size:2rem;font-weight:800;color:#dc2626">${agData.entTotal || 0}</div>
+          <div style="font-size:.78rem;color:#6b7280;margin-top:4px">Entrants total agence</div>
+        </div>
+        <div style="text-align:center;padding:12px;background:#fef2f2;border-radius:8px">
+          <div style="font-size:2rem;font-weight:800;color:#dc2626">${agData.nonTraites || 0}</div>
+          <div style="font-size:.78rem;color:#6b7280;margin-top:4px">Non traités (répondeur + manqué)</div>
+        </div>
+        <div style="text-align:center;padding:12px;background:#f0fdf4;border-radius:8px">
+          <div style="font-size:2rem;font-weight:800;color:#059669">${agData.entDecroches || 0}</div>
+          <div style="font-size:.78rem;color:#6b7280;margin-top:4px">Décroché toutes lignes</div>
+        </div>
+      </div>
+    </div>` : '';
+
+  // Sélecteur mois/année
+  const moisOpts = MOIS_FULL.slice(1).map(function(l,i){
+    return `<option value="${i+1}"${(i+1)===mois?' selected':''}>${l}</option>`;
+  }).join('');
+  const curY = nowAnnee();
+  const anneeOpts = [curY-1, curY, curY+1].map(function(a){
+    return `<option value="${a}"${a===annee?' selected':''}>${a}</option>`;
+  }).join('');
+
+  mc.innerHTML = `
+    <div class="page-header no-print">
+      <h1>Téléphonie Ringover</h1>
+      <p>Statistiques par collaborateur — importées depuis le CSV Ringover</p>
+    </div>
+
+    <!-- Filtre + Import -->
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px;padding:12px 16px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;" class="no-print">
+      <span style="font-weight:700;font-size:.88rem;color:#374151">📅 Période :</span>
+      <select id="tel-filter-mois" onchange="renderTelPage(parseInt(this.value),parseInt(document.getElementById('tel-filter-annee').value))"
+        style="padding:6px 10px;border:1.5px solid #d1d5db;border-radius:6px;font-size:.87rem">${moisOpts}</select>
+      <select id="tel-filter-annee" onchange="renderTelPage(parseInt(document.getElementById('tel-filter-mois').value),parseInt(this.value))"
+        style="padding:6px 10px;border:1.5px solid #d1d5db;border-radius:6px;font-size:.87rem">${anneeOpts}</select>
+      <label style="display:flex;align-items:center;gap:8px;background:#003781;color:#fff;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.87rem;font-weight:600;margin-left:auto">
+        📂 Importer CSV Ringover
+        <input type="file" accept=".csv" style="display:none" onchange="importRingoverCSV(this,parseInt(document.getElementById('tel-filter-mois').value),parseInt(document.getElementById('tel-filter-annee').value))">
+      </label>
+    </div>
+
+    <!-- Cards collaborateurs -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:20px">
+      ${collabCards}
+    </div>
+
+    <!-- Agence -->
+    ${agenceBlock}
+
+    ${!agData && !(DB.telStats && Object.keys(DB.telStats).some(k=>k.includes('_'+mois+'_'+annee))) ? `
+    <div class="alert alert-info" style="margin-top:8px">
+      💡 Aucune donnée pour ${MOIS_FULL[mois]} ${annee}. Importez le CSV Ringover (téléchargeable depuis votre espace Ringover → Rapports → Historique des appels → Exporter).
+    </div>` : ''}`;
+}
+
+PAGES['admin-tel'] = (mc) => { renderTelPage(nowMois(), nowAnnee()); };
+
+// ── Import CSV Ringover ───────────────────────────────────────────────────────
+function importRingoverCSV(input, mois, annee) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const text = e.target.result.replace(/^﻿/, '');
+      const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l);
+      if (!lines.length) { toast('Fichier vide', 'error'); return; }
+
+      // Détecter séparateur
+      const sep = lines[0].split(';').length > lines[0].split(',').length ? ';' : ',';
+      const headers = parseCSVLine(lines[0], sep).map(h=>h.replace(/^"(.*)"$/,'$1').trim());
+      const iDir    = headers.indexOf('Direction');
+      const iType   = headers.indexOf('Type');
+      const iUser   = headers.indexOf('Utilisateur');
+      if (iDir<0 || iType<0 || iUser<0) { toast('Format CSV non reconnu — colonnes Direction/Type/Utilisateur attendues','error'); return; }
+
+      // Compteurs par collab
+      const stats = {}; // collab → {entTotal, entDecroches, entNonTraites, sortTotal, sortDecroches}
+      let agEntTotal=0, agNonTraites=0, agEntDecroches=0;
+
+      for (var i=1; i<lines.length; i++) {
+        const cols = parseCSVLine(lines[i], sep);
+        if (cols.length < Math.max(iDir,iType,iUser)+1) continue;
+        const dir  = (cols[iDir]  ||'').replace(/^"|"$/g,'').trim();
+        const type = (cols[iType] ||'').replace(/^"|"$/g,'').trim();
+        const user = (cols[iUser] ||'').replace(/^"|"$/g,'').trim();
+        const collab = _ringoverCollab(user);
+        const decroche = type === 'Décroché' || type === 'Transféré';
+        const nonTraite = type === 'Manqué' || type === 'Répondeur';
+
+        if (dir === 'Entrant') {
+          agEntTotal++;
+          if (decroche) agEntDecroches++;
+          if (!user) {
+            if (nonTraite) agNonTraites++;
+            continue;
+          }
+          if (!collab) continue;
+          if (!stats[collab]) stats[collab] = {entTotal:0,entDecroches:0,entNonTraites:0,sortTotal:0,sortDecroches:0};
+          stats[collab].entTotal++;
+          if (decroche) stats[collab].entDecroches++;
+          if (nonTraite) stats[collab].entNonTraites++;
+        } else if (dir === 'Sortant') {
+          if (!collab) continue;
+          if (!stats[collab]) stats[collab] = {entTotal:0,entDecroches:0,entNonTraites:0,sortTotal:0,sortDecroches:0};
+          stats[collab].sortTotal++;
+          if (decroche) stats[collab].sortDecroches++;
+        }
+      }
+
+      if (!DB.telStats) DB.telStats = {};
+      // Sauvegarder par collab
+      Object.keys(stats).forEach(function(name) {
+        const key = name + '_' + mois + '_' + annee;
+        DB.telStats[key] = Object.assign({}, stats[name], {mois, annee, importedAt: Date.now()});
+        // Rétro-compat avec l'ancien format pour les entretiens
+        DB.telStats[key].decEnt  = stats[name].entDecroches;
+        DB.telStats[key].totEnt  = stats[name].entTotal;
+        DB.telStats[key].decSort = stats[name].sortDecroches;
+        DB.telStats[key].totSort = stats[name].sortTotal;
+      });
+      // Sauvegarder agence
+      DB.telStats['agence_' + mois + '_' + annee] = {
+        entTotal: agEntTotal, entDecroches: agEntDecroches,
+        nonTraites: agNonTraites, mois, annee, importedAt: Date.now()
+      };
+
+      saveDB(DB);
+      const total = Object.keys(stats).length;
+      toast('✅ Ringover importé — ' + (lines.length-1) + ' lignes · ' + total + ' collaborateur(s)', 'success');
+      renderTelPage(mois, annee);
+    } catch(err) {
+      console.error('Import Ringover:', err);
+      toast('Erreur lors de l\'import : ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+}
 
 // ---- ADMIN: ENTRETIEN IA ----
 PAGES['admin-entretien'] = (mc) => {
@@ -11956,7 +12134,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.3.4";',
+      'var CACHE="allianz-v3.4.0";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
