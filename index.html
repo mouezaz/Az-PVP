@@ -8675,34 +8675,18 @@ function printEntretienProfessional() {
   </div>
 </section>
 
-<!-- PORTEFEUILLE -->
-<div class="two-cols">
-  <section>
-    <div class="sec-head"><span class="ico">📁</span>Portefeuille</div>
-    <div class="sec-body">
-      <table class="data-table">
-        ${row('Résiliations (nb)', d.port.nbResil || '0')}
-        ${row('Prime résiliée', (d.port.primeResil||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:0}))}
-        ${d.port.nbPort ? row('Contrats portefeuille', d.port.nbPort) : ''}
-        ${d.port.primePort ? row('Prime portefeuille', (d.port.primePort||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:0})) : ''}
-        ${d.port.primePort > 0 ? row('Taux résiliation', ((d.port.primeResil/d.port.primePort)*100).toFixed(2)+'%') : ''}
-      </table>
-    </div>
-  </section>
-
-  <!-- TÉLÉPHONIE -->
-  <section>
-    <div class="sec-head"><span class="ico">📞</span>Téléphonie Ringover</div>
-    <div class="sec-body">
-      <table class="data-table">
-        ${re !== null ? row('Décrochage entrants', d.tel.decEnt+'/'+d.tel.totEnt+' = <strong>'+re+'%</strong>') : ''}
-        ${rs !== null ? row('Décrochage sortants', d.tel.decSort+'/'+d.tel.totSort+' = <strong>'+rs+'%</strong>') : ''}
-        ${d.tel.leads ? row('Leads reçus / signés', d.tel.leads+' / '+(d.tel.leadsC||0)) : ''}
-      </table>
-      ${d.tel.obsTel ? '<div class="axe-block" style="margin-top:8px">'+d.tel.obsTel+'</div>' : ''}
-    </div>
-  </section>
-</div>
+<!-- TÉLÉPHONIE -->
+<section>
+  <div class="sec-head"><span class="ico">📞</span>Téléphonie Ringover</div>
+  <div class="sec-body">
+    <table class="data-table">
+      ${re !== null ? row('Décrochage entrants', d.tel.decEnt+'/'+d.tel.totEnt+' = <strong>'+re+'%</strong>') : ''}
+      ${rs !== null ? row('Décrochage sortants', d.tel.decSort+'/'+d.tel.totSort+' = <strong>'+rs+'%</strong>') : ''}
+      ${d.tel.leads ? row('Leads reçus / signés', d.tel.leads+' / '+(d.tel.leadsC||0)) : ''}
+    </table>
+    ${d.tel.obsTel ? '<div class="axe-block" style="margin-top:8px">'+d.tel.obsTel+'</div>' : ''}
+  </div>
+</section>
 
 <!-- ÉVALUATION QUALITATIVE -->
 <section>
@@ -11929,7 +11913,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.3.0";',
+      'var CACHE="allianz-v3.3.1";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
