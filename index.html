@@ -12134,7 +12134,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.4.0";',
+      'var CACHE="allianz-v3.4.1";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
@@ -12152,7 +12152,21 @@ function resetAll() {
     try {
       var swBlob = new Blob([swCode], {type: 'application/javascript'});
       var swUrl = URL.createObjectURL(swBlob);
-      navigator.serviceWorker.register(swUrl).catch(function(){});
+      navigator.serviceWorker.register(swUrl).then(function(reg) {
+        reg.addEventListener('updatefound', function() {
+          var newSW = reg.installing;
+          if (!newSW) return;
+          newSW.addEventListener('statechange', function() {
+            if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
+              window.location.reload();
+            }
+          });
+        });
+      }).catch(function(){});
+      // Recharge automatiquement quand un nouveau SW prend le contrôle
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (!window._swReloading) { window._swReloading = true; window.location.reload(); }
+      });
     } catch(e) {}
   }
 
