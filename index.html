@@ -8192,7 +8192,7 @@ function renderEntretienForm(name, mois, annee) {
       <div id="fiche-container"></div>
       <div class="btn-group no-print" style="margin-top:20px">
         <button class="btn btn-outline" onclick="switchTab('et',3,document.querySelectorAll('.tab-btn')[3])">← Modifier</button>
-        <button class="btn btn-success" onclick="window.print()">🖨 Imprimer / PDF</button>
+        <button class="btn btn-success" onclick="printEntretienProfessional()">🖨 Imprimer / PDF</button>
         <button class="btn btn-primary" onclick="saveEntretienDB()">💾 Archiver l'entretien</button>
       </div>
     </div>`;
@@ -8470,6 +8470,347 @@ function buildFallbackIA(d, pct, re, ko) {
   else L.push('Ce mois-ci sera le point de départ d\'une belle progression : les clients sont là, les outils aussi — à vous de jouer !');
   return L.join('<br>');
 }
+// ── Impression professionnelle de l'entretien ────────────────────────────────
+function printEntretienProfessional() {
+  if (!ecCollab) { toast('Sélectionnez une collaboratrice', 'error'); return; }
+  const d = collectEntretien();
+
+  // Récupérer le texte IA généré si disponible
+  const aiZone = document.getElementById('ai-zone');
+  const aiText = aiZone ? (aiZone.innerText || aiZone.textContent || '').trim() : '';
+  const hasAI = aiText && aiText.length > 20 && !aiText.includes('Génération en cours');
+
+  const MOIS_LABEL = ['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const moisLabel = MOIS_LABEL[d.mois] || '';
+  const pct = d.perf.an > 0 ? Math.round(d.perf.an / 28 * 100) : 0;
+  const re = d.tel.totEnt > 0 ? Math.round(d.tel.decEnt / d.tel.totEnt * 100) : null;
+  const rs = d.tel.totSort > 0 ? Math.round(d.tel.decSort / d.tel.totSort * 100) : null;
+
+  const starsHTML_print = (val) => {
+    var s = '';
+    for (var i = 1; i <= 5; i++) s += i <= val ? '★' : '☆';
+    return '<span style="color:#f59e0b;letter-spacing:1px;font-size:14px">' + s + '</span>';
+  };
+  const pill = (txt, color) => '<span style="display:inline-block;background:'+color+';color:#fff;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;margin:0 2px">'+txt+'</span>';
+  const row = (label, val) => '<tr><td style="padding:5px 10px 5px 0;color:#6b7280;font-size:12px;white-space:nowrap;width:44%">'+label+'</td><td style="padding:5px 0;font-size:12px;font-weight:600;color:#111">'+val+'</td></tr>';
+
+  const ok=[], ko=[];
+  if(d.perf.condAuto==='OK') ok.push('Auto'); else ko.push('Auto');
+  if(d.perf.condMrh==='OK') ok.push('MRH'); else ko.push('MRH');
+  if(d.perf.nop>=4) ok.push('NOP'); else if(d.perf.nop>0) ko.push('NOP '+d.perf.nop+'/4');
+  if(d.perf.gav>=2) ok.push('GAV'); else if(d.perf.gav>0) ko.push('GAV '+d.perf.gav+'/2');
+  if(d.perf.sante>=2) ok.push('Santé'); else if(d.perf.sante>0) ko.push('Santé '+d.perf.sante+'/2');
+  if(d.perf.pj>=5) ok.push('PJ'); else if(d.perf.pj>0) ko.push('PJ '+d.perf.pj+'/5');
+
+  const evts = [
+    d.admin.avenant&&'Avenants dans les délais',d.admin.crm&&'CRM 7 mois respecté',
+    d.admin.sinistre&&'Sinistre déclaré/suivi',d.admin.multi&&'Multi-équipement',
+    d.admin.visa&&'Visa CSC IARD',d.admin.ims&&'IMS/Ultimo',
+    d.admin.formation&&('Formation '+(d.admin.formationDetail?'('+d.admin.formationDetail+')':'')),
+    d.admin.abs&&'ABS traité',d.admin.relance&&'Relances cotisations'
+  ].filter(Boolean);
+  const rhEvts = [
+    d.rh.absent&&'Absence(s)',d.rh.retard&&'Retard(s)',
+    d.rh.conges&&'Congés posés',d.rh.essai&&"Période d'essai"
+  ].filter(Boolean);
+
+  const barColor = pct >= 100 ? '#059669' : pct >= 70 ? '#2563eb' : '#dc2626';
+  const barLabel = pct >= 100 ? 'OBJECTIF ATTEINT' : pct >= 70 ? 'EN PROGRESSION' : 'SOUS OBJECTIF';
+
+  const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Entretien ${d.collab} — ${moisLabel} ${d.annee}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',Arial,sans-serif;font-size:12px;color:#111;background:#fff;line-height:1.5}
+  @page{size:A4;margin:14mm 14mm 18mm 14mm}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.no-print{display:none!important}section{page-break-inside:avoid}}
+
+  /* Header */
+  .doc-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #003781;padding-bottom:12px;margin-bottom:18px}
+  .agency-block{line-height:1.6}
+  .agency-name{font-size:16px;font-weight:800;color:#003781;letter-spacing:.5px}
+  .agency-sub{font-size:10px;color:#6b7280;margin-top:2px}
+  .doc-title-block{text-align:right}
+  .doc-title{font-size:19px;font-weight:800;color:#003781}
+  .doc-subtitle{font-size:11px;color:#374151;margin-top:3px}
+  .doc-badge{display:inline-block;background:#003781;color:#fff;border-radius:20px;padding:3px 14px;font-size:10px;font-weight:700;margin-top:6px;letter-spacing:.5px}
+
+  /* Identity strip */
+  .identity{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;background:#f1f5f9;border-radius:8px;margin-bottom:18px;overflow:hidden;border:1px solid #e2e8f0}
+  .identity-cell{padding:10px 14px;border-right:1px solid #e2e8f0}
+  .identity-cell:last-child{border-right:none}
+  .identity-lbl{font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px}
+  .identity-val{font-size:13px;font-weight:700;color:#003781}
+
+  /* Sections */
+  section{margin-bottom:16px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+  .sec-head{background:#003781;color:#fff;padding:7px 14px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  .sec-head span.ico{font-size:13px}
+  .sec-body{padding:12px 14px}
+
+  /* KPI bar */
+  .kpi-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .kpi-main{flex:1}
+  .kpi-pct{font-size:26px;font-weight:800;color:${barColor};line-height:1}
+  .kpi-label{font-size:10px;color:#6b7280;margin-top:1px}
+  .bar-track{background:#e5e7eb;border-radius:4px;height:10px;margin-top:6px;overflow:hidden}
+  .bar-fill{height:10px;border-radius:4px;background:${barColor};width:${Math.min(100,pct)}%}
+  .bar-badge{display:inline-block;background:${barColor};color:#fff;border-radius:4px;font-size:9px;font-weight:700;padding:2px 8px;margin-top:4px;letter-spacing:.5px}
+
+  /* Products grid */
+  .prod-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:10px 0}
+  .prod-cell{text-align:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:6px 4px}
+  .prod-cell-lbl{font-size:9px;color:#6b7280;font-weight:600}
+  .prod-cell-val{font-size:17px;font-weight:800;color:#003781;line-height:1.2;margin-top:2px}
+
+  /* Pill */
+  .tag-ok{display:inline-block;background:#dcfce7;color:#15803d;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;margin:2px}
+  .tag-ko{display:inline-block;background:#fee2e2;color:#b91c1c;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;margin:2px}
+  .tag-blue{display:inline-block;background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;margin:2px}
+  .tag-orange{display:inline-block;background:#fef3c7;color:#92400e;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;margin:2px}
+
+  /* Tables */
+  .data-table{width:100%;border-collapse:collapse}
+  .data-table td{padding:5px 8px;font-size:11px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+  .data-table tr:last-child td{border-bottom:none}
+  .data-table td:first-child{color:#6b7280;width:50%;font-weight:500}
+  .data-table td:last-child{font-weight:600;color:#111}
+
+  /* Axes */
+  .axe-block{background:#f0fdf4;border-left:3px solid #22c55e;border-radius:0 6px 6px 0;padding:7px 12px;margin:6px 0;font-size:11px}
+  .axe-warn-block{background:#fefce8;border-left:3px solid #eab308;border-radius:0 6px 6px 0;padding:7px 12px;margin:6px 0;font-size:11px}
+  .axe-neg-block{background:#fff1f2;border-left:3px solid #ef4444;border-radius:0 6px 6px 0;padding:7px 12px;margin:6px 0;font-size:11px}
+
+  /* AI analysis */
+  .ai-section{background:#fafaf9;border:1px solid #e7e5e4;border-radius:8px;padding:14px;margin-bottom:16px}
+  .ai-title{font-size:10px;font-weight:700;color:#78716c;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .ai-title::before{content:'';display:inline-block;width:6px;height:6px;background:#a8a29e;border-radius:50%}
+  .ai-body{font-size:11px;color:#292524;line-height:1.7;white-space:pre-wrap}
+
+  /* Signature */
+  .sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:20px}
+  .sig-box{border-top:1.5px solid #374151;padding-top:8px}
+  .sig-name{font-size:10px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px}
+  .sig-role{font-size:9px;color:#9ca3af;margin-top:2px}
+  .sig-space{height:42px}
+
+  /* Footer */
+  .doc-footer{margin-top:20px;border-top:1px solid #e5e7eb;padding-top:8px;display:flex;justify-content:space-between;align-items:center}
+  .doc-footer-txt{font-size:8.5px;color:#9ca3af}
+
+  /* Cols layout */
+  .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="doc-header">
+  <div class="agency-block">
+    <div class="agency-name">MOUEZ ESSID EI</div>
+    <div class="agency-sub">Agent Général Allianz · Paray-Vieille-Poste</div>
+    <div class="agency-sub">Tél. 01 XX XX XX XX &nbsp;·&nbsp; contact@allianz-essid.fr</div>
+  </div>
+  <div class="doc-title-block">
+    <div class="doc-title">ENTRETIEN INDIVIDUEL</div>
+    <div class="doc-subtitle">Fiche de suivi des performances & axes de développement</div>
+    <div class="doc-badge">CONFIDENTIEL — Usage interne</div>
+  </div>
+</div>
+
+<!-- IDENTITY -->
+<div class="identity">
+  <div class="identity-cell">
+    <div class="identity-lbl">Collaborateur(rice)</div>
+    <div class="identity-val">${d.collab}</div>
+  </div>
+  <div class="identity-cell">
+    <div class="identity-lbl">Période</div>
+    <div class="identity-val">${moisLabel} ${d.annee}</div>
+  </div>
+  <div class="identity-cell">
+    <div class="identity-lbl">Date de génération</div>
+    <div class="identity-val">${new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})}</div>
+  </div>
+</div>
+
+<!-- PERFORMANCES -->
+<section>
+  <div class="sec-head"><span class="ico">📊</span>Performances commerciales</div>
+  <div class="sec-body">
+    <!-- KPI principal -->
+    <div class="kpi-row">
+      <div class="kpi-main">
+        <div class="kpi-pct">${d.perf.an} <span style="font-size:13px;font-weight:500;color:#6b7280">/ 28 AN</span></div>
+        <div class="kpi-label">Affaires Nouvelles — objectif mensuel</div>
+        <div class="bar-track"><div class="bar-fill"></div></div>
+        <div class="bar-badge">${barLabel} — ${pct}%</div>
+      </div>
+      <div style="text-align:right;min-width:120px">
+        <div style="font-size:10px;color:#6b7280;margin-bottom:4px">Prime AN produite</div>
+        <div style="font-size:20px;font-weight:800;color:#003781">${(d.perf.prime||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:0})}</div>
+        ${d.perf.ytdAn ? '<div style="font-size:9px;color:#6b7280;margin-top:6px">Cumul '+d.annee+' : <strong>'+d.perf.ytdAn+' AN</strong></div>' : ''}
+        ${d.perf.ytdPrime ? '<div style="font-size:9px;color:#6b7280">Prime cumul : <strong>'+Math.round(d.perf.ytdPrime).toLocaleString('fr-FR')+'€</strong></div>' : ''}
+      </div>
+    </div>
+    <!-- Produits -->
+    <div class="prod-grid">
+      <div class="prod-cell"><div class="prod-cell-lbl">Auto</div><div class="prod-cell-val">${d.perf.auto}</div></div>
+      <div class="prod-cell"><div class="prod-cell-lbl">MRH</div><div class="prod-cell-val">${d.perf.mrh}</div></div>
+      <div class="prod-cell"><div class="prod-cell-lbl">NOP</div><div class="prod-cell-val">${d.perf.nop}<span style="font-size:9px;color:#6b7280">/4</span></div></div>
+      <div class="prod-cell"><div class="prod-cell-lbl">GAV</div><div class="prod-cell-val">${d.perf.gav}<span style="font-size:9px;color:#6b7280">/2</span></div></div>
+      <div class="prod-cell"><div class="prod-cell-lbl">Santé</div><div class="prod-cell-val">${d.perf.sante}<span style="font-size:9px;color:#6b7280">/2</span></div></div>
+      <div class="prod-cell"><div class="prod-cell-lbl">PJ</div><div class="prod-cell-val">${d.perf.pj}<span style="font-size:9px;color:#6b7280">/5</span></div></div>
+    </div>
+    <!-- Conditions primes -->
+    <div style="margin-top:8px">
+      <span style="font-size:10px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.4px">Conditions primes :</span>&nbsp;
+      ${ok.map(p=>'<span class="tag-ok">'+p+' ✓</span>').join('')}
+      ${ko.map(p=>'<span class="tag-ko">'+p+' ✗</span>').join('')}
+    </div>
+  </div>
+</section>
+
+<!-- PORTEFEUILLE -->
+<div class="two-cols">
+  <section>
+    <div class="sec-head"><span class="ico">📁</span>Portefeuille</div>
+    <div class="sec-body">
+      <table class="data-table">
+        ${row('Résiliations (nb)', d.port.nbResil || '0')}
+        ${row('Prime résiliée', (d.port.primeResil||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:0}))}
+        ${d.port.nbPort ? row('Contrats portefeuille', d.port.nbPort) : ''}
+        ${d.port.primePort ? row('Prime portefeuille', (d.port.primePort||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:0})) : ''}
+        ${d.port.primePort > 0 ? row('Taux résiliation', ((d.port.primeResil/d.port.primePort)*100).toFixed(2)+'%') : ''}
+      </table>
+    </div>
+  </section>
+
+  <!-- TÉLÉPHONIE -->
+  <section>
+    <div class="sec-head"><span class="ico">📞</span>Téléphonie Ringover</div>
+    <div class="sec-body">
+      <table class="data-table">
+        ${re !== null ? row('Décrochage entrants', d.tel.decEnt+'/'+d.tel.totEnt+' = <strong>'+re+'%</strong>') : ''}
+        ${rs !== null ? row('Décrochage sortants', d.tel.decSort+'/'+d.tel.totSort+' = <strong>'+rs+'%</strong>') : ''}
+        ${d.tel.leads ? row('Leads reçus / signés', d.tel.leads+' / '+(d.tel.leadsC||0)) : ''}
+      </table>
+      ${d.tel.obsTel ? '<div class="axe-block" style="margin-top:8px">'+d.tel.obsTel+'</div>' : ''}
+    </div>
+  </section>
+</div>
+
+<!-- ÉVALUATION QUALITATIVE -->
+<section>
+  <div class="sec-head"><span class="ico">⭐</span>Évaluation qualitative</div>
+  <div class="sec-body">
+    <div class="two-cols">
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#374151;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Posture téléphonique</div>
+        <table class="data-table">
+          ${row('Accueil & présentation', starsHTML_print(d.tel.stAccueil))}
+          ${row('Écoute / reformulation', starsHTML_print(d.tel.stEcoute))}
+          ${row('Rebond commercial', starsHTML_print(d.tel.stRebond))}
+          ${row('Gestion des objections', starsHTML_print(d.tel.stObjection))}
+        </table>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#374151;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Activité générale</div>
+        <table class="data-table">
+          ${row('Organisation & méthode', starsHTML_print(d.activite.stOrga))}
+          ${row('Maîtrise outils (NOA, HAB01, IMS)', starsHTML_print(d.activite.stOutils))}
+          ${row('Autonomie & initiative', starsHTML_print(d.activite.stAutonomie))}
+          ${row('Accueil physique agence', starsHTML_print(d.activite.stAgence))}
+        </table>
+      </div>
+    </div>
+    ${d.activite.obsActivite ? '<div class="axe-block" style="margin-top:10px"><strong>Observations :</strong> '+d.activite.obsActivite+'</div>' : ''}
+  </div>
+</section>
+
+<!-- ADMIN & RH -->
+<div class="two-cols">
+  <section>
+    <div class="sec-head"><span class="ico">📋</span>Points administratifs</div>
+    <div class="sec-body">
+      ${evts.length ? '<div>'+evts.map(e=>'<span class="tag-blue">'+e+'</span>').join('')+'</div>' : '<p style="font-size:11px;color:#9ca3af">Aucun événement coché.</p>'}
+      ${d.admin.heures ? '<div class="axe-block" style="margin-top:8px"><strong>Formation :</strong> '+d.admin.heures+'h — '+(d.admin.formationDetail||'—')+'</div>' : ''}
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="ico">👥</span>RH & Comportement</div>
+    <div class="sec-body">
+      <table class="data-table">
+        ${row('Motivation / Implication', starsHTML_print(d.rh.stMotiv))}
+        ${row('Relations d\'équipe', starsHTML_print(d.rh.stEquipe))}
+        ${row('Ponctualité & présence', starsHTML_print(d.rh.stPonct))}
+        ${row('Communication direction', starsHTML_print(d.rh.stComm))}
+      </table>
+      ${rhEvts.length ? '<div style="margin-top:8px">'+rhEvts.map(e=>'<span class="tag-orange">'+e+'</span>').join('')+'</div>' : ''}
+    </div>
+  </section>
+</div>
+
+<!-- AXES & ENGAGEMENTS -->
+<section>
+  <div class="sec-head"><span class="ico">🎯</span>Axes de développement & Engagements</div>
+  <div class="sec-body">
+    ${(d.tags.pos && d.tags.pos.length) ? '<div style="margin-bottom:8px"><span style="font-size:10px;font-weight:700;color:#15803d">Points forts identifiés : </span>'+d.tags.pos.map(t=>'<span class="tag-ok">'+t+'</span>').join('')+'</div>' : ''}
+    ${(d.tags.warn && d.tags.warn.length) ? '<div style="margin-bottom:8px"><span style="font-size:10px;font-weight:700;color:#92400e">Axes de progression : </span>'+d.tags.warn.map(t=>'<span class="tag-orange">'+t+'</span>').join('')+'</div>' : ''}
+    ${d.engagements.bilan ? '<div class="axe-block"><strong>Bilan des engagements du mois précédent</strong><br>'+d.engagements.bilan+'</div>' : ''}
+    ${d.engagements.next ? '<div class="axe-warn-block"><strong>Engagements pour le mois prochain</strong><br>'+d.engagements.next+'</div>' : ''}
+    ${d.notes ? '<div class="axe-block" style="background:#f8fafc;border-color:#94a3b8;margin-top:8px"><strong>Notes libres</strong><br>'+d.notes+'</div>' : ''}
+  </div>
+</section>
+
+${hasAI ? `
+<!-- ANALYSE IA -->
+<div class="ai-section">
+  <div class="ai-title">Synthèse — Analyse & recommandations</div>
+  <div class="ai-body">${aiText.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}</div>
+</div>` : ''}
+
+<!-- SIGNATURES -->
+<div class="sig-grid">
+  <div class="sig-box">
+    <div class="sig-space"></div>
+    <div class="sig-name">Mouez Essid</div>
+    <div class="sig-role">Agent Général — Signature & date</div>
+  </div>
+  <div class="sig-box">
+    <div class="sig-space"></div>
+    <div class="sig-name">${d.collab}</div>
+    <div class="sig-role">Collaborateur(rice) — Signature & date</div>
+  </div>
+</div>
+<p style="font-size:9px;color:#9ca3af;margin-top:8px;text-align:center">En signant ce document, le(la) collaborateur(rice) confirme avoir pris connaissance de son contenu et des engagements pris lors de cet entretien.</p>
+
+<!-- FOOTER -->
+<div class="doc-footer">
+  <div class="doc-footer-txt">MOUEZ ESSID EI — Agent Général Allianz · Paray-Vieille-Poste · Document confidentiel</div>
+  <div class="doc-footer-txt">Entretien ${moisLabel} ${d.annee} — ${d.collab} — Généré le ${new Date().toLocaleDateString('fr-FR')}</div>
+</div>
+
+<div class="no-print" style="text-align:center;padding:24px">
+  <button onclick="window.print()" style="background:#003781;color:#fff;border:none;border-radius:8px;padding:12px 32px;font-size:14px;font-weight:700;cursor:pointer;margin-right:12px">🖨️ Imprimer / Enregistrer en PDF</button>
+  <button onclick="window.close()" style="background:#f3f4f6;color:#374151;border:none;border-radius:8px;padding:12px 20px;font-size:14px;cursor:pointer">✕ Fermer</button>
+</div>
+<script>setTimeout(function(){ window.print(); }, 400);<\/script>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank', 'width=820,height=1060,scrollbars=yes');
+  if (!w) { toast('Autorisez les popups pour imprimer', 'error'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
 function saveEntretienDB() {
   const d = collectEntretien();
   d.id = uid();
@@ -11588,7 +11929,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.2.9";',
+      'var CACHE="allianz-v3.3.0";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
