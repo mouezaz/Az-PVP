@@ -8230,29 +8230,36 @@ function renderEntretienForm(name, mois, annee) {
     return '<div style="background:#e5e7eb;border-radius:3px;height:5px;margin-top:5px;overflow:hidden"><div style="width:'+pct+'%;height:5px;background:'+color+';border-radius:3px"></div></div>';
   }
   const _telBlock = _tsC ? (
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px">'
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:16px">'
+    // Tuile 1 : entrants décroché rapporté au total agence
     +'<div style="background:#f9fafb;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center">'
       +'<div style="font-size:1.5rem;font-weight:800;color:#1e3a5f">'+_cEntDec+'</div>'
       +'<div style="font-size:.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Entrants décroché</div>'
-      +'<div style="font-size:.75rem;color:#9ca3af;margin-top:2px">sur '+_cEntTot+' reçus'+(_tauxDecEnt!==null?' · '+_tauxDecEnt+'%':'')+'</div>'
+      +(_agEntTotal ? '<div style="font-size:.75rem;color:#9ca3af;margin-top:2px">sur '+_agEntTotal+' total agence</div>' : '<div style="font-size:.75rem;color:#9ca3af;margin-top:2px">importer CSV pour ratio</div>')
+      +(_agEntTotal ? _ratBar(_cEntDec, _agEntTotal, _colRatEnt) : '')
     +'</div>'
+    // Tuile 2 : % part agence entrants
     +'<div style="background:#f9fafb;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center">'
       +'<div style="font-size:1.3rem;font-weight:800;color:'+_colRatEnt+'">'+(_ratEntAg !== null ? _ratEntAg+'%' : '—')+'</div>'
       +'<div style="font-size:.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Part agence entrants</div>'
-      +(_agEntTotal ? '<div style="font-size:.7rem;color:#9ca3af;margin-top:4px">'+_agEntDec+' décroché / '+_agEntTotal+' agence</div>' : '')
+      +(_agEntTotal ? '<div style="font-size:.7rem;color:#9ca3af;margin-top:4px">agence : '+_agEntDec+' décroché / '+_agEntTotal+'</div>' : '')
       +(_agEntTotal ? _ratBar(_cEntDec, _agEntTotal, _colRatEnt) : '')
     +'</div>'
+    // Tuile 3 : sortants rapportés au total agence
     +'<div style="background:#f9fafb;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center">'
       +'<div style="font-size:1.5rem;font-weight:800;color:#1e3a5f">'+_cSortTot+'</div>'
       +'<div style="font-size:.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Sortants total</div>'
-      +'<div style="font-size:.75rem;color:#9ca3af;margin-top:2px">'+_cSortDec+' aboutis'+(_tauxDecSort!==null?' · '+_tauxDecSort+'%':'')+'</div>'
+      +(_agSortTotal ? '<div style="font-size:.75rem;color:#9ca3af;margin-top:2px">sur '+_agSortTotal+' total agence</div>' : '<div style="font-size:.75rem;color:#9ca3af;margin-top:2px">'+_cSortDec+' aboutis</div>')
+      +(_agSortTotal ? _ratBar(_cSortTot, _agSortTotal, _colRatSort) : '')
     +'</div>'
+    // Tuile 4 : % part agence sortants
     +'<div style="background:#f9fafb;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center">'
       +'<div style="font-size:1.3rem;font-weight:800;color:'+_colRatSort+'">'+(_ratSortAg !== null ? _ratSortAg+'%' : '—')+'</div>'
       +'<div style="font-size:.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Part agence sortants</div>'
       +(_agSortTotal ? '<div style="font-size:.7rem;color:#9ca3af;margin-top:4px">agence : '+_agSortTotal+' appels</div>' : '')
       +(_agSortTotal ? _ratBar(_cSortTot, _agSortTotal, _colRatSort) : '')
     +'</div>'
+    // Tuile 5 : non traités
     +'<div style="background:#fef2f2;border-radius:10px;padding:14px;border:1px solid #fecaca;text-align:center">'
       +'<div style="font-size:1.5rem;font-weight:800;color:#dc2626">'+_cNonTrait+'</div>'
       +'<div style="font-size:.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Non traités</div>'
@@ -12211,7 +12218,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.4.6";',
+      'var CACHE="allianz-v3.4.7";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
