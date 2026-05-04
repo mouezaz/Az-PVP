@@ -8078,48 +8078,6 @@ function renderTelPage(mois, annee) {
       </div>
     </div>
 
-    <!-- Évaluation qualitative posture téléphonique (depuis entretiens) -->
-    ${(function() {
-      const entMois = mois > 1 ? mois - 1 : 12;
-      const entAnnee = mois > 1 ? annee : annee - 1;
-      const starDisp = function(val) {
-        val = val || 0;
-        return '★'.repeat(val) + '☆'.repeat(Math.max(0, 5-val));
-      };
-      const qualRows = collabs.map(function(name) {
-        const et = (DB.entretiens||[]).filter(function(e){ return e.collab===name; })
-          .sort(function(a,b){ return (b.annee*100+b.mois)-(a.annee*100+a.mois); })[0];
-        if (!et || !et.tel) return `<tr><td style="font-weight:700;padding:10px">${name}</td><td colspan="5" style="color:#9ca3af;font-size:.82rem;padding:10px">Aucun entretien enregistré</td></tr>`;
-        const t = et.tel;
-        return `<tr style="border-bottom:1px solid #f1f5f9">
-          <td style="font-weight:700;padding:10px;font-size:.88rem">${name}<div style="font-size:.72rem;color:#9ca3af;font-weight:400">${MOIS_FULL[et.mois]||''} ${et.annee||''}</div></td>
-          <td style="padding:10px;text-align:center;font-size:1rem;letter-spacing:2px" title="Accueil & présentation">${starDisp(t.stAccueil)}</td>
-          <td style="padding:10px;text-align:center;font-size:1rem;letter-spacing:2px" title="Écoute / reformulation">${starDisp(t.stEcoute)}</td>
-          <td style="padding:10px;text-align:center;font-size:1rem;letter-spacing:2px" title="Rebond commercial">${starDisp(t.stRebond)}</td>
-          <td style="padding:10px;text-align:center;font-size:1rem;letter-spacing:2px" title="Gestion des objections">${starDisp(t.stObjection)}</td>
-          <td style="padding:10px;font-size:.8rem;color:#374151;max-width:200px">${t.obsTel||'—'}</td>
-        </tr>`;
-      }).join('');
-      return `<div class="card" style="margin-top:16px">
-        <div class="card-header">
-          <div class="card-title">Évaluation posture téléphonique</div>
-          <span class="pill pill-blue">Dernier entretien enregistré</span>
-        </div>
-        <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:.88rem">
-            <thead><tr style="border-bottom:2px solid #e5e7eb;background:#f9fafb">
-              <th style="text-align:left;padding:10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em">Collaborateur</th>
-              <th style="padding:10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em;text-align:center">Accueil</th>
-              <th style="padding:10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em;text-align:center">Écoute</th>
-              <th style="padding:10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em;text-align:center">Rebond</th>
-              <th style="padding:10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em;text-align:center">Objections</th>
-              <th style="padding:10px;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.05em">Observations</th>
-            </tr></thead>
-            <tbody>${qualRows}</tbody>
-          </table>
-        </div>
-      </div>`;
-    })()}
     `;
 }
 
@@ -8249,6 +8207,60 @@ function renderEntretienForm(name, mois, annee) {
   mois  = mois  || nowMois();
   annee = annee || nowAnnee();
   ecMois = mois; ecAnnee = annee;
+
+  // ── Ringover telStats pour ce collab / ce mois ──
+  const _tsC  = (DB.telStats && DB.telStats[name+'_'+mois+'_'+annee]) || null;
+  const _tsAg = (DB.telStats && DB.telStats['agence_'+mois+'_'+annee]) || null;
+  const _agEntTotal  = _tsAg ? (_tsAg.entTotal    || 0) : 0;
+  const _agSortTotal = _tsAg ? (_tsAg.sortTotal   || 0) : 0;
+  const _agEntDec    = _tsAg ? (_tsAg.entDecroches|| 0) : 0;
+  const _cEntDec     = _tsC  ? (_tsC.entDecroches || 0) : 0;
+  const _cEntTot     = _tsC  ? (_tsC.entTotal     || 0) : 0;
+  const _cSortTot    = _tsC  ? (_tsC.sortTotal    || 0) : 0;
+  const _cSortDec    = _tsC  ? (_tsC.sortDecroches|| 0) : 0;
+  const _cNonTrait   = _tsC  ? (_tsC.entNonTraites|| 0) : 0;
+  const _ratEntAg    = _agEntTotal  > 0 ? (_cEntDec  / _agEntTotal  * 100).toFixed(1) : null;
+  const _ratSortAg   = _agSortTotal > 0 ? (_cSortTot / _agSortTotal * 100).toFixed(1) : null;
+  const _tauxDecEnt  = _cEntTot  > 0 ? Math.round(_cEntDec  / _cEntTot  * 100) : null;
+  const _tauxDecSort = _cSortTot > 0 ? Math.round(_cSortDec / _cSortTot * 100) : null;
+  const _colRatEnt   = _ratEntAg  !== null ? (parseFloat(_ratEntAg)  >= 15 ? '#059669' : parseFloat(_ratEntAg)  >= 8  ? '#d97706' : '#dc2626') : '#9ca3af';
+  const _colRatSort  = _ratSortAg !== null ? (parseFloat(_ratSortAg) >= 25 ? '#059669' : parseFloat(_ratSortAg) >= 15 ? '#d97706' : '#dc2626') : '#9ca3af';
+  function _ratBar(val, total, color) {
+    const pct = total > 0 ? Math.min(100, Math.round(val/total*100)) : 0;
+    return '<div style="background:#e5e7eb;border-radius:3px;height:5px;margin-top:5px;overflow:hidden"><div style="width:'+pct+'%;height:5px;background:'+color+';border-radius:3px"></div></div>';
+  }
+  const _telBlock = _tsC ? (
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px">'
+    +'<div style="background:#f9fafb;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center">'
+      +'<div style="font-size:1.5rem;font-weight:800;color:#1e3a5f">'+_cEntDec+'</div>'
+      +'<div style="font-size:.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Entrants décroché</div>'
+      +'<div style="font-size:.75rem;color:#9ca3af;margin-top:2px">sur '+_cEntTot+' reçus'+(_tauxDecEnt!==null?' · '+_tauxDecEnt+'%':'')+'</div>'
+    +'</div>'
+    +'<div style="background:#f9fafb;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center">'
+      +'<div style="font-size:1.3rem;font-weight:800;color:'+_colRatEnt+'">'+(_ratEntAg !== null ? _ratEntAg+'%' : '—')+'</div>'
+      +'<div style="font-size:.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Part agence entrants</div>'
+      +(_agEntTotal ? '<div style="font-size:.7rem;color:#9ca3af;margin-top:4px">'+_agEntDec+' décroché / '+_agEntTotal+' agence</div>' : '')
+      +(_agEntTotal ? _ratBar(_cEntDec, _agEntTotal, _colRatEnt) : '')
+    +'</div>'
+    +'<div style="background:#f9fafb;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center">'
+      +'<div style="font-size:1.5rem;font-weight:800;color:#1e3a5f">'+_cSortTot+'</div>'
+      +'<div style="font-size:.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Sortants total</div>'
+      +'<div style="font-size:.75rem;color:#9ca3af;margin-top:2px">'+_cSortDec+' aboutis'+(_tauxDecSort!==null?' · '+_tauxDecSort+'%':'')+'</div>'
+    +'</div>'
+    +'<div style="background:#f9fafb;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center">'
+      +'<div style="font-size:1.3rem;font-weight:800;color:'+_colRatSort+'">'+(_ratSortAg !== null ? _ratSortAg+'%' : '—')+'</div>'
+      +'<div style="font-size:.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Part agence sortants</div>'
+      +(_agSortTotal ? '<div style="font-size:.7rem;color:#9ca3af;margin-top:4px">agence : '+_agSortTotal+' appels</div>' : '')
+      +(_agSortTotal ? _ratBar(_cSortTot, _agSortTotal, _colRatSort) : '')
+    +'</div>'
+    +'<div style="background:#fef2f2;border-radius:10px;padding:14px;border:1px solid #fecaca;text-align:center">'
+      +'<div style="font-size:1.5rem;font-weight:800;color:#dc2626">'+_cNonTrait+'</div>'
+      +'<div style="font-size:.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Non traités</div>'
+      +'<div style="font-size:.75rem;color:#9ca3af;margin-top:2px">Manqués + Répondeur</div>'
+    +'</div>'
+    +'</div>'
+  ) : '<div style="background:#fffbeb;border:1.5px solid #fbbf24;border-radius:8px;padding:12px 16px;font-size:.85rem;color:#92400e;margin-bottom:16px">⚠️ Aucune donnée Ringover pour '+MOIS_FULL[mois]+' '+annee+' — importez le CSV dans la page <strong>Téléphonie</strong> puis revenez ici.</div>';
+
   const stats = collabStatsForMois(name, mois, annee);
   // Load existing saved entretien for this month/collab if it exists
   const existing = (DB.entretiens||[]).find(function(e){ return e.collab===name && e.mois===mois && e.annee===annee; });
@@ -8321,21 +8333,18 @@ function renderEntretienForm(name, mois, annee) {
     <!-- TAB 1: TÉLÉPHONIE -->
     <div class="tab-panel" id="et-panel-1">
       <div class="card">
-        <div class="card-header"><div class="card-title">Téléphonie — données pré-chargées</div></div>
-        <div class="form-row form-row-4">
-          <div class="form-group"><label class="fl">Entrants décroché</label><input type="number" id="et-dec-ent" value="${tel.decEntrant||''}" min="0" oninput="calcEntretienTel()"></div>
-          <div class="form-group"><label class="fl">Entrants total</label><input type="number" id="et-tot-ent" value="${tel.totEntrant||''}" min="0" oninput="calcEntretienTel()"></div>
-          <div class="form-group"><label class="fl">Sortants décroché</label><input type="number" id="et-dec-sort" value="${tel.decSortant||''}" min="0" oninput="calcEntretienTel()"></div>
-          <div class="form-group"><label class="fl">Sortants total</label><input type="number" id="et-tot-sort" value="${tel.totSortant||''}" min="0" oninput="calcEntretienTel()"></div>
-        </div>
-        <div id="et-tel-ratios" class="sep8"></div>
-        <div class="form-row form-row-2">
-          <div class="form-group"><label class="fl">Leads reçus</label><input type="number" id="et-leads" value="${tel.leadsRecus||''}" min="0"></div>
-          <div class="form-group"><label class="fl">Leads → contrat</label><input type="number" id="et-leads-c" value="${tel.leadsContrat||''}" min="0"></div>
-        </div>
-        <div style="margin-top:12px">
-          <label class="fl">Qualité posture téléphonique</label>
-          <div class="form-row form-row-2" style="margin-top:8px">
+        <div class="card-header"><div class="card-title">📞 Ringover — ${MOIS_FULL[mois]} ${annee}</div></div>
+        ${_telBlock}
+        <!-- champs cachés pour collectEntretien() -->
+        <input type="hidden" id="et-dec-ent"  value="${_cEntDec}">
+        <input type="hidden" id="et-tot-ent"  value="${_cEntTot}">
+        <input type="hidden" id="et-dec-sort" value="${_cSortDec}">
+        <input type="hidden" id="et-tot-sort" value="${_cSortTot}">
+        <input type="hidden" id="et-leads"    value="${tel.leadsRecus||''}">
+        <input type="hidden" id="et-leads-c"  value="${tel.leadsContrat||''}">
+        <div style="border-top:1px solid #e5e7eb;margin-top:4px;padding-top:16px">
+          <div style="font-weight:700;font-size:.85rem;color:#374151;margin-bottom:12px">Qualité posture téléphonique</div>
+          <div class="form-row form-row-2">
             <div class="form-group"><label class="fl">Accueil & présentation</label>${starsHTML('et-st-accueil')}</div>
             <div class="form-group"><label class="fl">Écoute / reformulation</label>${starsHTML('et-st-ecoute')}</div>
             <div class="form-group"><label class="fl">Rebond commercial</label>${starsHTML('et-st-rebond')}</div>
@@ -12202,7 +12211,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.4.5";',
+      'var CACHE="allianz-v3.4.6";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
