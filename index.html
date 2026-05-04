@@ -8079,93 +8079,107 @@ function renderTelPage(mois, annee) {
     </div>
 
     <!-- ── Comparaison multi-mois ── -->
-    ${(function() {
-      // Collecte tous les mois disponibles dans telStats
-      const telStats = DB.telStats || {};
-      const collabNames = getCollabNames();
-
-      // Trouver tous les mois/années uniques avec données agence
-      const periodesSet = {};
-      Object.keys(telStats).forEach(function(k) {
-        const m = k.match(/^agence_(\d+)_(\d+)$/);
-        if (m) periodesSet[m[2]+'_'+('0'+m[1]).slice(-2)] = { mois: parseInt(m[1]), annee: parseInt(m[2]) };
-      });
-      const periodes = Object.keys(periodesSet).sort().slice(-8).map(function(k) { return periodesSet[k]; });
-
-      if (periodes.length < 2) return '<div class="card" style="margin-top:16px"><div style="padding:20px;color:#9ca3af;font-size:.87rem;text-align:center">📊 Importez au moins 2 mois de données Ringover pour afficher la comparaison multi-mois.</div></div>';
-
-      // Sélecteur collab actif (mémoriser via attribut data sur le container)
-      const selId = 'tel-multi-collab-sel';
-
-      // Construire les lignes par collab pour tous les mois
-      function buildTable(selectedCollab) {
-        const isAgence = selectedCollab === '_agence_';
-        const headerCols = periodes.map(function(p) {
-          const isCurrent = p.mois === mois && p.annee === annee;
-          return '<th style="text-align:right;padding:8px 10px;font-size:.75rem;font-weight:700;color:'+(isCurrent?'#003781':'#6b7280')+';white-space:nowrap">'
-            +(isCurrent?'<span style="background:#003781;color:#fff;border-radius:4px;padding:1px 5px;font-size:.7rem">':'')
-            +MOIS_LABELS[p.mois]+' '+String(p.annee).slice(2)
-            +(isCurrent?'</span>':'')
-            +'</th>';
-        }).join('');
-
-        function metricRow(label, fn, colorFn) {
-          const cells = periodes.map(function(p) {
-            const agKey  = 'agence_'+p.mois+'_'+p.annee;
-            const cKey   = selectedCollab+'_'+p.mois+'_'+p.annee;
-            const ag = telStats[agKey] || null;
-            const cd = isAgence ? ag : (telStats[cKey] || null);
-            const val = (ag && cd) ? fn(cd, ag) : null;
-            const color = colorFn && val !== null ? colorFn(val) : '#374151';
-            const isCurrent = p.mois === mois && p.annee === annee;
-            return '<td style="text-align:right;padding:8px 10px;font-weight:'+(isCurrent?'800':'500')+';color:'+color+';background:'+(isCurrent?'#f0f4ff':'')+'">'+
-              (val !== null ? val : '<span style="color:#d1d5db">—</span>')+'</td>';
-          }).join('');
-          return '<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:8px 10px;font-size:.82rem;color:#6b7280;white-space:nowrap">'+label+'</td>'+cells+'</tr>';
-        }
-
-        const colEntDecColor = function(v) { return parseFloat(v)>=15?'#059669':parseFloat(v)>=8?'#d97706':'#dc2626'; };
-        const colSortColor   = function(v) { return parseFloat(v)>=25?'#059669':parseFloat(v)>=15?'#d97706':'#dc2626'; };
-
-        const rows = isAgence ? [
-          metricRow('Entrants total',    function(cd){ return cd.entTotal||0; }, null),
-          metricRow('Décroché',          function(cd){ return cd.entDecroches||0; }, null),
-          metricRow('Taux décroché',     function(cd){ const t=cd.entTotal||0; const d=cd.entDecroches||0; return t>0?Math.round(d/t*100)+'%':null; }, function(v){ return parseInt(v)>=40?'#059669':parseInt(v)>=25?'#d97706':'#dc2626'; }),
-          metricRow('Sortants total',    function(cd){ return cd.sortTotal||0; }, null),
-          metricRow('Non traités',       function(cd){ return cd.nonTraites||0; }, function(v){ return v>10?'#dc2626':v>5?'#d97706':'#374151'; }),
-        ] : [
-          metricRow('Entrants décroché', function(cd,ag){ return cd.entDecroches||0; }, null),
-          metricRow('Part agence ent.', function(cd,ag){ const d=cd.entDecroches||0; const t=ag.entTotal||0; return t>0?(d/t*100).toFixed(1)+'%':null; }, colEntDecColor),
-          metricRow('Sortants total',   function(cd,ag){ return cd.sortTotal||0; }, null),
-          metricRow('Part agence sort.',function(cd,ag){ const s=cd.sortTotal||0; const t=ag.sortTotal||0; return t>0?(s/t*100).toFixed(1)+'%':null; }, colSortColor),
-          metricRow('Non traités',      function(cd,ag){ return cd.entNonTraites||0; }, function(v){ return v>10?'#dc2626':v>5?'#d97706':'#374151'; }),
-        ];
-
-        return '<table style="width:100%;border-collapse:collapse;font-size:.87rem">'
-          +'<thead><tr style="border-bottom:2px solid #e5e7eb;background:#f9fafb">'
-          +'<th style="text-align:left;padding:8px 10px;font-size:.75rem;color:#6b7280;font-weight:600">Indicateur</th>'
-          +headerCols+'</tr></thead><tbody>'+rows.join('')+'</tbody></table>';
-      }
-
-      // Onglets collab
-      const tabs = [{ key:'_agence_', label:'Agence' }].concat(collabNames.map(function(n){ return { key:n, label:n }; }));
-      const tabBtns = tabs.map(function(t) {
-        return '<button onclick="document.getElementById(\'tel-multi-body\').innerHTML=(' + buildTable.toString() + ')(\''+t.key+'\');this.closest(\'.tel-multi-tabs\').querySelectorAll(\'button\').forEach(b=>b.style.background=\'#f1f5f9\');this.style.background=\'#003781\';this.style.color=\'#fff\';" '
-          +'style="padding:6px 14px;border:none;border-radius:6px;font-size:.82rem;font-weight:600;cursor:pointer;background:'+(t.key==='_agence_'?'#003781':'#f1f5f9')+';color:'+(t.key==='_agence_'?'#fff':'#374151')+'">'
-          +t.label+'</button>';
-      }).join('');
-
-      return '<div class="card" style="margin-top:16px">'
-        +'<div class="card-header"><div class="card-title">📊 Évolution multi-mois</div><span class="pill pill-blue">'+periodes.length+' mois de données</span></div>'
-        +'<div class="tel-multi-tabs no-print" style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #e5e7eb">'+tabBtns+'</div>'
-        +'<div style="overflow-x:auto"><div id="tel-multi-body" style="min-width:400px">'+buildTable('_agence_')+'</div></div>'
-        +'</div>';
-    })()}
+    <div id="tel-multi-container" style="margin-top:16px"></div>
+    <script>renderTelMulti('_agence_');</script>
 
     `;
 }
 
 PAGES['admin-tel'] = (mc) => { renderTelPage(nowMois(), nowAnnee()); };
+
+// ── Comparaison multi-mois Ringover ──────────────────────────────────────────
+function renderTelMulti(selectedCollab) {
+  const container = document.getElementById('tel-multi-container');
+  if (!container) return;
+
+  const ts = DB.telStats || {};
+  const collabNames = getCollabNames();
+
+  // Identifier tous les mois disponibles via les clés agence
+  const periodesSet = {};
+  Object.keys(ts).forEach(function(k) {
+    const m = k.match(/^agence_(\d+)_(\d+)$/);
+    if (m) {
+      const sortKey = m[2] + '_' + ('0' + m[1]).slice(-2);
+      periodesSet[sortKey] = { mois: parseInt(m[1]), annee: parseInt(m[2]) };
+    }
+  });
+  const periodes = Object.keys(periodesSet).sort().slice(-8).map(function(k) { return periodesSet[k]; });
+
+  if (periodes.length < 2) {
+    container.innerHTML = '<div class="card"><div style="padding:20px;color:#9ca3af;font-size:.87rem;text-align:center">📊 Importez au moins 2 mois de données Ringover pour afficher la comparaison multi-mois.</div></div>';
+    return;
+  }
+
+  const curMois  = nowMois();
+  const curAnnee = nowAnnee();
+  const isAgence = selectedCollab === '_agence_';
+
+  // En-têtes mois
+  const headerCols = periodes.map(function(p) {
+    const isCur = p.mois === curMois && p.annee === curAnnee;
+    return '<th style="text-align:right;padding:8px 10px;font-size:.75rem;font-weight:700;white-space:nowrap;color:' + (isCur ? '#003781' : '#6b7280') + '">'
+      + (isCur ? '<span style="background:#003781;color:#fff;border-radius:4px;padding:1px 6px">' : '')
+      + MOIS_LABELS[p.mois] + ' ' + String(p.annee).slice(2)
+      + (isCur ? '</span>' : '') + '</th>';
+  }).join('');
+
+  // Ligne de métrique
+  function row(label, fn, colorFn) {
+    const cells = periodes.map(function(p) {
+      const ag = ts['agence_' + p.mois + '_' + p.annee] || null;
+      const cd = isAgence ? ag : (ts[selectedCollab + '_' + p.mois + '_' + p.annee] || null);
+      if (!ag || !cd) return '<td style="text-align:right;padding:8px 10px;color:#d1d5db">—</td>';
+      const val = fn(cd, ag);
+      const isCur = p.mois === curMois && p.annee === curAnnee;
+      const color = (colorFn && val !== null && val !== undefined) ? colorFn(val) : '#374151';
+      return '<td style="text-align:right;padding:8px 10px;font-weight:' + (isCur ? '800' : '500') + ';color:' + color + ';background:' + (isCur ? '#f0f4ff' : '') + '">'
+        + (val !== null && val !== undefined ? val : '—') + '</td>';
+    }).join('');
+    return '<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:8px 10px;font-size:.82rem;color:#6b7280;white-space:nowrap">' + label + '</td>' + cells + '</tr>';
+  }
+
+  function pct(n, d) { return d > 0 ? (n / d * 100).toFixed(1) + '%' : null; }
+  function colEnt(v)  { return parseFloat(v) >= 15 ? '#059669' : parseFloat(v) >= 8  ? '#d97706' : '#dc2626'; }
+  function colSort(v) { return parseFloat(v) >= 25 ? '#059669' : parseFloat(v) >= 15 ? '#d97706' : '#dc2626'; }
+  function colTaux(v) { return parseInt(v)   >= 40 ? '#059669' : parseInt(v)   >= 25 ? '#d97706' : '#dc2626'; }
+  function colNT(v)   { return v > 10 ? '#dc2626' : v > 5 ? '#d97706' : '#374151'; }
+
+  const rows = isAgence ? [
+    row('Entrants total',  function(cd)    { return cd.entTotal    || 0; }, null),
+    row('Décroché',        function(cd)    { return cd.entDecroches|| 0; }, null),
+    row('Taux décroché',   function(cd)    { return pct(cd.entDecroches||0, cd.entTotal||0); }, colTaux),
+    row('Sortants total',  function(cd)    { return cd.sortTotal   || 0; }, null),
+    row('Non traités',     function(cd)    { return cd.nonTraites  || 0; }, colNT),
+  ] : [
+    row('Entrants décroché', function(cd)     { return cd.entDecroches || 0; }, null),
+    row('Part agence ent.',  function(cd, ag) { return pct(cd.entDecroches||0, ag.entTotal||0); },  colEnt),
+    row('Sortants total',    function(cd)     { return cd.sortTotal    || 0; }, null),
+    row('Part agence sort.', function(cd, ag) { return pct(cd.sortTotal||0,    ag.sortTotal||0); }, colSort),
+    row('Non traités',       function(cd)     { return cd.entNonTraites|| 0; }, colNT),
+  ];
+
+  // Onglets
+  const tabs = [{ key: '_agence_', label: 'Agence' }].concat(collabNames.map(function(n) { return { key: n, label: n }; }));
+  const tabBtns = tabs.map(function(t) {
+    const active = t.key === selectedCollab;
+    return '<button onclick="renderTelMulti(\'' + t.key + '\')" '
+      + 'style="padding:6px 14px;border:none;border-radius:6px;font-size:.82rem;font-weight:600;cursor:pointer;'
+      + 'background:' + (active ? '#003781' : '#f1f5f9') + ';color:' + (active ? '#fff' : '#374151') + '">'
+      + t.label + '</button>';
+  }).join('');
+
+  const table = '<table style="width:100%;border-collapse:collapse;font-size:.87rem">'
+    + '<thead><tr style="border-bottom:2px solid #e5e7eb;background:#f9fafb">'
+    + '<th style="text-align:left;padding:8px 10px;font-size:.75rem;color:#6b7280;font-weight:600;min-width:130px">Indicateur</th>'
+    + headerCols + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
+
+  container.innerHTML = '<div class="card">'
+    + '<div class="card-header"><div class="card-title">📊 Évolution multi-mois</div><span class="pill pill-blue">' + periodes.length + ' mois</span></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #e5e7eb" class="no-print">' + tabBtns + '</div>'
+    + '<div style="overflow-x:auto">' + table + '</div>'
+    + '</div>';
+}
 
 // ── Import CSV Ringover ───────────────────────────────────────────────────────
 function importRingoverCSV(input, mois, annee) {
@@ -12302,7 +12316,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.4.8";',
+      'var CACHE="allianz-v3.4.9";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
