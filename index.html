@@ -13475,23 +13475,26 @@ PAGES['admin-compta'] = function(mc) {
   if (mStr) { var p=mStr.split('-'); mois=+p[1]; annee=+p[0]; }
   var moisSel = annee+'-'+String(mois).padStart(2,'0');
 
-  // Lancer une sync Firebase en arrière-plan pour récupérer les entrées Mandat/Dashboard
+  // Sync Firebase à chaque ouverture : Firebase est la source de vérité pour la compta
   if (_fbRef && !_comptaAdminSyncPending) {
     _comptaAdminSyncPending = true;
     _fbRef.once('value').then(function(snap) {
       _comptaAdminSyncPending = false;
       var remote = snap.val();
-      if (!remote) return;
-      var remoteEcritures = (remote.compta && remote.compta.ecritures) || [];
+      if (!remote || !remote.compta) return;
+      // Remplacer entièrement les écritures par la version Firebase (inclut Mandat + Dashboard)
+      var remoteEcritures = remote.compta.ecritures || [];
       var remoteList = Array.isArray(remoteEcritures) ? remoteEcritures : Object.values(remoteEcritures);
+      if (remoteList.length === 0) return;
       initCompta();
-      var localIds = (DB.compta.ecritures||[]).map(function(e){return e.id;});
-      var added = remoteList.filter(function(e){return e&&e.id&&localIds.indexOf(e.id)===-1;});
-      if (added.length > 0) {
-        DB.compta.ecritures = (DB.compta.ecritures||[]).concat(added);
-        try { localStorage.setItem('allianz_db_v4', JSON.stringify(DB)); } catch(ex){}
-        if (currentPage === 'admin-compta') showPage('admin-compta');
-      }
+      // Fusionner : Firebase + entrées locales absentes de Firebase (saisies offline récentes)
+      var remoteIds = remoteList.map(function(e){return e.id;});
+      var localOnly = (DB.compta.ecritures||[]).filter(function(e){return e&&e.id&&remoteIds.indexOf(e.id)===-1;});
+      DB.compta.ecritures = remoteList.concat(localOnly);
+      if (remote.compta.mouvements) DB.compta.mouvements = remote.compta.mouvements;
+      if (remote.compta.remises)    DB.compta.remises    = remote.compta.remises;
+      try { localStorage.setItem('allianz_db_v4', JSON.stringify(DB)); } catch(ex){}
+      if (currentPage === 'admin-compta') showPage('admin-compta');
     }).catch(function(){_comptaAdminSyncPending=false;});
   }
 
