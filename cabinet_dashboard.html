@@ -464,9 +464,10 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
         <span style="color:#94a3b8;font-size:13px;font-weight:600">Solde Compte Mandat</span>
         <span style="font-size:22px;font-weight:800" id="mandat-solde">—</span>
       </div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-p" onclick="saveMandat()">💾 Enregistrer</button>
         <button class="btn btn-g" onclick="initMandat()">↺ Annuler</button>
+        <button class="btn" style="background:#1d4ed8;color:#fff" onclick="syncAllMandatToFirebase()">🔄 Sync tout Jan→Auj vers Perf</button>
       </div>
     </div>
 
@@ -747,7 +748,7 @@ function _buildComptaSync(ecritures){
   const typeLabel={cheque:'Chèque',especes:'Espèces',virement:'Virement'};
   const sync={};
   // Exclure les chèques différés ET les entrées créées depuis ce dashboard (évite la boucle)
-  (ecritures||[]).filter(e=>e&&e.statut!=='differe'&&e.date&&e._source!=='dashboard').forEach(function(e){
+  (ecritures||[]).filter(e=>e&&e.statut!=='differe'&&e.date&&e._source!=='dashboard'&&e._source!=='mandat').forEach(function(e){
     const yr=e.date.slice(0,4);
     const mo=+e.date.slice(5,7);
     if(!sync[yr]) sync[yr]={};
@@ -1666,6 +1667,80 @@ function syncDashboardToFirebase(yr, mo, manualRows){
   });
 }
 
+// ── Sync Compte Mandat → Firebase (perf app) ──────────────────
+function syncMandatToFirebase(yr, mo){
+  if(!_fbDb) return;
+  const typeMap={'Chèque':'cheque','Virement':'virement','Espèces':'especes'};
+  const datePfx=String(yr)+'-'+String(mo).padStart(2,'0');
+  const ref=_fbDb.ref('allianz_db_v4/compta/ecritures');
+  ref.once('value',function(snap){
+    const raw=snap.val()||[];
+    const list=(Array.isArray(raw)?raw:Object.values(raw)).filter(e=>
+      !(e&&e._source==='mandat'&&e.date&&e.date.startsWith(datePfx))
+    );
+    const enc=(MANDAT_DATA[yr]&&MANDAT_DATA[yr][mo]&&MANDAT_DATA[yr][mo].enc)||[];
+    const now=Date.now();
+    enc.forEach(function(r,i){
+      if(!r.amount&&!r.desc) return;
+      list.push({
+        id:'mandat-'+datePfx+'-'+i+'-'+now+'-'+Math.random().toString(36).slice(2,5),
+        date:r.date||datePfx+'-01',
+        type:typeMap[r.type]||'cheque',
+        montant:r.amount||0,
+        client:r.desc||'',
+        produit:'',contrat:'',
+        collaborateur:'Compte Mandat',
+        note:'Saisi depuis Compte Mandat',
+        statut:'remis',
+        _source:'mandat',
+        createdAt:now
+      });
+    });
+    ref.set(list).catch(function(e){console.warn('Sync mandat→Firebase error',e);});
+  });
+}
+
+function syncAllMandatToFirebase(){
+  if(!_fbDb){showNotif('❌ Firebase non connecté');return;}
+  const yr=CURRENT_YEAR;
+  const typeMap={'Chèque':'cheque','Virement':'virement','Espèces':'especes'};
+  const ref=_fbDb.ref('allianz_db_v4/compta/ecritures');
+  ref.once('value',function(snap){
+    const raw=snap.val()||[];
+    // Supprimer toutes les entrées mandat de l'année en cours
+    const list=(Array.isArray(raw)?raw:Object.values(raw)).filter(e=>
+      !(e&&e._source==='mandat'&&e.date&&e.date.startsWith(String(yr)))
+    );
+    let count=0;
+    const now=Date.now();
+    for(let mo=1;mo<=CURRENT_MONTH;mo++){
+      const datePfx=String(yr)+'-'+String(mo).padStart(2,'0');
+      const enc=(MANDAT_DATA[yr]&&MANDAT_DATA[yr][mo]&&MANDAT_DATA[yr][mo].enc)||[];
+      enc.forEach(function(r,i){
+        if(!r.amount&&!r.desc) return;
+        list.push({
+          id:'mandat-'+datePfx+'-'+i+'-'+now+'-'+Math.random().toString(36).slice(2,5),
+          date:r.date||datePfx+'-01',
+          type:typeMap[r.type]||'cheque',
+          montant:r.amount||0,
+          client:r.desc||'',
+          produit:'',contrat:'',
+          collaborateur:'Compte Mandat',
+          note:'Saisi depuis Compte Mandat',
+          statut:'remis',
+          _source:'mandat',
+          createdAt:now
+        });
+        count++;
+      });
+    }
+    ref.set(list).then(function(){
+      showNotif('✅ '+count+' écriture(s) Mandat synchronisée(s) vers Perf (jan → '+MO[CURRENT_MONTH-1]+')');
+      if(document.getElementById('view-mandat')?.classList.contains('active')) renderMandat();
+    }).catch(function(e){console.warn('Sync mandat→Firebase error',e);showNotif('❌ Erreur de synchronisation');});
+  });
+}
+
 function saveTreso(){
   const data=collectTresoData();
   const el=document.getElementById('treso-remonter');if(el) data.remonter=+el.value||0;
@@ -1936,7 +2011,8 @@ function saveMandat(){
   if(!EXPLOIT_DATA[mandat_yr][mo1]) EXPLOIT_DATA[mandat_yr][mo1]={courtage:[],virement_recu:0};
   EXPLOIT_DATA[mandat_yr][mo1].virement_recu=virement;
   saveLocal();
-  showNotif('✅ Compte Mandat enregistré');
+  syncMandatToFirebase(mandat_yr, mo1);
+  showNotif('✅ Compte Mandat enregistré et synchronisé');
   renderMandatKpi();
 }
 
