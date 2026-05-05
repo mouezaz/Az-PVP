@@ -13475,27 +13475,36 @@ PAGES['admin-compta'] = function(mc) {
   if (mStr) { var p=mStr.split('-'); mois=+p[1]; annee=+p[0]; }
   var moisSel = annee+'-'+String(mois).padStart(2,'0');
 
-  // Sync Firebase à chaque ouverture : Firebase est la source de vérité pour la compta
-  if (_fbRef && !_comptaAdminSyncPending) {
-    _comptaAdminSyncPending = true;
+  // Sync Firebase à l'ouverture (max 1 fois/10s pour éviter boucle infinie)
+  if (_fbRef && (Date.now() - _comptaAdminSyncPending > 10000)) {
+    _comptaAdminSyncPending = Date.now();
     _fbRef.once('value').then(function(snap) {
-      _comptaAdminSyncPending = false;
       var remote = snap.val();
       if (!remote || !remote.compta) return;
-      // Remplacer entièrement les écritures par la version Firebase (inclut Mandat + Dashboard)
       var remoteEcritures = remote.compta.ecritures || [];
       var remoteList = Array.isArray(remoteEcritures) ? remoteEcritures : Object.values(remoteEcritures);
       if (remoteList.length === 0) return;
       initCompta();
-      // Fusionner : Firebase + entrées locales absentes de Firebase (saisies offline récentes)
       var remoteIds = remoteList.map(function(e){return e.id;});
       var localOnly = (DB.compta.ecritures||[]).filter(function(e){return e&&e.id&&remoteIds.indexOf(e.id)===-1;});
-      DB.compta.ecritures = remoteList.concat(localOnly);
-      if (remote.compta.mouvements) DB.compta.mouvements = remote.compta.mouvements;
-      if (remote.compta.remises)    DB.compta.remises    = remote.compta.remises;
-      try { localStorage.setItem('allianz_db_v4', JSON.stringify(DB)); } catch(ex){}
-      if (currentPage === 'admin-compta') showPage('admin-compta');
-    }).catch(function(){_comptaAdminSyncPending=false;});
+      var merged = remoteList.concat(localOnly);
+      // Mettre à jour uniquement si de nouvelles entrées ont été trouvées
+      if (merged.length !== (DB.compta.ecritures||[]).length) {
+        DB.compta.ecritures = merged;
+        if (remote.compta.mouvements) DB.compta.mouvements = remote.compta.mouvements;
+        if (remote.compta.remises)    DB.compta.remises    = remote.compta.remises;
+        try { localStorage.setItem('allianz_db_v4', JSON.stringify(DB)); } catch(ex){}
+        // Rafraîchir uniquement le tableau, pas toute la page (évite la boucle)
+        var zone = document.getElementById('admin-compta-table-zone');
+        if (zone) {
+          var m2 = _comptaAdminMoisSel ? _comptaAdminMoisSel.split('-') : null;
+          var mo2 = m2 ? +m2[1] : (new Date().getMonth()+1);
+          var an2 = m2 ? +m2[0] : new Date().getFullYear();
+          _comptaEcritures = getEcrituresMois(mo2, an2);
+          renderComptaTable(_comptaEcritures, 'admin-compta-table-zone', true);
+        }
+      }
+    }).catch(function(){});
   }
 
   initCompta();
@@ -13608,7 +13617,7 @@ var _comptaEcritures = [];
 var _comptaIsAdmin   = false;
 var _comptaCollabMoisSel   = null;   // mémorise le mois sélectionné collab
 var _comptaAdminMoisSel    = null;   // mémorise le mois sélectionné admin
-var _comptaAdminSyncPending = false; // évite les requêtes Firebase concurrentes
+var _comptaAdminSyncPending = 0; // timestamp dernier sync (évite boucle + requêtes concurrentes)
 
 function filterComptaTable(zoneId) {
   var searchId = zoneId === 'compta-table-zone' ? 'compta-search' : 'admin-compta-search';
