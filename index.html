@@ -8033,6 +8033,7 @@ function renderTelPage(mois, annee) {
         📂 Importer CSV Ringover
         <input type="file" accept=".csv" style="display:none" onchange="importRingoverCSV(this,parseInt(document.getElementById('tel-filter-mois').value),parseInt(document.getElementById('tel-filter-annee').value))">
       </label>
+      <button onclick="resetTelStats()" style="background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;border-radius:8px;padding:8px 14px;font-size:.87rem;font-weight:600;cursor:pointer">🗑️ Tout réinitialiser</button>
     </div>
 
     ${agData ? `
@@ -8102,6 +8103,14 @@ function renderTelPage(mois, annee) {
 }
 
 PAGES['admin-tel'] = (mc) => { renderTelPage(nowMois(), nowAnnee()); };
+
+function resetTelStats() {
+  if (!confirm('Supprimer toutes les données téléphonie (tous les mois) ?')) return;
+  DB.telStats = {};
+  saveDB(DB);
+  toast('✅ Données téléphonie réinitialisées', 'success');
+  renderTelPage(nowMois(), nowAnnee());
+}
 
 // ── Comparaison multi-mois Ringover ──────────────────────────────────────────
 function renderTelMulti(selectedCollab) {
