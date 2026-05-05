@@ -181,8 +181,8 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .fcard-hd .right{display:flex;align-items:center;gap:8px}
 .ic2{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:#e0f2fe;color:#0284c7}
 .ftot{font-size:15px;font-weight:800;color:#0284c7}
-.arr{color:#94a3b8;font-size:11px;transition:transform .2s}
-.fcard.open .arr{transform:rotate(180deg)}
+.arr{color:#94a3b8;font-size:15px;font-weight:700;width:18px;text-align:center;line-height:1;transition:color .15s}
+.fcard.open .arr{color:#64748b}
 .fcard-bd{display:none;padding:4px 16px 16px;border-radius:0 0 12px 12px}
 .fcard.open .fcard-bd{display:block}
 /* Header de la section Charges */
@@ -348,10 +348,6 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
         <h3>⚖️ Poids des charges sur le CA — alertes</h3>
         <div id="dPctBars" style="padding:6px 0"></div>
       </div>
-      <div class="ch" style="margin-bottom:14px">
-        <h3>💳 Encaissements clients — par mois</h3>
-        <div id="dEncMensuels" style="padding:4px 0"></div>
-      </div>
     </div>
 
     <!-- GRILLE -->
@@ -388,7 +384,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
       <div class="fcard open" style="margin-bottom:12px">
         <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
           <div class="title"><span class="ic2">🏦</span>Mouvements KSU — <span id="ksu-mo-label">Janvier 2026</span></div>
-          <div class="right"><span class="ftot" id="ksu-net-top">—</span><span class="arr">▾</span></div>
+          <div class="right"><span class="ftot" id="ksu-net-top">—</span><span class="arr">−</span></div>
         </div>
         <div class="fcard-bd">
           <p style="font-size:12px;color:#64748b;margin:0 0 10px">Saisir toutes les lignes du relevé KSU (montants positifs = entrées, négatifs = prélèvements)</p>
@@ -427,7 +423,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
       <div class="fcard open" style="margin-bottom:10px">
         <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
           <div class="title"><span class="ic2">📥</span>Entrées Compte Mandat</div>
-          <div class="right"><span class="ftot" id="mandat-in-tot">—</span><span class="arr">▾</span></div>
+          <div class="right"><span class="ftot" id="mandat-in-tot">—</span><span class="arr">−</span></div>
         </div>
         <div class="fcard-bd">
           <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
@@ -447,7 +443,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
       <div class="fcard open" style="margin-bottom:10px">
         <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
           <div class="title"><span class="ic2">📤</span>Sorties Compte Mandat</div>
-          <div class="right"><span class="ftot" id="mandat-out-tot">—</span><span class="arr">▾</span></div>
+          <div class="right"><span class="ftot" id="mandat-out-tot">—</span><span class="arr">−</span></div>
         </div>
         <div class="fcard-bd">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
@@ -468,10 +464,21 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
         <span style="color:#94a3b8;font-size:13px;font-weight:600">Solde Compte Mandat</span>
         <span style="font-size:22px;font-weight:800" id="mandat-solde">—</span>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-p" onclick="saveMandat()">💾 Enregistrer</button>
         <button class="btn btn-g" onclick="initMandat()">↺ Annuler</button>
         <button class="btn" style="background:#1d4ed8;color:#fff" onclick="syncAllMandatToFirebase()">🔄 Sync tout Jan→Auj vers Perf</button>
+      </div>
+
+      <!-- Tableau récapitulatif par mois -->
+      <div class="fcard open" id="fcard-enc-mensuels">
+        <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
+          <div class="title"><span class="ic2">📊</span>Récapitulatif encaissements — tous les mois</div>
+          <div class="right"><span class="arr">−</span></div>
+        </div>
+        <div class="fcard-bd" style="padding:8px 16px 16px">
+          <div id="mandatEncMensuels"></div>
+        </div>
       </div>
     </div>
 
@@ -490,7 +497,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
       <div class="fcard open" style="margin-bottom:10px">
         <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
           <div class="title"><span class="ic2">📥</span>Entrées</div>
-          <div class="right"><span class="ftot" id="exploit-in-tot">—</span><span class="arr">▾</span></div>
+          <div class="right"><span class="ftot" id="exploit-in-tot">—</span><span class="arr">−</span></div>
         </div>
         <div class="fcard-bd">
           <!-- Commissions Mandat remontées (info) -->
@@ -744,8 +751,8 @@ function initFirebaseCompta(){
       if(document.getElementById('view-tresorerie')?.classList.contains('active')) buildTresoForm();
       // Rafraîchir la vue Compte Mandat si elle est active
       if(document.getElementById('view-mandat')?.classList.contains('active')) renderMandat();
-      // Rafraîchir le tableau encaissements du dashboard si visible
-      if(document.getElementById('view-dashboard')?.classList.contains('active')) renderEncaissementsMensuels(dash_yr);
+      // Rafraîchir le tableau encaissements Mandat si visible
+      if(document.getElementById('view-mandat')?.classList.contains('active')) renderEncaissementsMensuels(mandat_yr);
     });
   }catch(e){ console.warn('Firebase compta init error',e); }
 }
@@ -995,14 +1002,13 @@ function renderDash(){
     barsEl.innerHTML='<div style="color:#94a3b8;font-size:13px;padding:8px">Aucune donnée de revenus pour cette période.</div>';
   }
 
-  renderEncaissementsMensuels(yr);
 }
 
 // ================================================================
 // ENCAISSEMENTS MENSUELS (Dashboard)
 // ================================================================
 function renderEncaissementsMensuels(yr){
-  const el=document.getElementById('dEncMensuels');
+  const el=document.getElementById('mandatEncMensuels')||document.getElementById('dEncMensuels');
   if(!el) return;
   const limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
   let grandTotal=0;
@@ -1642,11 +1648,11 @@ function buildTresoForm(){
 
   document.getElementById('tresoForm').innerHTML=`
     <div class="fcard" id="fc-enc" style="margin-bottom:10px">
-      <div class="fcard-hd" onclick="toggleCard('fc-enc')"><div class="title"><span class="ic2">💰</span>Encaissements clients</div><div class="right"><span class="ftot" id="tot-enc">${fmt(autoTotal+manTotal)}</span><span class="arr">▾</span></div></div>
+      <div class="fcard-hd" onclick="toggleCard('fc-enc')"><div class="title"><span class="ic2">💰</span>Encaissements clients</div><div class="right"><span class="ftot" id="tot-enc">${fmt(autoTotal+manTotal)}</span><span class="arr">−</span></div></div>
       <div class="fcard-bd"><table class="dyn-table"><thead><tr><th>Type</th><th>Description / Client</th><th>Montant</th><th class="del-cell"></th></tr></thead><tbody id="tenc-body">${encR}</tbody></table><button class="btn-add-row" onclick="addTR('enc')">+ Ajouter une ligne manuelle</button></div>
     </div>
     <div class="fcard" id="fc-pai">
-      <div class="fcard-hd" onclick="toggleCard('fc-pai')"><div class="title"><span class="ic2">🏦</span>Paiements directs Allianz</div><div class="right"><span class="ftot" id="tot-pai">${fmt(sum(data.paiements.map(r=>r.amount||0)))}</span><span class="arr">▾</span></div></div>
+      <div class="fcard-hd" onclick="toggleCard('fc-pai')"><div class="title"><span class="ic2">🏦</span>Paiements directs Allianz</div><div class="right"><span class="ftot" id="tot-pai">${fmt(sum(data.paiements.map(r=>r.amount||0)))}</span><span class="arr">−</span></div></div>
       <div class="fcard-bd"><table class="dyn-table"><thead><tr><th>Organisme</th><th>Montant</th><th class="del-cell"></th></tr></thead><tbody id="tpai-body">${paiR}</tbody></table><button class="btn-add-row" onclick="addTR('pai')">+ Ajouter</button></div>
     </div>`;
   updateTresoKpi();
@@ -1819,7 +1825,13 @@ function saveTreso(){
   showNotif('💾 Trésorerie enregistrée et synchronisée !');
   buildTresoMonthNav();
 }
-function toggleCard(el){if(typeof el==='string') el=document.getElementById(el); if(el) el.classList.toggle('open');}
+function toggleCard(el){
+  if(typeof el==='string') el=document.getElementById(el);
+  if(!el) return;
+  el.classList.toggle('open');
+  const arr=el.querySelector('.arr');
+  if(arr) arr.textContent=el.classList.contains('open')?'−':'+';
+}
 
 // ================================================================
 // KSU / ALLIANZ
@@ -2104,6 +2116,7 @@ function renderMandatKpi(){
     <div class="kc k2"><div class="lbl">📤 Total Sorties ${yr}</div><div class="val">${fmt(totOut)}</div></div>
     <div class="kc k3"><div class="lbl">⚖️ Solde cumulé</div><div class="val" style="color:${solde>=0?'#059669':'#dc2626'}">${fmt(solde)}</div></div>
     <div class="kc k4"><div class="lbl">📅 Mois saisis</div><div class="val" style="font-size:28px">${months} / ${limit}</div></div>`;
+  renderEncaissementsMensuels(yr);
 }
 
 // ================================================================
@@ -2308,7 +2321,7 @@ function renderExploitCharges(){
             <span class="exploit-cat-tot" id="eacc-tot-${cat}" style="color:${tot>0?'#dc2626':'#cbd5e1'}">${tot>0?fmt(tot,2):'—'}</span>
             ${m1Html}
           </div>
-          <span class="arr">▾</span>
+          <span class="arr">+</span>
         </div>
       </div>
       <div class="fcard-bd" id="eacc-body-${cat}"></div>`;
@@ -2321,6 +2334,8 @@ function toggleExploitAcc(cat){
   const body=document.getElementById(`eacc-body-${cat}`);
   const wasOpen=card.classList.contains('open');
   card.classList.toggle('open');
+  const arr=card.querySelector('.arr');
+  if(arr) arr.textContent=card.classList.contains('open')?'−':'+';
   if(!wasOpen && !body.dataset.loaded){
     body.innerHTML=buildExploitCatContent(cat,exploit_yr,exploit_mo+1);
     body.dataset.loaded='1';
