@@ -1114,15 +1114,19 @@ function initApp() {
 // SIDEBAR
 // ============================================================
 function buildCollabSidebar() {
-  const commercial = [
+  const quotidien = [
     { id: 'collab-home',        icon: '🏠', label: "Accueil — Aujourd'hui" },
-    { id: 'collab-suivi',       icon: '🎯', label: 'Mes objectifs' },
-    { id: 'collab-leads',       icon: '📞', label: 'Leads & Relances' },
     { id: 'collab-taches',      icon: '✅',  label: 'Mes tâches' },
+    { id: 'collab-leads',       icon: '📞', label: 'Leads & Relances' },
+  ];
+  const commercial = [
+    { id: 'collab-suivi',       icon: '🎯', label: 'Mes objectifs' },
     { id: 'collab-saisir',      icon: '✚',  label: 'Saisir une vente' },
     { id: 'collab-ventes',      icon: '📂', label: 'Mes affaires' },
     { id: 'collab-stats',       icon: '📊', label: 'Mes stats & R/O' },
     { id: 'collab-resil',       icon: '🛡',  label: 'Résiliations' },
+  ];
+  const gestion = [
     { id: 'collab-compta',      icon: '💵', label: 'Encaissements' },
   ];
   const rh = [
@@ -1132,35 +1136,43 @@ function buildCollabSidebar() {
     { id: 'collab-primes',       icon: '🎁', label: 'Mes primes' },
   ];
   renderSidebar([
-    { label: '📈 Commercial & Gestion', items: commercial },
+    { label: '🏠 Quotidien',            items: quotidien },
+    { label: '💼 Commercial',           items: commercial },
+    { label: '💵 Gestion',              items: gestion },
     { label: '👥 Ressources Humaines',  items: rh },
   ]);
   showPage('collab-home');
 }
 
 function buildAdminSidebar() {
-  const commercial = [
+  const pilotage = [
     { id: 'admin-dashboard',    icon: '📊', label: 'Tableau de bord' },
     { id: 'admin-performance',  icon: '🏆', label: 'Performance Équipe' },
+    { id: 'admin-tel',          icon: '📞', label: 'Téléphonie' },
     { id: 'admin-commissions',  icon: '💰', label: 'Commissions détaillées' },
+  ];
+  const commercial = [
     { id: 'admin-ventes',       icon: '📋', label: 'Toutes les ventes' },
     { id: 'admin-resil',        icon: '🛡', label: 'Résiliations' },
     { id: 'admin-prospects',    icon: '🔍', label: 'Prospects & Relances' },
-    { id: 'admin-tel',          icon: '📞', label: 'Téléphonie' },
-    { id: 'admin-entretien',    icon: '🤝', label: 'Entretien individuel IA' },
-    { id: 'admin-import',       icon: '📥', label: 'Import données' },
-    { id: 'admin-settings',     icon: '⚙️', label: 'Paramètres & PIN' },
-    { id: 'admin-export',       icon: '⬇',  label: 'Export & Impression' },
+  ];
+  const gestion = [
     { id: 'admin-compta',       icon: '🏦', label: 'Comptabilité Caisse' },
+    { id: 'admin-import',       icon: '📥', label: 'Import données' },
+    { id: 'admin-export',       icon: '⬇',  label: 'Export & Impression' },
+    { id: 'admin-settings',     icon: '⚙️', label: 'Paramètres & PIN' },
   ];
   const rh = [
     { id: 'admin-rh-conges',      icon: '🏖️', label: 'Congés équipe' },
     { id: 'admin-rh-entretiens',  icon: '📄', label: 'Entretiens mensuels' },
+    { id: 'admin-entretien',      icon: '🤝', label: 'Entretien individuel IA' },
     { id: 'admin-rh-primes',      icon: '🎁', label: 'Primes mensuelles' },
     { id: 'admin-taches',         icon: '✅',  label: 'Tâches équipe' },
   ];
   renderSidebar([
-    { label: '📈 Commercial & Gestion', items: commercial },
+    { label: '📊 Pilotage',             items: pilotage },
+    { label: '💼 Commercial',           items: commercial },
+    { label: '💵 Gestion',              items: gestion },
     { label: '👥 Ressources Humaines',  items: rh },
   ]);
   showPage('admin-dashboard');
@@ -12317,7 +12329,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.5.2";',
+      'var CACHE="allianz-v3.5.7";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
