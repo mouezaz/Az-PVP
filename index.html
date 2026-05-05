@@ -12316,7 +12316,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.5.0";',
+      'var CACHE="allianz-v3.5.1";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
@@ -13630,6 +13630,7 @@ function renderComptaTable(ecritures, zoneId, isAdmin) {
     var actions = '';
     actions += '<button onclick="printRecu(\''+e.id+'\')" title="Imprimer le reçu" style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;margin-right:4px;">🖨️</button>';
     if (isAdmin && e.statut==='differe') actions += '<button onclick="autoriserCheque(\''+e.id+'\')" title="Autoriser l\'encaissement" style="background:#fef9c3;border:1px solid #fde047;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;font-weight:700;margin-right:4px;">✅ Autoriser</button>';
+    if (isAdmin && e.type==='virement' && e.statut==='en_attente') actions += '<button onclick="validerVirement(\''+e.id+'\')" title="Marquer comme remis" style="background:#dbeafe;border:1px solid #93c5fd;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;font-weight:700;margin-right:4px;">✅ Valider</button>';
     if (canEdit) actions += '<button onclick="openContaModal(\''+e.id+'\')" title="Modifier" style="background:#f1f5f9;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;margin-right:4px;">✏️</button>';
     if (isAdmin) actions += '<button onclick="annulerEcriture(\''+e.id+'\')" title="Supprimer définitivement" style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.78rem;">🗑️</button>';
     var montantDetail = e.type==='mixte'
@@ -14127,6 +14128,8 @@ function saveContaModal(existingId) {
   var note    = (document.getElementById('cm-note').value||'').trim();
   var statutEl= document.getElementById('cm-statut');
   var statut  = statutEl ? statutEl.value : 'en_attente';
+  // Les virements sont électroniques → immédiatement remis, pas besoin de remise physique
+  if (type === 'virement' && !statutEl) statut = 'remis';
 
   // Helper: parse montant (supporte virgule française et point)
   function _parseMontant(val) {
@@ -14264,6 +14267,19 @@ function autoriserCheque(id) {
   saveDB(DB);
   syncComptaToLocalStorage();
   toast('Chèque autorisé — en attente de remise ✓','success');
+  showPage('admin-compta');
+}
+
+function validerVirement(id) {
+  initCompta();
+  var e = (DB.compta.ecritures||[]).find(function(x){return x.id===id;});
+  if (!e) return;
+  e.statut = 'remis';
+  e.validePar = currentUser.name;
+  e.valideLe  = new Date().toISOString();
+  saveDB(DB);
+  syncComptaToLocalStorage();
+  toast('Virement validé ✓','success');
   showPage('admin-compta');
 }
 
