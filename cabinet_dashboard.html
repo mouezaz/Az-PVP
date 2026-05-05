@@ -737,6 +737,8 @@ function initFirebaseCompta(){
       _buildComptaSync(list);
       // Rafraîchir la vue trésorerie si elle est active
       if(document.getElementById('view-tresorerie')?.classList.contains('active')) buildTresoForm();
+      // Rafraîchir la vue Compte Mandat si elle est active
+      if(document.getElementById('view-mandat')?.classList.contains('active')) renderMandat();
     });
   }catch(e){ console.warn('Firebase compta init error',e); }
 }
@@ -1833,6 +1835,24 @@ function renderMandat(){
   // Encaissements clients
   const body=document.getElementById('mandat-enc-body');
   body.innerHTML='';
+  // ── Entrées auto depuis Firebase (app terrain) ──
+  const autoEnc=getComptaSync(mandat_yr,mo1);
+  if(autoEnc.length){
+    const hdr=document.createElement('tr');
+    hdr.setAttribute('data-auto','1');
+    hdr.style.cssText='background:#dcfce7;';
+    hdr.innerHTML='<td colspan="4" style="padding:5px 10px;font-size:10px;font-weight:800;color:#065f46;letter-spacing:.5px;text-transform:uppercase;">📱 Synchronisé depuis l\'application ('+autoEnc.length+' ligne'+(autoEnc.length>1?'s':'')+')</td>';
+    body.appendChild(hdr);
+    autoEnc.forEach(r=>body.appendChild(mandatAutoRow(r)));
+    if(data.enc&&data.enc.length){
+      const sep=document.createElement('tr');
+      sep.setAttribute('data-auto','1');
+      sep.style.cssText='background:#f1f5f9;';
+      sep.innerHTML='<td colspan="4" style="padding:5px 10px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-transform:uppercase;">✏️ Saisies manuelles</td>';
+      body.appendChild(sep);
+    }
+  }
+  // ── Entrées manuelles ──
   const encs=data.enc&&data.enc.length?data.enc:[{type:'Chèque',desc:'',amount:''}];
   encs.forEach(e=>body.appendChild(mandatMakeEncRow(e.type||'Chèque',e.desc||'',e.amount||'')));
   // Sorties
@@ -1840,6 +1860,20 @@ function renderMandat(){
   document.getElementById('mandat-virement').value=data.virement>0?data.virement:'';
   updateMandatTotals();
   renderMandatKpi();
+}
+
+function mandatAutoRow(r){
+  const colors={'Chèque':'#1e3a5f','Espèces':'#065f46','Virement':'#1d4ed8'};
+  const bgs={'Chèque':'#eff6ff','Espèces':'#f0fdf4','Virement':'#dbeafe'};
+  const col=colors[r.type]||'#374151'; const bg=bgs[r.type]||'#f0fdf4';
+  const tr=document.createElement('tr');
+  tr.setAttribute('data-auto','1');
+  tr.style.background='#f0fdf4';
+  tr.innerHTML=`<td><span style="padding:2px 8px;background:${bg};color:${col};border-radius:4px;font-size:11px;font-weight:700;">${r.type}</span></td>
+    <td style="font-size:12px;color:#374151;">${r.desc||''}&nbsp;<span style="font-size:10px;color:#10b981;font-weight:700;">📱</span></td>
+    <td style="text-align:right;font-weight:700;color:#065f46;">${fmt(r.amount||0)}<input type="number" value="${r.amount||0}" style="display:none" readonly></td>
+    <td class="del-cell"><span style="font-size:10px;color:#9ca3af;">auto</span></td>`;
+  return tr;
 }
 
 function mandatMakeEncRow(type='Chèque',desc='',amount=''){
@@ -1880,9 +1914,10 @@ function updateMandatTotals(){
 function saveMandat(){
   const mo1=mandat_mo+1;
   const enc=[];
-  document.querySelectorAll('#mandat-enc-body tr').forEach(row=>{
+  // Exclure les lignes auto (synchronisées depuis l'application)
+  document.querySelectorAll('#mandat-enc-body tr:not([data-auto])').forEach(row=>{
     const sel=row.querySelector('select');
-    const inputs=row.querySelectorAll('input');
+    const inputs=row.querySelectorAll('input:not([readonly])');
     const type=sel?.value||'Chèque';
     const desc=inputs[0]?.value.trim()||'';
     const amount=+inputs[1]?.value||0;
@@ -1906,11 +1941,13 @@ function renderMandatKpi(){
   let totIn=0,totOut=0,months=0;
   for(let m=1;m<=limit;m++){
     const d=MANDAT_DATA[yr]?.[m];
-    if(d){
+    const autoEnc=getComptaSync(yr,m);
+    if(d||autoEnc.length){
       const kNet=getKsuNet(yr,m);
-      const enc=(d.enc||[]).reduce((s,e)=>s+(+e.amount||0),0);
-      totIn+=kNet+enc;
-      totOut+=(d.remontee||0)+(d.virement||0);
+      const manualEnc=(d&&d.enc||[]).reduce((s,e)=>s+(+e.amount||0),0);
+      const autoTotal=autoEnc.reduce((s,e)=>s+(e.amount||0),0);
+      totIn+=kNet+manualEnc+autoTotal;
+      totOut+=((d&&d.remontee)||0)+((d&&d.virement)||0);
       months++;
     }
   }
