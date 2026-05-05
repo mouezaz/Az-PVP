@@ -426,11 +426,15 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
           <div class="right"><span class="ftot" id="mandat-in-tot">—</span><span class="arr">−</span></div>
         </div>
         <div class="fcard-bd">
-          <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+          <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:13px;color:#1e40af;font-weight:600">🏦 Net KSU reçu</span>
             <span style="font-size:15px;font-weight:700;color:#1d4ed8" id="mandat-ksu-auto">—</span>
           </div>
-          <p style="font-size:12px;color:#64748b;margin:0 0 8px;font-weight:600">Encaissements clients directs :</p>
+          <div style="background:#f0fdf4;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;color:#065f46;font-weight:600">💵 Total encaissements clients</span>
+            <span style="font-size:15px;font-weight:700;color:#059669" id="mandat-enc-total">—</span>
+          </div>
+          <p style="font-size:12px;color:#64748b;margin:0 0 8px;font-weight:600">Détail encaissements :</p>
           <table class="dyn-table">
             <thead><tr><th style="width:22%">Mode</th><th style="width:80px">Date</th><th>Client / Description</th><th>Montant</th><th class="del-cell"></th></tr></thead>
             <tbody id="mandat-enc-body"></tbody>
@@ -2056,6 +2060,9 @@ function updateMandatTotals(){
   const ksuNet=getKsuNet(mandat_yr,mo1);
   let encClients=0;
   document.querySelectorAll('#mandat-enc-body tr input[type="number"]').forEach(el=>encClients+=(+el.value||0));
+  // Bandeau total encaissements clients (auto + manuel, sans KSU)
+  const encTotEl=document.getElementById('mandat-enc-total');
+  if(encTotEl) encTotEl.textContent=encClients>0?fmt(encClients,2):'—';
   const totalIn=ksuNet+encClients;
   const remontee=+document.getElementById('mandat-remontee')?.value||0;
   const virement=+document.getElementById('mandat-virement')?.value||0;
