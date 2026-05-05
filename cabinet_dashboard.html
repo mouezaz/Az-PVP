@@ -432,7 +432,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
           </div>
           <p style="font-size:12px;color:#64748b;margin:0 0 8px;font-weight:600">Encaissements clients directs :</p>
           <table class="dyn-table">
-            <thead><tr><th style="width:25%">Mode</th><th>Client / Description</th><th>Montant</th><th class="del-cell"></th></tr></thead>
+            <thead><tr><th style="width:22%">Mode</th><th style="width:80px">Date</th><th>Client / Description</th><th>Montant</th><th class="del-cell"></th></tr></thead>
             <tbody id="mandat-enc-body"></tbody>
           </table>
           <button class="btn-add-row" onclick="mandatAddEnc()">+ Ajouter encaissement</button>
@@ -754,10 +754,10 @@ function _buildComptaSync(ecritures){
     if(!sync[yr][mo]) sync[yr][mo]=[];
     const desc=e.client+(e.produit?' — '+e.produit:'')+(e.contrat?' n°'+e.contrat:'');
     if(e.type==='mixte'){
-      if((e.montantEspeces||0)>0) sync[yr][mo].push({type:'Espèces',desc:desc+' (esp.)',amount:e.montantEspeces,_auto:true});
-      if((e.montantCheque||0)>0)  sync[yr][mo].push({type:'Chèque', desc:desc+' (chq.)',amount:e.montantCheque, _auto:true});
+      if((e.montantEspeces||0)>0) sync[yr][mo].push({type:'Espèces',desc:desc+' (esp.)',amount:e.montantEspeces,date:e.date,_auto:true});
+      if((e.montantCheque||0)>0)  sync[yr][mo].push({type:'Chèque', desc:desc+' (chq.)',amount:e.montantCheque, date:e.date,_auto:true});
     }else{
-      sync[yr][mo].push({type:typeLabel[e.type]||'Chèque',desc,amount:e.montant||0,_auto:true});
+      sync[yr][mo].push({type:typeLabel[e.type]||'Chèque',desc,amount:e.montant||0,date:e.date,_auto:true});
     }
   });
   _comptaSyncData=sync;
@@ -1854,7 +1854,7 @@ function renderMandat(){
   }
   // ── Entrées manuelles ──
   const encs=data.enc&&data.enc.length?data.enc:[{type:'Chèque',desc:'',amount:''}];
-  encs.forEach(e=>body.appendChild(mandatMakeEncRow(e.type||'Chèque',e.desc||'',e.amount||'')));
+  encs.forEach(e=>body.appendChild(mandatMakeEncRow(e.type||'Chèque',e.desc||'',e.amount||'',e.date||'')));
   // Sorties
   document.getElementById('mandat-remontee').value=data.remontee>0?data.remontee:'';
   document.getElementById('mandat-virement').value=data.virement>0?data.virement:'';
@@ -1866,23 +1866,26 @@ function mandatAutoRow(r){
   const colors={'Chèque':'#1e3a5f','Espèces':'#065f46','Virement':'#1d4ed8'};
   const bgs={'Chèque':'#eff6ff','Espèces':'#f0fdf4','Virement':'#dbeafe'};
   const col=colors[r.type]||'#374151'; const bg=bgs[r.type]||'#f0fdf4';
+  const dayStr=r.date?r.date.slice(8,10)+'/'+r.date.slice(5,7):'—';
   const tr=document.createElement('tr');
   tr.setAttribute('data-auto','1');
   tr.style.background='#f0fdf4';
   tr.innerHTML=`<td><span style="padding:2px 8px;background:${bg};color:${col};border-radius:4px;font-size:11px;font-weight:700;">${r.type}</span></td>
+    <td style="font-size:12px;color:#64748b;font-weight:600;">${dayStr}</td>
     <td style="font-size:12px;color:#374151;">${r.desc||''}&nbsp;<span style="font-size:10px;color:#10b981;font-weight:700;">📱</span></td>
     <td style="text-align:right;font-weight:700;color:#065f46;">${fmt(r.amount||0)}<input type="number" value="${r.amount||0}" style="display:none" readonly></td>
     <td class="del-cell"><span style="font-size:10px;color:#9ca3af;">auto</span></td>`;
   return tr;
 }
 
-function mandatMakeEncRow(type='Chèque',desc='',amount=''){
+function mandatMakeEncRow(type='Chèque',desc='',amount='',date=''){
   const tr=document.createElement('tr');
   tr.innerHTML=`<td><select onchange="updateMandatTotals()">
     <option${type==='Chèque'?' selected':''}>Chèque</option>
     <option${type==='Virement'?' selected':''}>Virement</option>
     <option${type==='Espèces'?' selected':''}>Espèces</option>
   </select></td>
+  <td><input type="date" value="${date||''}" style="width:100%;padding:4px 5px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12px;" oninput="updateMandatTotals()"></td>
   <td><input type="text" value="${desc.replace(/"/g,'&quot;')}" placeholder="Client / description" oninput="updateMandatTotals()"></td>
   <td><input type="number" step="0.01" class="amt" value="${amount>0?amount:''}" placeholder="0,00" oninput="updateMandatTotals()"></td>
   <td class="del-cell"><button class="dyn-del" onclick="this.closest('tr').remove();updateMandatTotals()">×</button></td>`;
@@ -1919,9 +1922,10 @@ function saveMandat(){
     const sel=row.querySelector('select');
     const inputs=row.querySelectorAll('input:not([readonly])');
     const type=sel?.value||'Chèque';
-    const desc=inputs[0]?.value.trim()||'';
-    const amount=+inputs[1]?.value||0;
-    if(amount>0||desc) enc.push({type,desc,amount});
+    const date=inputs[0]?.value||'';
+    const desc=inputs[1]?.value.trim()||'';
+    const amount=+inputs[2]?.value||0;
+    if(amount>0||desc) enc.push({type,date,desc,amount});
   });
   const remontee=+document.getElementById('mandat-remontee')?.value||0;
   const virement=+document.getElementById('mandat-virement')?.value||0;
