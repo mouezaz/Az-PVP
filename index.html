@@ -13475,6 +13475,26 @@ PAGES['admin-compta'] = function(mc) {
   if (mStr) { var p=mStr.split('-'); mois=+p[1]; annee=+p[0]; }
   var moisSel = annee+'-'+String(mois).padStart(2,'0');
 
+  // Lancer une sync Firebase en arrière-plan pour récupérer les entrées Mandat/Dashboard
+  if (_fbRef && !_comptaAdminSyncPending) {
+    _comptaAdminSyncPending = true;
+    _fbRef.once('value').then(function(snap) {
+      _comptaAdminSyncPending = false;
+      var remote = snap.val();
+      if (!remote) return;
+      var remoteEcritures = (remote.compta && remote.compta.ecritures) || [];
+      var remoteList = Array.isArray(remoteEcritures) ? remoteEcritures : Object.values(remoteEcritures);
+      initCompta();
+      var localIds = (DB.compta.ecritures||[]).map(function(e){return e.id;});
+      var added = remoteList.filter(function(e){return e&&e.id&&localIds.indexOf(e.id)===-1;});
+      if (added.length > 0) {
+        DB.compta.ecritures = (DB.compta.ecritures||[]).concat(added);
+        try { localStorage.setItem('allianz_db_v4', JSON.stringify(DB)); } catch(ex){}
+        if (currentPage === 'admin-compta') showPage('admin-compta');
+      }
+    }).catch(function(){_comptaAdminSyncPending=false;});
+  }
+
   initCompta();
   var ecM         = getEcrituresMois(mois, annee);
   var espAttente  = (DB.compta.ecritures||[]).filter(function(e){return e.type==='especes'&&e.statut==='en_attente';});
@@ -13498,6 +13518,7 @@ PAGES['admin-compta'] = function(mc) {
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button onclick="openContaModal()" style="background:#10b981;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:.85rem;cursor:pointer;">✚ Nouvelle écriture</button>
         <button onclick="openRemiseBanqueModal()" style="background:#fff;color:#1e3a5f;border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:.85rem;cursor:pointer;">🏦 Remise en banque</button>
+        <button onclick="fbForceSync()" style="background:rgba(255,255,255,.15);color:#fff;border:2px solid rgba(255,255,255,.35);border-radius:10px;padding:10px 18px;font-weight:700;font-size:.85rem;cursor:pointer;">🔄 Rafraîchir</button>
       </div>
     </div>
   </div>
@@ -13582,8 +13603,9 @@ function comptaKpi(title, val, sub, color, bg) {
 
 var _comptaEcritures = [];
 var _comptaIsAdmin   = false;
-var _comptaCollabMoisSel = null;   // mémorise le mois sélectionné collab
-var _comptaAdminMoisSel  = null;   // mémorise le mois sélectionné admin
+var _comptaCollabMoisSel   = null;   // mémorise le mois sélectionné collab
+var _comptaAdminMoisSel    = null;   // mémorise le mois sélectionné admin
+var _comptaAdminSyncPending = false; // évite les requêtes Firebase concurrentes
 
 function filterComptaTable(zoneId) {
   var searchId = zoneId === 'compta-table-zone' ? 'compta-search' : 'admin-compta-search';
@@ -13642,7 +13664,7 @@ function renderComptaTable(ecritures, zoneId, isAdmin) {
       ? '<div style="font-size:.7rem;color:#dc2626;margin-top:2px;font-weight:600;">📅 Chèque : '+fmtDateFR2(e.dateCheque)+'</div>' : '';
     return '<tr style="border-bottom:1px solid #f1f5f9;'+(e.statut==='differe'?'background:#fff5f5;':'')+';">'
       +'<td style="padding:10px 14px;color:#374151;font-size:12px;white-space:nowrap;">'+fmtDateFR2(e.date||'')+dateChequeHtml+'</td>'
-      +(isAdmin?'<td style="padding:10px 14px;font-weight:600;font-size:12px;color:#374151;">'+e.collaborateur+(e._source==='dashboard'?'&nbsp;<span title="Saisi depuis Cabinet Dashboard" style="background:#eff6ff;color:#1d4ed8;border-radius:4px;font-size:10px;padding:1px 5px;font-weight:700;">🏢 Dashboard</span>':'')+'</td>':'')
+      +(isAdmin?'<td style="padding:10px 14px;font-weight:600;font-size:12px;color:#374151;">'+e.collaborateur+(e._source==='dashboard'?'&nbsp;<span title="Saisi depuis Cabinet Dashboard" style="background:#eff6ff;color:#1d4ed8;border-radius:4px;font-size:10px;padding:1px 5px;font-weight:700;">🏢 Dashboard</span>':e._source==='mandat'?'&nbsp;<span title="Synchronisé depuis Compte Mandat" style="background:#f5f3ff;color:#7c3aed;border-radius:4px;font-size:10px;padding:1px 5px;font-weight:700;">💳 Mandat</span>':'')+'</td>':'')
       +'<td style="padding:10px 14px;white-space:nowrap;"><span style="background:'+tm.bg+';color:'+tm.color+';padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;">'+tm.label+'</span></td>'
       +'<td style="padding:10px 14px;font-weight:600;color:#111;">'+e.client+'</td>'
       +'<td style="padding:10px 14px;font-size:12px;color:#6b7280;">'+(e.produit||'')+(e.contrat?' · <span style="font-family:monospace;font-size:11px;">'+e.contrat+'</span>':'')+(e.note?'<br><span style="font-size:.72rem;color:#9ca3af;">'+e.note+'</span>':'')+'</td>'
