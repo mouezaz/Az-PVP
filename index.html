@@ -13432,7 +13432,7 @@ function saveComptaRemise(obj) {
 PAGES['collab-compta'] = function(mc) {
   var td = new Date();
   var mois = td.getMonth()+1, annee = td.getFullYear();
-  var mStr = document.getElementById('compta-mois-sel') ? document.getElementById('compta-mois-sel').value : (annee+'-'+String(mois).padStart(2,'0'));
+  var mStr = _comptaCollabMoisSel || (annee+'-'+String(mois).padStart(2,'0'));
   if (mStr) { var p=mStr.split('-'); mois=+p[1]; annee=+p[0]; }
 
   var moisSel = annee+'-'+String(mois).padStart(2,'0');
@@ -13452,7 +13452,7 @@ PAGES['collab-compta'] = function(mc) {
   </div>
   <div style="padding:16px;max-width:1100px;margin:0 auto;">
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
-      <input type="month" id="compta-mois-sel" value="${moisSel}" onchange="showPage('collab-compta')"
+      <input type="month" id="compta-mois-sel" value="${moisSel}" onchange="_comptaCollabMoisSel=this.value;showPage('collab-compta')"
         style="padding:7px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.85rem;">
       <div style="flex:1;min-width:200px;position:relative;">
         <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#9ca3af;">🔍</span>
@@ -13471,8 +13471,7 @@ PAGES['collab-compta'] = function(mc) {
 PAGES['admin-compta'] = function(mc) {
   var td = new Date();
   var mois = td.getMonth()+1, annee = td.getFullYear();
-  var selEl = document.getElementById('admin-compta-mois-sel');
-  var mStr = selEl ? selEl.value : (annee+'-'+String(mois).padStart(2,'0'));
+  var mStr = _comptaAdminMoisSel || (annee+'-'+String(mois).padStart(2,'0'));
   if (mStr) { var p=mStr.split('-'); mois=+p[1]; annee=+p[0]; }
   var moisSel = annee+'-'+String(mois).padStart(2,'0');
 
@@ -13527,7 +13526,7 @@ PAGES['admin-compta'] = function(mc) {
 
     <!-- Sélecteur mois + recherche + tableau -->
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
-      <input type="month" id="admin-compta-mois-sel" value="${moisSel}" onchange="showPage('admin-compta')"
+      <input type="month" id="admin-compta-mois-sel" value="${moisSel}" onchange="_comptaAdminMoisSel=this.value;showPage('admin-compta')"
         style="padding:7px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.85rem;">
       <div style="flex:1;min-width:200px;position:relative;">
         <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#9ca3af;">🔍</span>
@@ -13583,6 +13582,8 @@ function comptaKpi(title, val, sub, color, bg) {
 
 var _comptaEcritures = [];
 var _comptaIsAdmin   = false;
+var _comptaCollabMoisSel = null;   // mémorise le mois sélectionné collab
+var _comptaAdminMoisSel  = null;   // mémorise le mois sélectionné admin
 
 function filterComptaTable(zoneId) {
   var searchId = zoneId === 'compta-table-zone' ? 'compta-search' : 'admin-compta-search';
