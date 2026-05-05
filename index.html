@@ -8215,20 +8215,18 @@ function importRingoverCSV(input, mois, annee) {
       const iType   = headers.indexOf('Type');
       const iUser   = headers.indexOf('Utilisateur');
       if (iDir<0 || iType<0 || iUser<0) { toast('Format CSV non reconnu — colonnes Direction/Type/Utilisateur attendues','error'); return; }
-      // Colonne numéro de téléphone (Ringover : "Numéro", "Contact", "Correspondant"…)
-      const iNum = ['Numéro','Contact','Correspondant','Téléphone','Numéro appelant','Numéro de téléphone']
-        .reduce(function(acc, h){ return acc >= 0 ? acc : headers.indexOf(h); }, -1);
+      // Colonnes numéros Ringover
+      const iNumApp  = headers.indexOf('Numéro appelant'); // qui a appelé (entrant = client)
+      const iNumAppe = headers.indexOf('Numéro appelé');   // qui a été appelé (sortant = client)
 
-      // ── Passe 1 : collecter les numéros rappelés (appels sortants) ──
-      const numRappeles = new Set(); // numéros ayant reçu un appel sortant
-      if (iNum >= 0) {
-        for (var i=1; i<lines.length; i++) {
-          const cols = parseCSVLine(lines[i], sep);
-          const dir  = (cols[iDir]  ||'').replace(/^"|"$/g,'').trim();
-          if (dir === 'Sortant') {
-            const num = (cols[iNum] ||'').replace(/^"|"$/g,'').trim().replace(/\s/g,'');
-            if (num) numRappeles.add(num);
-          }
+      // ── Passe 1 : collecter les numéros rappelés = "Numéro appelé" des appels Sortants ──
+      const numRappeles = new Set();
+      for (var i=1; i<lines.length; i++) {
+        const cols = parseCSVLine(lines[i], sep);
+        const dir  = (cols[iDir] ||'').replace(/^"|"$/g,'').trim();
+        if (dir === 'Sortant' && iNumAppe >= 0) {
+          const num = (cols[iNumAppe]||'').replace(/^"|"$/g,'').trim().replace(/\s/g,'');
+          if (num) numRappeles.add(num);
         }
       }
 
@@ -8245,9 +8243,10 @@ function importRingoverCSV(input, mois, annee) {
         const collab = _ringoverCollab(user);
         const decroche = type === 'Décroché' || type === 'Transféré';
         const manque   = type === 'Manqué' || type === 'Répondeur';
-        // Non traité = manqué ET pas rappelé (si numéro disponible) ou manqué tout court
-        const num = iNum >= 0 ? (cols[iNum]||'').replace(/^"|"$/g,'').trim().replace(/\s/g,'') : '';
-        const nonTraite = manque && (iNum < 0 || !num || !numRappeles.has(num));
+        // Numéro appelant = le client qui a tenté de nous joindre
+        const numApp = iNumApp >= 0 ? (cols[iNumApp]||'').replace(/^"|"$/g,'').trim().replace(/\s/g,'') : '';
+        // Non traité = manqué ET ce numéro n'a jamais été rappelé (appel sortant vers lui)
+        const nonTraite = manque && (!numApp || !numRappeles.has(numApp));
 
         if (dir === 'Entrant') {
           agEntTotal++;
