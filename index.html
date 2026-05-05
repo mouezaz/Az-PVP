@@ -12326,41 +12326,14 @@ function resetAll() {
     if (el) el.href = url;
   } catch(e) {}
 
-  // Service Worker — dés-enregistrement forcé des anciens SW + vidage cache
+  // Supprimer tous les anciens service workers (ils bloquaient les mises à jour)
   if ('serviceWorker' in navigator) {
-    try {
-      // 1) Supprimer TOUS les anciens service workers
-      navigator.serviceWorker.getRegistrations().then(function(regs) {
-        var kills = regs.map(function(r){ return r.unregister(); });
-        return Promise.all(kills);
-      }).then(function() {
-        // 2) Vider tous les caches
-        return caches.keys().then(function(keys){
-          return Promise.all(keys.map(function(k){ return caches.delete(k); }));
-        });
-      }).then(function() {
-        // 3) Enregistrer le nouveau SW
-        var swCode = [
-          'var CACHE="allianz-v3.5.7";',
-          'self.addEventListener("install",function(e){',
-          '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
-          '  self.skipWaiting();',
-          '});',
-          'self.addEventListener("activate",function(e){',
-          '  e.waitUntil(caches.keys().then(function(keys){',
-          '    return Promise.all(keys.filter(function(k){return k!==CACHE;}).map(function(k){return caches.delete(k);}));',
-          '  }));',
-          '  self.clients.claim();',
-          '});',
-          'self.addEventListener("fetch",function(e){',
-          '  e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));',
-          '});'
-        ].join('\n');
-        var swBlob = new Blob([swCode], {type: 'application/javascript'});
-        var swUrl = URL.createObjectURL(swBlob);
-        return navigator.serviceWorker.register(swUrl);
-      }).catch(function(){});
-    } catch(e) {}
+    navigator.serviceWorker.getRegistrations().then(function(regs) {
+      regs.forEach(function(r){ r.unregister(); });
+    });
+    caches.keys().then(function(keys){
+      keys.forEach(function(k){ caches.delete(k); });
+    });
   }
 
   // "Install app" prompt handling
