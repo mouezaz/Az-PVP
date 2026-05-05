@@ -788,7 +788,8 @@ function _fbListen() {
       'collab-decouverte','collab-conges','collab-taches',
       'admin-dashboard','admin-performance','admin-ventes','admin-resil',
       'admin-prospects','admin-commissions','admin-import','admin-export',
-      'admin-tel','admin-entretien','admin-rh-conges','admin-taches'
+      'admin-tel','admin-entretien','admin-rh-conges','admin-taches',
+      'admin-compta','collab-compta'
     ];
     if (typeof currentPage !== 'undefined' && safePages.indexOf(currentPage) !== -1 &&
         typeof showPage === 'function') {
@@ -920,19 +921,19 @@ function saveDB(db) {
           try { localStorage.setItem('allianz_db_v4', JSON.stringify(DB)); } catch(e){}
           console.log('🔀 Fusion congés Firebase:', remoteExtra.length, 'entrée(s) préservée(s)');
         }
-        // Merge compta.ecritures: préserver les entrées _source:'dashboard' (cabinet_dashboard)
+        // Merge compta.ecritures: préserver toutes les entrées distantes non présentes localement
         var remoteEcritures = (remote.compta && remote.compta.ecritures) || [];
         var remoteEcrituresList = Array.isArray(remoteEcritures) ? remoteEcritures : Object.values(remoteEcritures);
         var localEcrituresIds = ((merged.compta && merged.compta.ecritures)||[]).map(function(e){ return e.id; });
-        var dashboardExtra = remoteEcrituresList.filter(function(e){
-          return e && e._source === 'dashboard' && localEcrituresIds.indexOf(e.id) === -1;
+        var remoteComptaExtra = remoteEcrituresList.filter(function(e){
+          return e && e.id && localEcrituresIds.indexOf(e.id) === -1;
         });
-        if (dashboardExtra.length > 0) {
+        if (remoteComptaExtra.length > 0) {
           if (!merged.compta) merged.compta = {};
-          merged.compta.ecritures = (merged.compta.ecritures||[]).concat(dashboardExtra);
+          merged.compta.ecritures = (merged.compta.ecritures||[]).concat(remoteComptaExtra);
           DB.compta = merged.compta;
           try { localStorage.setItem('allianz_db_v4', JSON.stringify(DB)); } catch(e){}
-          console.log('🔀 Fusion compta dashboard→perf:', dashboardExtra.length, 'entrée(s) préservée(s)');
+          console.log('🔀 Fusion compta:', remoteComptaExtra.length, 'entrée(s) distante(s) préservée(s)');
         }
         return _fbRef.set(merged);
       }).then(function() {
@@ -12316,7 +12317,7 @@ function resetAll() {
   // Service Worker (works when file is served from a web server)
   if ('serviceWorker' in navigator) {
     var swCode = [
-      'var CACHE="allianz-v3.5.1";',
+      'var CACHE="allianz-v3.5.2";',
       'self.addEventListener("install",function(e){',
       '  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll([self.location.href||"/"]);}));',
       '  self.skipWaiting();',
