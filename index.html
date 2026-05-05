@@ -8215,8 +8215,24 @@ function importRingoverCSV(input, mois, annee) {
       const iType   = headers.indexOf('Type');
       const iUser   = headers.indexOf('Utilisateur');
       if (iDir<0 || iType<0 || iUser<0) { toast('Format CSV non reconnu — colonnes Direction/Type/Utilisateur attendues','error'); return; }
+      // Colonne numéro de téléphone (Ringover : "Numéro", "Contact", "Correspondant"…)
+      const iNum = ['Numéro','Contact','Correspondant','Téléphone','Numéro appelant','Numéro de téléphone']
+        .reduce(function(acc, h){ return acc >= 0 ? acc : headers.indexOf(h); }, -1);
 
-      // Compteurs par collab
+      // ── Passe 1 : collecter les numéros rappelés (appels sortants) ──
+      const numRappeles = new Set(); // numéros ayant reçu un appel sortant
+      if (iNum >= 0) {
+        for (var i=1; i<lines.length; i++) {
+          const cols = parseCSVLine(lines[i], sep);
+          const dir  = (cols[iDir]  ||'').replace(/^"|"$/g,'').trim();
+          if (dir === 'Sortant') {
+            const num = (cols[iNum] ||'').replace(/^"|"$/g,'').trim().replace(/\s/g,'');
+            if (num) numRappeles.add(num);
+          }
+        }
+      }
+
+      // ── Passe 2 : comptage avec logique "non rappelé" ──
       const stats = {}; // collab → {entTotal, entDecroches, entNonTraites, sortTotal, sortDecroches}
       let agEntTotal=0, agNonTraites=0, agEntDecroches=0, agSortTotal=0, agSortDecroches=0;
 
@@ -8228,7 +8244,10 @@ function importRingoverCSV(input, mois, annee) {
         const user = (cols[iUser] ||'').replace(/^"|"$/g,'').trim();
         const collab = _ringoverCollab(user);
         const decroche = type === 'Décroché' || type === 'Transféré';
-        const nonTraite = type === 'Manqué' || type === 'Répondeur';
+        const manque   = type === 'Manqué' || type === 'Répondeur';
+        // Non traité = manqué ET pas rappelé (si numéro disponible) ou manqué tout court
+        const num = iNum >= 0 ? (cols[iNum]||'').replace(/^"|"$/g,'').trim().replace(/\s/g,'') : '';
+        const nonTraite = manque && (iNum < 0 || !num || !numRappeles.has(num));
 
         if (dir === 'Entrant') {
           agEntTotal++;
@@ -8243,7 +8262,6 @@ function importRingoverCSV(input, mois, annee) {
           if (decroche) stats[collab].entDecroches++;
           if (nonTraite) stats[collab].entNonTraites++;
         } else if (dir === 'Sortant') {
-          // Comptage agence sortants (tous, pas seulement les collabs mappés)
           agSortTotal++;
           if (decroche) agSortDecroches++;
           if (!collab) continue;
