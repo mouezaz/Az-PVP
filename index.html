@@ -661,7 +661,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
       <button id="btn-guide-op" onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
-      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.1</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.2</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
 
@@ -9016,10 +9016,18 @@ function buildFallbackIA(d, pct, re, ko) {
 function printEntretienProfessional() {
   if (!ecCollab) { toast('Sélectionnez une collaboratrice', 'error'); return; }
   const d = collectEntretien();
-
-  // Récupérer le texte IA généré si disponible
   const aiZone = document.getElementById('ai-zone');
   const aiText = aiZone ? (aiZone.innerText || aiZone.textContent || '').trim() : '';
+  openEntretienPrintWindow(d, aiText);
+}
+
+function printEntretienFromStored(id) {
+  var e = (DB.entretiensIA || []).find(function(x){ return x.id === id; });
+  if (!e || !e.rawData) { toast('Document complet non disponible pour cet entretien', 'error'); return; }
+  openEntretienPrintWindow(e.rawData, e.aiText || '');
+}
+
+function openEntretienPrintWindow(d, aiText) {
   const hasAI = aiText && aiText.length > 20 && !aiText.includes('Génération en cours');
 
   const MOIS_LABEL = ['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
@@ -9384,7 +9392,9 @@ function saveEntretienDB() {
       devisTotal: 0, devisGagnes: 0, tauxConversion: tauxDec,
       formCompletees: 0, byProd: {}
     },
-    synthese
+    synthese,
+    rawData: d,
+    aiText: aiText
   };
   DB.entretiensIA = DB.entretiensIA.filter(function(e){ return !(e.collab===d.collab&&e.mois===d.mois&&e.annee===d.annee); });
   DB.entretiensIA.push(eiaEntry);
@@ -10407,9 +10417,10 @@ function renderEntretienCard(e) {
   var col2Sub  = isManuel ? (e.data.devisGagnes + ' décr. / ' + e.data.devisTotal + ' appels') : (e.data.devisGagnes + ' gagné / ' + e.data.devisTotal + ' devis');
   var synthLines = e.synthese.replace(/\n/g, '<br>');
   var pubBadge = isManuel ? '<span style="font-size:.72rem;background:#d1fae5;color:#065f46;border-radius:4px;padding:2px 7px;margin-left:8px;font-weight:600">📝 Entretien individuel</span>' : '';
+  var printBtn = (isManuel && e.rawData) ? '<button onclick="printEntretienFromStored(\'' + e.id + '\')" style="margin-left:auto;background:#003781;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:.78rem;font-weight:600;cursor:pointer;">🖨 Imprimer</button>' : '';
   return '<div class="card" style="border:2px solid var(--blue-pale);margin-bottom:12px">'
-    + '<div class="card-header" style="background:linear-gradient(135deg,#eff6ff 0%,#fff 100%)">'
-    + '<div class="card-title" style="font-size:1rem">📄 Compte-rendu mensuel — ' + MOIS_LABELS[e.mois] + ' ' + e.annee + pubBadge + '</div></div>'
+    + '<div class="card-header" style="background:linear-gradient(135deg,#eff6ff 0%,#fff 100%);display:flex;align-items:center;">'
+    + '<div class="card-title" style="font-size:1rem;flex:1">📄 Compte-rendu mensuel — ' + MOIS_LABELS[e.mois] + ' ' + e.annee + pubBadge + '</div>' + printBtn + '</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:12px 0 16px">'
     + '<div style="text-align:center;background:#f8fafc;border-radius:8px;padding:12px">'
     + '<div style="font-size:1.6rem;font-weight:800;color:' + sc(e.data.pctAN) + '">' + e.data.an + '</div>'
