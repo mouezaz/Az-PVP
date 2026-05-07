@@ -661,7 +661,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
       <button id="btn-guide-op" onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
-      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.8</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.9</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
 
@@ -2991,7 +2991,12 @@ function moveLeadStage(unifiedId, direction) {
   renderLeadsTable();
   var newMeta = LEAD_STATUT_META[newStatut]||{};
   toast((newMeta.icon||'→')+' '+src.client+' → '+(newMeta.label||newStatut), 'success');
-  if (newStatut === 'Contrat signé') setTimeout(function(){ toast('🎉 Bravo ! Ouvrez le parcours pour créer l\'AN.','success'); }, 800);
+  if (newStatut === 'Contrat signé') {
+    setTimeout(function(){
+      if (isDevis) convertDevisToAN(origId);
+      else convertLeadToAN(origId);
+    }, 400);
+  }
 }
 
 // ── MODAL RELANCE ────────────────────────────────────────────
@@ -3285,6 +3290,8 @@ function convertDevisToAN(devisId) {
   }
 
   // Pre-fill the saisir form
+  const cvCollabOptions = getCollabNames().filter(n=>n!==currentUser.name).map(n=>`<option value="${n}">${n}</option>`).join('');
+  const cvSourceSel = (src) => LEAD_ORIGINE_OPTIONS.map(o=>`<option value="${o}"${o===src?' selected':''}>${(LEAD_SOURCES_META[o]||{}).icon||''} ${o}</option>`).join('');
   openModal(`
     <div style="font-weight:700;font-size:1.05rem;color:#1f2937;margin-bottom:4px;">✅ Devis gagné → Affaire Nouvelle</div>
     <div style="font-size:.85rem;color:#6b7280;margin-bottom:14px;">Vérifiez et enregistrez l'affaire.</div>
@@ -3309,15 +3316,22 @@ function convertDevisToAN(devisId) {
     <div id="cv-comm-preview" style="margin-bottom:10px;font-size:.85rem;color:#059669;font-weight:600;"></div>
     <div class="form-row form-row-2">
       <div class="form-group"><label class="fl">Source</label>
-        <select id="cv-source">
-          <option value="Lead entrant" selected>📥 Lead entrant</option>
-          <option value="Prospect pur">🎯 Prospect pur</option>
-          <option value="Recommandation">🤝 Recommandation</option>
-          <option value="Client existant">🔄 Client existant</option>
-        </select>
+        <select id="cv-source">${cvSourceSel(d.source||'Lead entrant')}</select>
       </div>
       <div class="form-group"><label class="fl">Commentaire</label>
         <input type="text" id="cv-comment" value="Converti depuis devis">
+      </div>
+    </div>
+    <div id="cv-partage-bloc" style="border:1.5px solid #e0e7ff;border-radius:10px;padding:12px 14px;margin-bottom:14px;background:#f5f3ff">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;color:#4c1d95;font-size:.9rem;">
+        <input type="checkbox" id="cv-partage" onchange="toggleCVPartage()" style="width:18px;height:18px;accent-color:#7c3aed;cursor:pointer">
+        ⚡ Commission partagée à 50/50
+      </label>
+      <div id="cv-partage-collab-zone" style="display:none;margin-top:10px">
+        <label class="fl" style="font-size:.82rem;color:#6b7280;margin-bottom:4px;">2e collaboratrice</label>
+        <select id="cv-partage-collab" style="width:100%;max-width:280px;padding:8px 10px;border:1.5px solid #c4b5fd;border-radius:8px;font-size:.9rem;font-weight:600;color:#4c1d95">
+          ${cvCollabOptions}
+        </select>
       </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
@@ -3333,8 +3347,15 @@ function updateCVCommPreview() {
   const prime   = parseFloat(document.getElementById('cv-prime')?.value)||0;
   const prev    = document.getElementById('cv-comm-preview');
   if (!prev || !produit) return;
-  const comm = calcCommissionCollab(produit, prime);
-  prev.textContent = comm > 0 ? `💰 Ma commission : ${fmtEuro(comm)}` : '';
+  const partage = document.getElementById('cv-partage')?.checked || false;
+  const comm = calcCommissionCollab(produit, prime) * (partage ? 0.5 : 1);
+  prev.textContent = comm > 0 ? `💰 Ma commission : ${fmtEuro(comm)}${partage ? ' (50%)' : ''}` : '';
+}
+function toggleCVPartage() {
+  const cb = document.getElementById('cv-partage');
+  const zone = document.getElementById('cv-partage-collab-zone');
+  if (cb && zone) zone.style.display = cb.checked ? 'block' : 'none';
+  updateCVCommPreview();
 }
 
 function saveConvertDevis(devisId) {
@@ -3346,24 +3367,30 @@ function saveConvertDevis(devisId) {
   const contrat = document.getElementById('cv-contrat')?.value.trim();
   const source  = document.getElementById('cv-source')?.value || 'Lead entrant';
   const comment = document.getElementById('cv-comment')?.value.trim();
+  const partage  = document.getElementById('cv-partage')?.checked || false;
+  const collab2  = partage ? (document.getElementById('cv-partage-collab')?.value || '') : '';
   if (!produit || !client) { toast('Produit et client requis', 'error'); return; }
+  if (partage && !collab2) { toast('Sélectionnez la 2e collaboratrice', 'error'); return; }
   if (!DB.ventes) DB.ventes = [];
-  DB.ventes.push({
-    id: uid(), collab: currentUser.name,
+  const baseVente = {
     mois: nowMois(), annee: nowAnnee(),
     produit, client, contrat, prime,
     moisEffet: nowMois(), anneeEffet: nowAnnee(),
     affaireNouvelle: 'Oui',
     source, commentaire: comment,
     fromDevis: devisId,
+    partageRatio: partage ? 0.5 : 1,
+    partageAvec: partage ? collab2 : undefined,
     createdAt: new Date().toISOString()
-  });
+  };
+  DB.ventes.push(Object.assign({}, baseVente, { id: uid(), collab: currentUser.name }));
+  if (partage) DB.ventes.push(Object.assign({}, baseVente, { id: uid(), collab: collab2, partageAvec: currentUser.name }));
   d.convertedToAN = true;
   d.statut = 'Gagné';
   saveDB(DB);
   closeModal();
-  toast('🎉 Affaire Nouvelle enregistrée !', 'success');
-  renderDevisList();
+  toast(partage ? `🎉 AN enregistrée — commission partagée avec ${collab2} !` : '🎉 Affaire Nouvelle enregistrée !', 'success');
+  try { renderDevisList(); } catch(e) { try { showPage(currentPage); } catch(e2) {} }
 }
 
 function convertLeadToAN(leadId) {
@@ -3373,6 +3400,8 @@ function convertLeadToAN(leadId) {
     toast('Ce lead a déjà été converti en AN', 'warning');
     return;
   }
+  const lvCollabOptions = getCollabNames().filter(n=>n!==currentUser.name).map(n=>`<option value="${n}">${n}</option>`).join('');
+  const lvSourceSel = (src) => LEAD_ORIGINE_OPTIONS.map(o=>`<option value="${o}"${o===src?' selected':''}>${(LEAD_SOURCES_META[o]||{}).icon||''} ${o}</option>`).join('');
   openModal(`
     <div style="font-weight:700;font-size:1.05rem;color:#1f2937;margin-bottom:4px;">🎉 Lead signé → Affaire Nouvelle</div>
     <div style="font-size:.85rem;color:#6b7280;margin-bottom:14px;">Félicitations ! Enregistrez l'affaire.</div>
@@ -3395,9 +3424,24 @@ function convertLeadToAN(leadId) {
       </div>
     </div>
     <div id="lv-comm-preview" style="margin-bottom:10px;font-size:.85rem;color:#059669;font-weight:600;"></div>
-    <div class="form-row">
+    <div class="form-row form-row-2">
+      <div class="form-group"><label class="fl">Source</label>
+        <select id="lv-source">${lvSourceSel(l.source||'Lead entrant')}</select>
+      </div>
       <div class="form-group"><label class="fl">Commentaire</label>
         <input type="text" id="lv-comment" value="Converti depuis lead">
+      </div>
+    </div>
+    <div id="lv-partage-bloc" style="border:1.5px solid #e0e7ff;border-radius:10px;padding:12px 14px;margin-bottom:14px;background:#f5f3ff">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;color:#4c1d95;font-size:.9rem;">
+        <input type="checkbox" id="lv-partage" onchange="toggleLVPartage()" style="width:18px;height:18px;accent-color:#7c3aed;cursor:pointer">
+        ⚡ Commission partagée à 50/50
+      </label>
+      <div id="lv-partage-collab-zone" style="display:none;margin-top:10px">
+        <label class="fl" style="font-size:.82rem;color:#6b7280;margin-bottom:4px;">2e collaboratrice</label>
+        <select id="lv-partage-collab" style="width:100%;max-width:280px;padding:8px 10px;border:1.5px solid #c4b5fd;border-radius:8px;font-size:.9rem;font-weight:600;color:#4c1d95">
+          ${lvCollabOptions}
+        </select>
       </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
@@ -3412,8 +3456,15 @@ function updateLVCommPreview() {
   const prime   = parseFloat(document.getElementById('lv-prime')?.value)||0;
   const prev    = document.getElementById('lv-comm-preview');
   if (!prev || !produit) return;
-  const comm = calcCommissionCollab(produit, prime);
-  prev.textContent = comm > 0 ? `💰 Ma commission : ${fmtEuro(comm)}` : '';
+  const partage = document.getElementById('lv-partage')?.checked || false;
+  const comm = calcCommissionCollab(produit, prime) * (partage ? 0.5 : 1);
+  prev.textContent = comm > 0 ? `💰 Ma commission : ${fmtEuro(comm)}${partage ? ' (50%)' : ''}` : '';
+}
+function toggleLVPartage() {
+  const cb = document.getElementById('lv-partage');
+  const zone = document.getElementById('lv-partage-collab-zone');
+  if (cb && zone) zone.style.display = cb.checked ? 'block' : 'none';
+  updateLVCommPreview();
 }
 
 function saveConvertLead(leadId) {
@@ -3423,27 +3474,32 @@ function saveConvertLead(leadId) {
   const client  = document.getElementById('lv-client')?.value.trim();
   const prime   = parseFloat(document.getElementById('lv-prime')?.value)||0;
   const contrat = document.getElementById('lv-contrat')?.value.trim();
+  const source  = document.getElementById('lv-source')?.value || l.source || 'Lead entrant';
   const comment = document.getElementById('lv-comment')?.value.trim();
+  const partage  = document.getElementById('lv-partage')?.checked || false;
+  const collab2  = partage ? (document.getElementById('lv-partage-collab')?.value || '') : '';
   if (!produit || !client) { toast('Produit et client requis', 'error'); return; }
+  if (partage && !collab2) { toast('Sélectionnez la 2e collaboratrice', 'error'); return; }
   if (!DB.ventes) DB.ventes = [];
-  DB.ventes.push({
-    id: uid(), collab: currentUser.name,
+  const baseVente = {
     mois: nowMois(), annee: nowAnnee(),
     produit, client, contrat, prime,
     moisEffet: nowMois(), anneeEffet: nowAnnee(),
     affaireNouvelle: 'Oui',
-    source: 'Lead entrant',
-    commentaire: comment,
+    source, commentaire: comment,
     fromLead: leadId,
+    partageRatio: partage ? 0.5 : 1,
+    partageAvec: partage ? collab2 : undefined,
     createdAt: new Date().toISOString()
-  });
+  };
+  DB.ventes.push(Object.assign({}, baseVente, { id: uid(), collab: currentUser.name }));
+  if (partage) DB.ventes.push(Object.assign({}, baseVente, { id: uid(), collab: collab2, partageAvec: currentUser.name }));
   l.convertedToAN = true;
   l.statut = 'Contrat signé';
   saveDB(DB);
   closeModal();
-  toast('🎉 Affaire Nouvelle enregistrée !', 'success');
-  renderLeadsKpis();
-  renderLeadsTable();
+  toast(partage ? `🎉 AN enregistrée — commission partagée avec ${collab2} !` : '🎉 Affaire Nouvelle enregistrée !', 'success');
+  try { renderLeadsKpis(); renderLeadsTable(); } catch(e) { try { showPage(currentPage); } catch(e2) {} }
 }
 
 
