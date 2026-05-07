@@ -2174,7 +2174,14 @@ function renderMandatRecap(){
   }
 
   function getKsu(y,m1){return getKsuNet(y,m1);}
-  function getEnc(y,m1){return(MANDAT_DATA[y]?.[m1]?.enc||[]).reduce((s,e)=>s+(+e.amount||0),0);}
+  function getEnc(y,m1){
+    // Encaissements auto (Firebase) + manuels (MANDAT_DATA)
+    const autoEnc=(_comptaSyncData[y]&&_comptaSyncData[y][m1])||[];
+    const autoTotal=autoEnc.reduce((s,e)=>s+(+e.amount||0),0);
+    const manualEnc=(MANDAT_DATA[y]?.[m1]?.enc)||[];
+    const manualTotal=manualEnc.reduce((s,e)=>s+(+e.amount||0),0);
+    return autoTotal+manualTotal;
+  }
   function getRemontee(y,m1){return MANDAT_DATA[y]?.[m1]?.remontee||0;}
   function getMandatVir(y,m1){return MANDAT_DATA[y]?.[m1]?.virement||0;}
   function getMandatIn(y,m1){return getKsu(y,m1)+getEnc(y,m1);}
