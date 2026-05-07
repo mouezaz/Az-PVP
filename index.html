@@ -661,7 +661,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
       <button id="btn-guide-op" onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
-      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.7.0</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.7.1</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
 
@@ -2365,6 +2365,8 @@ PAGES['collab-leads'] = function(mc) {
           style="padding:5px 13px;border:none;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;background:#fff;color:#1d4ed8;box-shadow:0 1px 3px rgba(0,0,0,.1);">🗂 Pipeline</button>
         <button id="btn-view-liste" onclick="setLeadView('liste')"
           style="padding:5px 13px;border:none;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;background:transparent;color:#6b7280;">📋 Liste</button>
+        <button id="btn-view-devis" onclick="setLeadView('devis')"
+          style="padding:5px 13px;border:none;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;background:transparent;color:#6b7280;">📝 Devis</button>
       </div>
     </div>
 
@@ -2385,13 +2387,49 @@ function setLeadView(v) {
   _leadView = v;
   var kb = document.getElementById('btn-view-kanban');
   var li = document.getElementById('btn-view-liste');
-  if (kb && li) {
-    var activeStyle = 'padding:5px 13px;border:none;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;background:#fff;color:#1d4ed8;box-shadow:0 1px 3px rgba(0,0,0,.1);';
-    var inactiveStyle = 'padding:5px 13px;border:none;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;background:transparent;color:#6b7280;';
-    kb.style.cssText = v==='kanban' ? activeStyle : inactiveStyle;
-    li.style.cssText = v==='liste'  ? activeStyle : inactiveStyle;
+  var dv = document.getElementById('btn-view-devis');
+  var activeStyle   = 'padding:5px 13px;border:none;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;background:#fff;color:#1d4ed8;box-shadow:0 1px 3px rgba(0,0,0,.1);';
+  var inactiveStyle = 'padding:5px 13px;border:none;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;background:transparent;color:#6b7280;';
+  if (kb) kb.style.cssText = v==='kanban' ? activeStyle : inactiveStyle;
+  if (li) li.style.cssText = v==='liste'  ? activeStyle : inactiveStyle;
+  if (dv) dv.style.cssText = v==='devis'  ? activeStyle : inactiveStyle;
+
+  if (v === 'devis') {
+    var zone = document.getElementById('leads-content-zone');
+    if (!zone) return;
+    var isAdmin = currentUser && currentUser.role === 'admin';
+    var collabFilterHtml = isAdmin
+      ? `<div class="form-group" style="min-width:150px"><label class="fl">Collaboratrice</label>
+           <select id="df-collab" onchange="renderDevisList()" style="padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.83rem;background:#fff;">
+             <option value="">Toute l'équipe</option>
+             ${getCollabNames().map(c=>'<option value="'+c+'">'+c+'</option>').join('')}
+           </select></div>`
+      : `<span id="df-collab" data-value="${currentUser.name}" style="display:none;"></span>`;
+    zone.innerHTML = `
+      <div class="card" style="padding:12px 16px;margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+          <div class="form-group" style="min-width:160px"><label class="fl">Statut</label>
+            <select id="df-statut" onchange="renderDevisList()" style="padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.83rem;background:#fff;">
+              <option value="">Actifs uniquement</option>
+              <option value="all">Tous les devis</option>
+              ${DEVIS_STATUTS.map(s=>'<option value="'+s+'">'+s+'</option>').join('')}
+            </select></div>
+          <div class="form-group" style="min-width:140px"><label class="fl">Produit</label>
+            <select id="df-produit" onchange="renderDevisList()" style="padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.83rem;background:#fff;">
+              <option value="">Tous</option>
+              ${buildProduitOptions()}
+            </select></div>
+          ${collabFilterHtml}
+          <div class="form-group" style="min-width:160px"><label class="fl">Rechercher</label>
+            <input type="text" id="df-search" placeholder="Nom, téléphone..." oninput="renderDevisList()"
+              style="padding:7px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.83rem;width:100%;box-sizing:border-box;background:#fff;"></div>
+        </div>
+      </div>
+      <div id="devis-liste"></div>`;
+    renderDevisList();
+  } else {
+    renderLeadsTable();
   }
-  renderLeadsTable();
 }
 
 // ── FUSION LEADS + DEVIS → contacts unifiés ─────────────────
@@ -5019,7 +5057,10 @@ function renderProspAlertes() {
 }
 
 function renderDevisList() {
-  const filtCollab = document.getElementById('df-collab')?.value || '';
+  var dfCollabEl = document.getElementById('df-collab');
+  var filtCollab = (dfCollabEl && dfCollabEl.tagName === 'SELECT') ? dfCollabEl.value : (dfCollabEl ? dfCollabEl.dataset.value || '' : '');
+  // Si collab (pas admin), restreindre automatiquement à ses devis
+  if (!filtCollab && currentUser && currentUser.role !== 'admin') filtCollab = currentUser.name;
   let devis = filtCollab ? (DB.devis||[]).filter(function(d){return d.collab === filtCollab;}) : (DB.devis||[]);
   const filtStatut = document.getElementById('df-statut')?.value || '';
   const filtProduit = document.getElementById('df-produit')?.value || '';
