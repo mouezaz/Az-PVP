@@ -661,7 +661,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
       <button id="btn-guide-op" onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
-      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.5.8</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.0</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
 
@@ -1925,7 +1925,7 @@ function renderMesVentes() {
         <td class="fw600">${v.client}</td>
         <td class="muted" style="font-size:12px">${v.contrat||'—'}</td>
         <td>${v.affaireNouvelle==='Oui'?'<span class="pill pill-green">AN</span>':'<span class="pill pill-gray">Non</span>'}</td>
-        <td><button class="btn btn-ghost btn-sm" onclick="deleteVente('${v.id}')">✕</button></td>
+        <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="editVenteCollab('${v.id}')" title="Modifier">✏️</button> <button class="btn btn-ghost btn-sm" onclick="deleteVente('${v.id}')" title="Supprimer">✕</button></td>
       </tr>`;
     }).join('')}</tbody>
   </table>
@@ -1940,6 +1940,49 @@ function deleteVente(id) {
   saveDB(DB);
   renderMesVentes();
   toast('Vente supprimée');
+}
+
+function editVenteCollab(id) {
+  var v = (DB.ventes||[]).find(function(x){ return x.id===id; });
+  if (!v) return;
+  var html = '<div style="padding:4px 0 16px"><h3 style="margin:0 0 16px;font-size:1rem">✏️ Modifier la vente</h3>'
+    + '<div style="display:grid;gap:10px">'
+    + '<div><label style="font-size:.82rem;color:#6b7280;display:block;margin-bottom:3px">Client</label>'
+    + '<input id="evc-client" type="text" value="'+escHtml(v.client||'')+'" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;box-sizing:border-box"></div>'
+    + '<div><label style="font-size:.82rem;color:#6b7280;display:block;margin-bottom:3px">N° Contrat</label>'
+    + '<input id="evc-contrat" type="text" value="'+escHtml(v.contrat||'')+'" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;box-sizing:border-box"></div>'
+    + '<div><label style="font-size:.82rem;color:#6b7280;display:block;margin-bottom:3px">Produit</label>'
+    + '<select id="evc-produit" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem">'
+    + PRODUITS.map(function(p){ return '<option value="'+p+'"'+(v.produit===p?' selected':'')+'>'+p+'</option>'; }).join('')
+    + '</select></div>'
+    + '<div><label style="font-size:.82rem;color:#6b7280;display:block;margin-bottom:3px">Prime (€)</label>'
+    + '<input id="evc-prime" type="number" value="'+(v.prime||0)+'" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;box-sizing:border-box"></div>'
+    + '<div><label style="font-size:.82rem;color:#6b7280;display:block;margin-bottom:3px">Affaire Nouvelle ?</label>'
+    + '<select id="evc-an" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem">'
+    + '<option value="Oui"'+(v.affaireNouvelle==='Oui'?' selected':'')+'>Oui — AN</option>'
+    + '<option value="Non"'+(v.affaireNouvelle!=='Oui'?' selected':'')+'>Non</option>'
+    + '</select></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">'
+    + '<button onclick="closeModal()" class="btn btn-ghost">Annuler</button>'
+    + '<button onclick="saveEditVenteCollab(\'' + id + '\')" class="btn btn-primary">💾 Enregistrer</button>'
+    + '</div></div>';
+  openModal(html);
+}
+
+function saveEditVenteCollab(id) {
+  var v = (DB.ventes||[]).find(function(x){ return x.id===id; });
+  if (!v) return;
+  v.client  = document.getElementById('evc-client').value.trim() || v.client;
+  v.contrat = document.getElementById('evc-contrat').value.trim();
+  v.produit = document.getElementById('evc-produit').value;
+  v.prime   = parseFloat(document.getElementById('evc-prime').value) || 0;
+  v.affaireNouvelle = document.getElementById('evc-an').value;
+  v.updatedAt = new Date().toISOString();
+  saveDB(DB);
+  closeModal();
+  renderMesVentes();
+  toast('Vente mise à jour ✓', 'success');
 }
 
 // ---- PAGE: RÉSILIATIONS (COLLAB) ----
@@ -2368,7 +2411,7 @@ function getFilteredLeadsActive() {
   var filtProduit = document.getElementById('lead-filter-produit')?.value || '';
   var filtSearch  = (document.getElementById('lead-filter-search')?.value || '').toLowerCase();
 
-  var contacts = getAllContacts().filter(function(l){ return !l.archived && l.statut !== 'Sans suite'; });
+  var contacts = getAllContacts().filter(function(l){ return !l.archived && l.statut !== 'Sans suite' && l.statut !== 'Contrat signé'; });
   if (filtCollab)  contacts = contacts.filter(function(l){ return l.collab  === filtCollab;  });
   if (filtSource)  contacts = contacts.filter(function(l){ return l.origine === filtSource;  });
   if (filtProduit) contacts = contacts.filter(function(l){ return l.produit === filtProduit; });
@@ -2770,6 +2813,7 @@ function openContactJourney(unifiedId) {
       + (!isDevis && l.statut === 'Contrat signé' && !l.convertedToAN ? '<button onclick="closeModal();convertLeadToAN(' + qO + ')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>' : '')
       + (isDevis && l.statut === 'Contrat signé' && !l.convertedToAN ? '<button onclick="closeModal();convertDevisToAN(' + qO + ')" style="padding:7px 13px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.82rem;font-weight:700;color:#16a34a;cursor:pointer;">🏆 Créer l\'AN</button>' : '')
       + '<button onclick="closeModal();' + (isDevis ? 'openEditDevis(' + qO + ')' : 'openEditLead(' + qO + ')') + '" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;cursor:pointer;">✏️ Modifier</button>'
+      + '<button onclick="' + (isDevis ? 'dupliquerDevis(' + qO + ')' : 'dupliquerLead(' + qO + ')') + '" style="padding:7px 13px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;font-size:.82rem;color:#0369a1;cursor:pointer;">📋 Dupliquer</button>'
       + '<button onclick="closeModal();archiveLead(' + qU + ')" style="padding:7px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;color:#6b7280;cursor:pointer;">📦 Sans suite / Archiver</button>'
       + '</div>';
   }
@@ -3666,6 +3710,33 @@ function deleteLead(id) {
   renderLeadsKpis();
   renderLeadsTable();
   toast('Contact supprimé');
+}
+
+function dupliquerLead(id) {
+  var orig = (DB.leads||[]).find(function(l){ return l.id===id; });
+  if (!orig) return;
+  var nouveau = {
+    id: 'lead_' + Date.now() + '_dup',
+    collab: orig.collab,
+    client: orig.client,
+    telephone: orig.telephone || '',
+    produit: orig.produit || '',
+    origine: orig.origine || '',
+    priorite: orig.priorite || '🟡 Moyenne',
+    statut: 'Nouveau',
+    rappel: '',
+    notes: '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    archived: false
+  };
+  if (!DB.leads) DB.leads = [];
+  DB.leads.push(nouveau);
+  saveDB(DB);
+  closeModal();
+  renderLeadsKpis();
+  renderLeadsTable();
+  toast('✅ Nouveau lead créé pour ' + orig.client + ' — pensez à compléter les infos', 'success');
 }
 
 
@@ -5315,6 +5386,32 @@ function saveEditDevis(id) {
 }
 
 
+
+function dupliquerDevis(id) {
+  var orig = (DB.devis||[]).find(function(d){ return d.id===id; });
+  if (!orig) return;
+  var nouveau = {
+    id: 'devis_' + Date.now() + '_dup',
+    collab: orig.collab,
+    client: orig.client,
+    telephone: orig.telephone || '',
+    produit: orig.produit || '',
+    origine: orig.origine || '',
+    primeEstimee: orig.primeEstimee || 0,
+    statut: 'En cours',
+    prochainContact: '',
+    notes: '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    archived: false
+  };
+  if (!DB.devis) DB.devis = [];
+  DB.devis.push(nouveau);
+  saveDB(DB);
+  closeModal();
+  try { renderProspKpis(); renderDevisList(); } catch(e){}
+  toast('✅ Nouveau devis créé pour ' + orig.client, 'success');
+}
 
 function renderAdminDevisBlock() {
   const allDevis = (DB.devis||[]).filter(d=>!['Gagné','Perdu','Abandonné'].includes(d.statut));
@@ -9709,8 +9806,9 @@ function saveEditVente(id) {
   v.annee   = parseInt(document.getElementById('ev-annee').value);
   saveDB(DB);
   closeModal();
-  renderAdminVentes();
-  toast('Vente mise à jour', 'success');
+  try { renderAdminVentes(); } catch(e){}
+  try { renderMesVentes(); } catch(e){}
+  toast('Vente mise à jour ✓', 'success');
 }
 
 function adminDeleteVente(id) {
