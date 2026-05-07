@@ -661,7 +661,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
       <button id="btn-guide-op" onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
-      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.3</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.4</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
 
@@ -1724,6 +1724,7 @@ function renderCollabVentes() {
           <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;border-bottom:2px solid var(--gray-100)">💰 Commission</th>
           <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;border-bottom:2px solid var(--gray-100)">Priorité</th>
           <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;border-bottom:2px solid var(--gray-100)">Suivi dossier</th>
+          <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;border-bottom:2px solid var(--gray-100)">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -1770,6 +1771,9 @@ function renderCollabVentes() {
             </td>
             <td style="padding:10px 14px;text-align:center">${prioPill}</td>
             <td style="padding:10px 14px;text-align:center">${blocagePill}</td>
+            <td style="padding:10px 14px;text-align:center;white-space:nowrap">
+              <button onclick="editVenteCollab('${v.id}')" title="Modifier" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:4px 9px;cursor:pointer;font-size:.8rem;margin-right:3px">✏️</button><button onclick="if(confirm('Supprimer cette vente ?')){DB.ventes=DB.ventes.filter(x=>x.id!=='${v.id}');saveDB(DB);renderCollabVentes();toast('Vente supprimée');}" title="Supprimer" style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:4px 9px;cursor:pointer;font-size:.8rem;color:#dc2626">✕</button>
+            </td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -1780,7 +1784,7 @@ function renderCollabVentes() {
             Prioritaires : ${anVentes.filter(v=>PRIO_PRODS.includes(v.produit)).length} · Auto : ${nbAuto} · MRH : ${nbMRH}
           </td>
           <td style="padding:10px 14px;text-align:right;font-weight:800;color:#1d4ed8;font-size:14px;">${fmtEuro(commCollabM)}</td>
-          <td colspan="2"></td>
+          <td colspan="3"></td>
         </tr>
       </tfoot>
     </table>
@@ -3160,9 +3164,22 @@ function openAddLead() {
       <div class="form-group"><label class="fl">📱 Téléphone</label>
         <input type="text" id="nl-tel" placeholder="06..."></div>
     </div>
-    <div class="form-row form-row-3">
-      <div class="form-group"><label class="fl">🏷 Produit visé</label>
-        <select id="nl-produit"><option value="">--</option>${buildProduitOptions()}</select></div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="fl">🏷 Produit(s) visé(s) <span style="font-size:.74rem;color:#6b7280;font-weight:400">— sélectionnez un ou plusieurs (une fiche par produit)</span></label>
+      <div id="nl-produits-pills" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:8px">
+        ${(function(){
+          var PCOLS={'Auto':'#2563EB','Cyclomoteur':'#2563EB','MRH':'#0891B2','PJ Part':'#64748B','Santé':'#16A34A','Emprunteur':'#D97706','NOP':'#EA580C','GAV':'#9333EA','PER':'#7C3AED','PJ Pro':'#64748B','Actif':'#6B7280','Décennale':'#6B7280','Assurance-vie':'#0ea5e9'};
+          return PRODUITS_GROUPES.map(function(g){
+            return '<div style="display:contents">'+g.items.map(function(p){
+              var c=PCOLS[p]||'#6B7280';
+              return '<span data-prod="'+p+'" data-color="'+c+'" onclick="toggleNlProd(this)" style="cursor:pointer;padding:5px 14px;border-radius:99px;font-size:.8rem;font-weight:600;border:2px solid '+c+';color:'+c+';background:#fff;transition:all .12s;user-select:none;display:inline-block">'+p+'</span>';
+            }).join('')+'</div>';
+          }).join('<div style="width:100%;height:0;margin:2px 0;border-top:1px dashed #e5e7eb"></div>');
+        })()}
+      </div>
+      <div id="nl-produits-hint" style="font-size:.75rem;color:#6b7280;margin-top:6px;display:none">✅ <span id="nl-produits-count">0</span> produit(s) sélectionné(s) — <span id="nl-produits-names" style="font-weight:600"></span></div>
+    </div>
+    <div class="form-row form-row-2">
       <div class="form-group"><label class="fl">🌐 Source du contact</label>
         <select id="nl-origine">
           <option value="">-- Choisir --</option>
@@ -3625,30 +3642,81 @@ function setBlocageAdmin(venteId, val) {
   toast('✅ Dossier résolu', 'success');
 }
 
+function toggleNlProd(el) {
+  var selected = el.getAttribute('data-selected') === '1';
+  var col = el.getAttribute('data-color') || '#6B7280';
+  if (selected) {
+    el.setAttribute('data-selected', '0');
+    el.style.background = '#fff';
+    el.style.color = col;
+    el.style.transform = '';
+  } else {
+    el.setAttribute('data-selected', '1');
+    el.style.background = col;
+    el.style.color = '#fff';
+    el.style.transform = 'scale(1.05)';
+  }
+  // Update hint
+  var pills = document.querySelectorAll('#nl-produits-pills [data-prod]');
+  var sel = Array.from(pills).filter(function(p){ return p.getAttribute('data-selected')==='1'; });
+  var hint = document.getElementById('nl-produits-hint');
+  var countEl = document.getElementById('nl-produits-count');
+  var namesEl = document.getElementById('nl-produits-names');
+  if (hint && countEl && namesEl) {
+    if (sel.length > 0) {
+      hint.style.display = '';
+      countEl.textContent = sel.length;
+      namesEl.textContent = sel.map(function(p){ return p.getAttribute('data-prod'); }).join(', ');
+    } else {
+      hint.style.display = 'none';
+    }
+  }
+}
+
 function saveLead() {
   var client = document.getElementById('nl-client')?.value.trim();
   if (!client) { toast('Renseignez le nom du contact', 'error'); return; }
   if (!DB.leads) DB.leads = [];
-  var note = document.getElementById('nl-notes')?.value.trim() || '';
-  DB.leads.push({
-    id: uid(),
-    collab: currentUser.name,
-    client: client,
-    telephone: document.getElementById('nl-tel')?.value.trim() || '',
-    produit: document.getElementById('nl-produit')?.value || '',
-    origine: document.getElementById('nl-origine')?.value || '',
-    priorite: document.getElementById('nl-prio')?.value || '🟡 Moyenne',
-    rappel: document.getElementById('nl-rappel')?.value || '',
-    statut: document.getElementById('nl-statut')?.value || 'À contacter',
-    notes: note,
-    relanceHistory: [],
-    relanceCount: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+
+  // Récupérer les produits sélectionnés (pills multi-select)
+  var pills = document.querySelectorAll('#nl-produits-pills [data-prod][data-selected="1"]');
+  var produits = Array.from(pills).map(function(p){ return p.getAttribute('data-prod'); });
+  if (produits.length === 0) produits = ['']; // Aucun produit sélectionné → fiche sans produit
+
+  var tel      = document.getElementById('nl-tel')?.value.trim() || '';
+  var origine  = document.getElementById('nl-origine')?.value || '';
+  var priorite = document.getElementById('nl-prio')?.value || '🟡 Moyenne';
+  var rappel   = document.getElementById('nl-rappel')?.value || '';
+  var statut   = document.getElementById('nl-statut')?.value || 'À contacter';
+  var note     = document.getElementById('nl-notes')?.value.trim() || '';
+  var now      = new Date().toISOString();
+
+  // Créer une fiche par produit sélectionné
+  produits.forEach(function(produit) {
+    DB.leads.push({
+      id: uid(),
+      collab: currentUser.name,
+      client: client,
+      telephone: tel,
+      produit: produit,
+      origine: origine,
+      priorite: priorite,
+      rappel: rappel,
+      statut: statut,
+      notes: note,
+      relanceHistory: [],
+      relanceCount: 0,
+      createdAt: now,
+      updatedAt: now
+    });
   });
+
   saveDB(DB);
   closeModal();
-  toast('🎯 Contact ajouté au pipeline !', 'success');
+  var msg = produits.length > 1
+    ? '🎯 ' + produits.length + ' fiches créées pour ' + client + ' (' + produits.join(', ') + ')'
+    : '🎯 Contact ajouté au pipeline !';
+  toast(msg, 'success');
   renderLeadsKpis();
   renderLeadsTable();
   try { updateAllBadges(); } catch(e) {}
@@ -3734,17 +3802,20 @@ function deleteLead(id) {
 function dupliquerLead(id) {
   var orig = (DB.leads||[]).find(function(l){ return l.id===id; });
   if (!orig) return;
+  var tomorrowISO = new Date(Date.now()+86400000).toISOString().split('T')[0];
   var nouveau = {
-    id: 'lead_' + Date.now() + '_dup',
+    id: uid(),
     collab: orig.collab,
     client: orig.client,
     telephone: orig.telephone || '',
     produit: orig.produit || '',
     origine: orig.origine || '',
     priorite: orig.priorite || '🟡 Moyenne',
-    statut: 'Nouveau',
-    rappel: '',
+    statut: 'À contacter',
+    rappel: tomorrowISO,
     notes: '',
+    relanceHistory: [],
+    relanceCount: 0,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     archived: false
@@ -3753,9 +3824,8 @@ function dupliquerLead(id) {
   DB.leads.push(nouveau);
   saveDB(DB);
   closeModal();
-  renderLeadsKpis();
-  renderLeadsTable();
-  toast('✅ Nouveau lead créé pour ' + orig.client + ' — pensez à compléter les infos', 'success');
+  toast('✅ Fiche créée pour ' + orig.client + ' — complétez le produit si nécessaire', 'success');
+  try { renderLeadsKpis(); renderLeadsTable(); } catch(e) { try { showPage(currentPage); } catch(e2) {} }
 }
 
 
@@ -5409,8 +5479,9 @@ function saveEditDevis(id) {
 function dupliquerDevis(id) {
   var orig = (DB.devis||[]).find(function(d){ return d.id===id; });
   if (!orig) return;
+  var tomorrowISO = new Date(Date.now()+86400000).toISOString().split('T')[0];
   var nouveau = {
-    id: 'devis_' + Date.now() + '_dup',
+    id: uid(),
     collab: orig.collab,
     client: orig.client,
     telephone: orig.telephone || '',
@@ -5418,7 +5489,7 @@ function dupliquerDevis(id) {
     origine: orig.origine || '',
     primeEstimee: orig.primeEstimee || 0,
     statut: 'En cours',
-    prochainContact: '',
+    prochainContact: tomorrowISO,
     notes: '',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -5428,8 +5499,8 @@ function dupliquerDevis(id) {
   DB.devis.push(nouveau);
   saveDB(DB);
   closeModal();
-  try { renderProspKpis(); renderDevisList(); } catch(e){}
   toast('✅ Nouveau devis créé pour ' + orig.client, 'success');
+  try { showPage(currentPage); } catch(e) {}
 }
 
 function renderAdminDevisBlock() {
