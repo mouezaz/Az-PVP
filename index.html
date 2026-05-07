@@ -661,7 +661,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
       <button id="btn-guide-op" onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
-      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.9</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.7.0</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
 
@@ -2967,9 +2967,25 @@ function moveLeadStage(unifiedId, direction) {
   if (newIdx < 0 || newIdx >= LEAD_PIPELINE_STAGES.length) return;
   var newStatut = LEAD_PIPELINE_STAGES[newIdx];
 
+  // Pour les devis qui arrivent à 'Contrat signé' : ne pas changer le statut
+  // immédiatement — c'est saveConvertDevis() qui le passera à 'Gagné' après confirmation
+  var skipSave = false;
+  if (isDevis && newStatut === 'Contrat signé') {
+    if (!src.historique) src.historique = [];
+    src.historique.push({ type:'stage', date:new Date().toISOString(), texte:'Passage à : '+newStatut });
+    src.updatedAt = new Date().toISOString();
+    // On sauvegarde l'historique mais PAS le changement de statut
+    saveDB(DB);
+    renderLeadsTable();
+    var newMeta2 = LEAD_STATUT_META[newStatut]||{};
+    toast((newMeta2.icon||'→')+' '+src.client+' → '+(newMeta2.label||newStatut), 'success');
+    setTimeout(function(){ convertDevisToAN(origId); }, 400);
+    return;
+  }
+
   if (isDevis) {
-    // Mapper le statut pipeline → statut devis
-    var devisMap = { 'À contacter':'Devis à envoyer', 'Contacté — en attente':'Devis à envoyer', 'Devis envoyé':'Devis envoyé', 'Contrat signé':'Gagné' };
+    // Mapper le statut pipeline → statut devis (hors Contrat signé déjà traité)
+    var devisMap = { 'À contacter':'Devis à envoyer', 'Contacté — en attente':'Devis à envoyer', 'Devis envoyé':'Devis envoyé' };
     src.statut = devisMap[newStatut] || src.statut;
     if (!src.historique) src.historique = [];
     src.historique.push({ type:'stage', date:new Date().toISOString(), texte:'Passage à : '+newStatut });
@@ -2992,10 +3008,7 @@ function moveLeadStage(unifiedId, direction) {
   var newMeta = LEAD_STATUT_META[newStatut]||{};
   toast((newMeta.icon||'→')+' '+src.client+' → '+(newMeta.label||newStatut), 'success');
   if (newStatut === 'Contrat signé') {
-    setTimeout(function(){
-      if (isDevis) convertDevisToAN(origId);
-      else convertLeadToAN(origId);
-    }, 400);
+    setTimeout(function(){ convertLeadToAN(origId); }, 400);
   }
 }
 
@@ -5066,6 +5079,7 @@ function buildClosedDevisActions(d) {
   html += ' <button class="btn btn-ghost btn-sm" style="color:#4f46e5" onclick="openReassignDevis(&#39;' + d.id + '&#39;)">↪ Réassigner</button>';
   if (d.statut === 'Gagné' && !d.convertedToAN) {
     html += ' <button class="btn btn-primary btn-sm" onclick="convertDevisToAN(&#39;' + d.id + '&#39;)" style="background:#059669;border-color:#059669;">✚ Créer l\'AN</button>';
+    html += ' <button class="btn btn-ghost btn-sm" onclick="restaurerDevis(&#39;' + d.id + '&#39;)" style="color:#d97706;border-color:#d97706;" title="Remettre en cours si passage à Gagné par erreur">↩ Restaurer</button>';
   } else if (d.statut === 'Gagné' && d.convertedToAN) {
     html += ' <span style="color:#059669;font-size:12px;font-weight:600;">✅ AN enregistrée</span>';
   }
@@ -5090,6 +5104,48 @@ function buildClosedDevisActions(d) {
     html += '</div>';
   }
   return html;
+}
+
+function restaurerDevis(devisId) {
+  var d = (DB.devis||[]).find(function(x){ return x.id===devisId; });
+  if (!d) { toast('Devis introuvable', 'error'); return; }
+  if (d.convertedToAN) { toast('Ce devis a déjà une AN enregistrée, impossible de restaurer', 'error'); return; }
+  openModal(`
+    <div class="modal-header">
+      <div class="modal-title">↩ Restaurer le devis</div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <p style="color:#4b5563;font-size:.9rem;margin-bottom:16px">Le devis de <strong>${d.client}</strong> a été passé à "Gagné" par erreur. Choisissez le statut à restaurer :</p>
+    <div class="form-group" style="margin-bottom:16px">
+      <label class="fl">Remettre au statut</label>
+      <select id="restore-statut">
+        <option value="Devis envoyé">Devis envoyé</option>
+        <option value="Relance 1">Relance 1</option>
+        <option value="Relance 2">Relance 2</option>
+        <option value="Devis à envoyer">Devis à envoyer</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-primary" onclick="confirmRestaurerDevis('${d.id}')">↩ Restaurer</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Annuler</button>
+    </div>`);
+}
+function confirmRestaurerDevis(devisId) {
+  var d = (DB.devis||[]).find(function(x){ return x.id===devisId; });
+  if (!d) return;
+  var newStatut = document.getElementById('restore-statut')?.value || 'Devis envoyé';
+  d.statut = newStatut;
+  d.archived = false;
+  d.convertedToAN = false;
+  d.archivedAt = undefined;
+  d.archivedReason = undefined;
+  if (!d.historique) d.historique = [];
+  d.historique.push({ type:'restauration', date:new Date().toISOString(), texte:'Restauré depuis Gagné → '+newStatut });
+  d.updatedAt = new Date().toISOString();
+  saveDB(DB);
+  closeModal();
+  toast('✅ Devis restauré au statut "'+newStatut+'"', 'success');
+  try { renderDevisList(); } catch(e) { try { showPage(currentPage); } catch(e2) {} }
 }
 
 function buildDevisCard(d) {
