@@ -661,7 +661,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
       <button id="btn-guide-op" onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
-      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.7.4</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.7.5</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
 
@@ -7600,14 +7600,23 @@ PAGES['admin-commissions'] = (mc) => {
       </td>
     </tr>`).join('');
 
+  const maxNetAbs = Math.max(...monthlyData.map(x=>Math.abs(x.net)), 1);
   const monthRows = monthlyData.map(r => {
-    const bar = r.gross > 0 ? `<div style="display:inline-block;background:#22c55e;height:8px;border-radius:4px;width:${Math.min(Math.round(r.net/Math.max(...monthlyData.map(x=>x.net),1)*80),80)}px;vertical-align:middle;margin-left:6px;"></div>` : '';
+    const hasData = r.gross > 0 || r.resil > 0;
+    const barW = hasData ? Math.min(Math.round(Math.abs(r.net)/maxNetAbs*80), 80) : 0;
+    const bar = barW > 0
+      ? `<div style="display:inline-block;background:${r.net>=0?'#22c55e':'#ef4444'};height:8px;border-radius:4px;width:${barW}px;vertical-align:middle;margin-left:6px;"></div>`
+      : '';
+    const netColor = r.net > 0 ? '#059669' : r.net < 0 ? '#dc2626' : '#6b7280';
+    const netDisplay = hasData
+      ? `<span style="color:${netColor};font-weight:700">${r.net >= 0 ? '' : ''}${fmtEuro(r.net)}</span>`
+      : '—';
     return `<tr>
       <td style="font-weight:600">${r.lbl}${r.m===mois?' ◀':''}</td>
       <td style="text-align:center">${r.nb||'—'}</td>
       <td style="text-align:right;color:#059669">${r.gross>0?fmtEuro(r.gross):'—'}</td>
       <td style="text-align:right;color:#dc2626;font-size:11px">${r.resil>0?'- '+fmtEuro(r.resil):'—'}</td>
-      <td style="text-align:right;font-weight:700">${r.net>0?fmtEuro(r.net):'—'}${bar}</td>
+      <td style="text-align:right">${netDisplay}${bar}</td>
     </tr>`;
   }).join('');
 
