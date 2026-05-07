@@ -661,7 +661,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
       <button id="btn-guide-op" onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
-      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.2</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.3</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
 
@@ -785,24 +785,43 @@ function _fbListen() {
     DB = _fbEnsure(remote);
     try { localStorage.setItem('allianz_db_v4', JSON.stringify(DB)); } catch(e){}
     console.log('🔄 Sync reçue — ventes:', DB.ventes.length, '| devis:', (DB.devis||[]).length);
+    // Pages avec formulaire en cours de saisie → ne jamais recharger automatiquement
+    var formPages = ['admin-entretien', 'collab-saisir', 'admin-import'];
+    // Pages simples → rechargement silencieux OK
     var safePages = [
-      'collab-home','collab-ventes','collab-saisir','collab-resil',
+      'collab-home','collab-ventes','collab-resil',
       'collab-leads','collab-suivi','collab-stats','collab-prospection','collab-formation',
       'collab-decouverte','collab-conges','collab-taches',
       'admin-dashboard','admin-performance','admin-ventes','admin-resil',
       'admin-prospects','admin-commissions','admin-import','admin-export',
-      'admin-tel','admin-entretien','admin-rh-conges','admin-taches',
+      'admin-tel','admin-rh-conges','admin-rh-entretiens','admin-taches',
       'admin-compta','collab-compta'
     ];
-    if (typeof currentPage !== 'undefined' && safePages.indexOf(currentPage) !== -1 &&
-        typeof showPage === 'function') {
-      showPage(currentPage);
+    if (typeof currentPage !== 'undefined' && typeof showPage === 'function') {
+      if (formPages.indexOf(currentPage) !== -1) {
+        // Formulaire en cours — mise à jour silencieuse, on n'écrase PAS le formulaire
+        _showSyncBanner();
+      } else if (safePages.indexOf(currentPage) !== -1) {
+        showPage(currentPage);
+        try { toast('🔄 Données mises à jour par un autre utilisateur', 'info'); } catch(e){}
+      }
     }
     try { updateCongeBadge(); } catch(e){}
-    try { toast('🔄 Données mises à jour par un autre utilisateur', 'info'); } catch(e){}
   }, function(err) {
     console.error('🔴 Firebase error:', err.code, err.message);
   });
+}
+
+// Bannière discrète affichée quand une sync arrive pendant un formulaire actif
+function _showSyncBanner() {
+  var banner = document.getElementById('_sync-banner');
+  if (banner) { banner.style.opacity = '1'; return; }
+  banner = document.createElement('div');
+  banner.id = '_sync-banner';
+  banner.style.cssText = 'position:fixed;bottom:72px;right:16px;background:#1e40af;color:#fff;border-radius:8px;padding:8px 14px;font-size:.8rem;font-weight:600;z-index:9999;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,.2);transition:opacity .4s';
+  banner.innerHTML = '🔄 Données reçues en arrière-plan — votre formulaire n\'a pas été modifié <button onclick="this.parentElement.remove()" style="margin-left:8px;background:rgba(255,255,255,.2);border:none;border-radius:4px;padding:2px 8px;color:#fff;cursor:pointer;font-size:.8rem">✕</button>';
+  document.body.appendChild(banner);
+  setTimeout(function(){ if(banner && banner.parentNode){ banner.style.opacity='0'; setTimeout(function(){ if(banner && banner.parentNode) banner.remove(); }, 500); } }, 8000);
 }
 
 function fbForceSync() {
