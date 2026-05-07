@@ -419,6 +419,9 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
       </div>
       <div class="krow" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px" id="mandatKpi"></div>
 
+      <!-- Récapitulatif cumulé -->
+      <div id="mandat-recap" style="margin-bottom:14px"></div>
+
       <!-- Entrées -->
       <div class="fcard open" style="margin-bottom:10px">
         <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
@@ -2018,6 +2021,7 @@ function renderMandat(){
   document.getElementById('mandat-virement').value=data.virement>0?data.virement:'';
   updateMandatTotals();
   renderMandatKpi();
+  renderMandatRecap();
 }
 
 function mandatAutoRow(r){
@@ -2100,6 +2104,7 @@ function saveMandat(){
   syncMandatToFirebase(mandat_yr, mo1);
   showNotif('✅ Compte Mandat enregistré et synchronisé');
   renderMandatKpi();
+  renderMandatRecap();
 }
 
 function renderMandatKpi(){
@@ -2124,6 +2129,112 @@ function renderMandatKpi(){
     <div class="kc k3"><div class="lbl">⚖️ Solde cumulé</div><div class="val" style="color:${solde>=0?'#059669':'#dc2626'}">${fmt(solde)}</div></div>
     <div class="kc k4"><div class="lbl">📅 Mois saisis</div><div class="val" style="font-size:28px">${months} / ${limit}</div></div>`;
   renderEncaissementsMensuels(yr);
+}
+
+function renderMandatRecap(){
+  const yr=mandat_yr;
+  const limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  const el=document.getElementById('mandat-recap');
+  if(!el) return;
+
+  const cols=[];
+  for(let m=0;m<limit;m++) cols.push(m);
+
+  function fv(v){return v!==0?fmtN(Math.round(v)):'—';}
+  function fvColor(v){
+    if(v===0) return `<span style="color:#475569">—</span>`;
+    return `<span style="color:${v>=0?'#6ee7b7':'#f87171'};font-weight:700">${fmtN(Math.round(v))}</span>`;
+  }
+
+  // En-tête cliquable
+  let th=`<th style="min-width:140px">Poste</th>`;
+  cols.forEach(m=>{
+    const isCur=m===mandat_mo;
+    const nav=` onclick="mandat_mo=${m};buildMandatMonthNav();renderMandat()" style="cursor:pointer"`;
+    th+=`<th class="${isCur?'rcur':''}"${nav}>${MO[m].substring(0,3)}${isCur?'<br><span style="font-size:9px;font-weight:500;color:#2563eb">▶</span>':''}</th>`;
+  });
+  th+=`<th style="background:#1e293b;color:#e2e8f0;font-weight:700">CUMUL</th>`;
+
+  function dataRow(icon,label,fn){
+    let tot=0;
+    let r=`<tr><td>${icon} ${label}</td>`;
+    cols.forEach(m=>{const v=fn(yr,m+1);tot+=v;r+=`<td class="${m===mandat_mo?'rcur':''}">${fv(v)}</td>`;});
+    r+=`<td style="background:#1e293b;color:#e2e8f0;font-weight:600">${fv(tot)}</td>`;
+    return r+'</tr>';
+  }
+  function totRow(cls,label,fn){
+    let tot=0;
+    let r=`<tr class="${cls}"><td>${label}</td>`;
+    cols.forEach(m=>{const v=fn(yr,m+1);tot+=v;r+=`<td class="${m===mandat_mo?'rcur':''}">${fv(v)}</td>`;});
+    r+=`<td style="background:#1e293b;color:#e2e8f0;font-weight:700">${fv(tot)}</td>`;
+    return r+'</tr>';
+  }
+  function secRow(label){
+    return `<tr class="r-sec"><td colspan="${cols.length+2}">${label}</td></tr>`;
+  }
+
+  function getKsu(y,m1){return getKsuNet(y,m1);}
+  function getEnc(y,m1){return(MANDAT_DATA[y]?.[m1]?.enc||[]).reduce((s,e)=>s+(+e.amount||0),0);}
+  function getRemontee(y,m1){return MANDAT_DATA[y]?.[m1]?.remontee||0;}
+  function getMandatVir(y,m1){return MANDAT_DATA[y]?.[m1]?.virement||0;}
+  function getMandatIn(y,m1){return getKsu(y,m1)+getEnc(y,m1);}
+  function getMandatOut(y,m1){return getRemontee(y,m1)+getMandatVir(y,m1);}
+
+  let rows='';
+  rows+=secRow('▸ ENTRÉES');
+  rows+=dataRow('🏦','KSU reçu',(y,m1)=>getKsu(y,m1));
+  rows+=dataRow('👥','Encaissements clients',(y,m1)=>getEnc(y,m1));
+  rows+=totRow('r-rev-tot','TOTAL ENTRÉES',(y,m1)=>getMandatIn(y,m1));
+
+  rows+=secRow('▸ SORTIES');
+  rows+=dataRow('📤','Remontée Allianz',(y,m1)=>getRemontee(y,m1));
+  rows+=dataRow('🏢','Virement → Exploitation',(y,m1)=>getMandatVir(y,m1));
+  rows+=totRow('r-chg-tot','TOTAL SORTIES',(y,m1)=>getMandatOut(y,m1));
+
+  // Solde mensuel + cumul courant
+  let cumul=0;
+  let rSolde=`<tr class="r-solde"><td>⚖️ SOLDE MENSUEL</td>`;
+  cols.forEach(m=>{
+    const mo1=m+1;
+    const inp=getMandatIn(yr,mo1);
+    const out=getMandatOut(yr,mo1);
+    const v=inp-out;
+    const hasData=inp>0||out>0;
+    if(hasData) cumul+=v;
+    const color=hasData?(v>=0?'#6ee7b7':'#f87171'):'#475569';
+    rSolde+=`<td class="${m===mandat_mo?'rcur':''}" style="color:${color};font-weight:700">${hasData?fmtN(Math.round(v)):'—'}</td>`;
+  });
+  const cumulColor=cumul>=0?'#6ee7b7':'#f87171';
+  rSolde+=`<td style="background:#1e293b;color:${cumulColor};font-weight:800;font-size:14px">${fmtN(Math.round(cumul))}</td></tr>`;
+  rows+=rSolde;
+
+  // Cumul courant par mois (running total)
+  let run=0;
+  let rCumul=`<tr style="background:#0f172a"><td style="color:#94a3b8;font-size:11px">∑ Cumulé</td>`;
+  cols.forEach(m=>{
+    const mo1=m+1;
+    const inp=getMandatIn(yr,mo1);
+    const out=getMandatOut(yr,mo1);
+    const v=inp-out;
+    const hasData=inp>0||out>0;
+    if(hasData) run+=v;
+    const color=hasData?(run>=0?'#6ee7b7':'#f87171'):'#475569';
+    rCumul+=`<td class="${m===mandat_mo?'rcur':''}" style="color:${color};font-weight:600;font-size:11px">${hasData?fmtN(Math.round(run)):'—'}</td>`;
+  });
+  rCumul+=`<td style="background:#1e293b;color:${run>=0?'#6ee7b7':'#f87171'};font-weight:800;font-size:13px">${fmtN(Math.round(run))}</td></tr>`;
+  rows+=rCumul;
+
+  const wasOpen=el.dataset.open!=='0';
+  el.innerHTML=`<div class="recap-wrap">
+    <div class="recap-hd" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';document.getElementById('mandat-recap').dataset.open=this.nextElementSibling.style.display==='none'?'0':'1'">
+      <span class="recap-hd-title">📊 Récapitulatif Compte Mandat ${yr} — cliquer un mois pour y aller</span>
+    </div>
+    <div class="recap-body" style="${wasOpen?'':'display:none'}">
+      <div style="overflow-x:auto">
+        <table class="recap-tbl"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>
+      </div>
+    </div>
+  </div>`;
 }
 
 // ================================================================
