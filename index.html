@@ -661,7 +661,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
       <button id="btn-guide-op" onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
-      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.7.1</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.7.2</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
 
@@ -2050,6 +2050,16 @@ function editVenteCollab(id) {
     + '<option value="Oui"'+(v.affaireNouvelle==='Oui'?' selected':'')+'>Oui — AN</option>'
     + '<option value="Non"'+(v.affaireNouvelle!=='Oui'?' selected':'')+'>Non</option>'
     + '</select></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    + '<div><label style="font-size:.82rem;color:#6b7280;display:block;margin-bottom:3px">Mois imputé</label>'
+    + '<select id="evc-mois" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem">'
+    + MOIS_FULL.slice(1).map(function(l,i){ return '<option value="'+(i+1)+'"'+((v.mois||nowMois())===(i+1)?' selected':'')+'>'+l+'</option>'; }).join('')
+    + '</select></div>'
+    + '<div><label style="font-size:.82rem;color:#6b7280;display:block;margin-bottom:3px">Année</label>'
+    + '<select id="evc-annee" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem">'
+    + [2025,2026,2027].map(function(y){ return '<option value="'+y+'"'+((v.annee||nowAnnee())===y?' selected':'')+'>'+y+'</option>'; }).join('')
+    + '</select></div>'
+    + '</div>'
     + '</div>'
     + '<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">'
     + '<button onclick="closeModal()" class="btn btn-ghost">Annuler</button>'
@@ -2067,10 +2077,14 @@ function saveEditVenteCollab(id) {
   v.prime   = parseFloat(document.getElementById('evc-prime').value) || 0;
   v.source  = document.getElementById('evc-source').value;
   v.affaireNouvelle = document.getElementById('evc-an').value;
+  var newMois  = parseInt(document.getElementById('evc-mois')?.value) || v.mois;
+  var newAnnee = parseInt(document.getElementById('evc-annee')?.value) || v.annee;
+  v.mois  = newMois;
+  v.annee = newAnnee;
   v.updatedAt = new Date().toISOString();
   saveDB(DB);
   closeModal();
-  renderMesVentes();
+  try { renderCollabVentes(); } catch(e) { try { renderMesVentes(); } catch(e2) { try { renderAdminVentes(); } catch(e3) {} } }
   toast('Vente mise à jour ✓', 'success');
 }
 
