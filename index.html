@@ -661,7 +661,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
       <button id="btn-guide-op" onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
-      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.4</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.5</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
 
@@ -2249,19 +2249,12 @@ const LEAD_STATUT_META = {
 };
 const LEAD_STATUT_PILLS = Object.fromEntries(Object.entries(LEAD_STATUT_META).map(([k,v])=>[k,v.pill]));
 const LEAD_SOURCES_META = {
-  'Digital Allianz':       { icon:'🌐', color:'#0369a1' },
-  'Recommandation client': { icon:'🤝', color:'#7c3aed' },
-  'Recommandation':        { icon:'🤝', color:'#7c3aed' },
-  'Entrant agence':        { icon:'🏢', color:'#0891b2' },
-  'Prospect agence':       { icon:'🏢', color:'#0891b2' },
-  'Passage agence':        { icon:'🏢', color:'#0891b2' },
-  'Multi-équipement CRM':  { icon:'🔄', color:'#d97706' },
-  'Multi-équipement':      { icon:'🔄', color:'#d97706' },
-  'Appel entrant':         { icon:'📞', color:'#16a34a' },
-  'Renouvellement':        { icon:'♻️', color:'#059669' },
-  'Autre':                 { icon:'✨', color:'#6b7280' },
+  'Contact agence':          { icon:'📞', color:'#0891b2' },
+  'Passage agence':          { icon:'🏢', color:'#0369a1' },
+  'Recommandation':          { icon:'🤝', color:'#7c3aed' },
+  'Prospection portefeuille':{ icon:'🔄', color:'#d97706' },
 };
-const LEAD_ORIGINE_OPTIONS = ['Digital Allianz','Appel entrant','Recommandation client','Recommandation','Entrant agence','Prospect agence','Passage agence','Multi-équipement CRM','Multi-équipement','Renouvellement','Autre'];
+const LEAD_ORIGINE_OPTIONS = ['Contact agence','Passage agence','Recommandation','Prospection portefeuille'];
 
 var _leadView = 'kanban';
 
