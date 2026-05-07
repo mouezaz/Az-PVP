@@ -661,7 +661,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
       <button id="btn-guide-op" onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
-      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.7</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.8</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
 
@@ -1734,7 +1734,8 @@ function renderCollabVentes() {
           const prodDecote28 = an28Bloque && EXEMPTES_28AN.indexOf(v.produit) === -1;
           const prodBloque = (v.produit==='Auto' && autoBloque) || (v.produit==='MRH' && mrhBloque);
           const commBase = prodBloque ? 0 : calcCommissionCollab(v.produit, v.prime);
-          const comm = (prodDecote28 && !prodBloque) ? commBase * DECOTE_28AN : commBase;
+          const commDecote = (prodDecote28 && !prodBloque) ? commBase * DECOTE_28AN : commBase;
+          const comm = v.partageRatio && v.partageRatio < 1 ? commDecote * v.partageRatio : commDecote;
           const rateInfo = COMM_RATES_COLLAB[v.produit];
           const rateLabel = prodBloque
             ? '🔒 objectif non atteint'
@@ -1758,8 +1759,9 @@ function renderCollabVentes() {
             <td style="padding:10px 14px;color:var(--gray-400);font-size:12px">${i+1}</td>
             <td style="padding:10px 14px">
               <span style="background:${col};color:white;padding:4px 12px;border-radius:99px;font-size:12px;font-weight:700">${v.produit}</span>
+              ${v.partage?`<span style="display:inline-block;background:#ede9fe;color:#6d28d9;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:4px" title="Commission partagée avec ${v.partageAvec||'?'}">⚡ 50%</span>`:''}
             </td>
-            <td style="padding:10px 14px;font-weight:600;color:var(--gray-800)">${v.client}</td>
+            <td style="padding:10px 14px;font-weight:600;color:var(--gray-800)">${v.client}${v.partage?`<div style="font-size:10px;color:#7c3aed;margin-top:2px">avec ${v.partageAvec||'?'}</div>`:''}</td>
             <td style="padding:10px 14px;font-family:'DM Mono',monospace;font-size:11px;color:var(--gray-400)">${v.contrat||'—'}</td>
             <td style="padding:10px 14px">
               ${(()=>{const src=v.source||''; const srcIcons={'Contact agence':'📞','Passage agence':'🏢','Recommandation':'🤝','Prospection portefeuille':'🔄','Lead entrant':'🎯','Prospect pur':'🎯','Client existant':'🔄'};
@@ -1851,6 +1853,26 @@ PAGES['collab-saisir'] = (mc) => {
         <div class="form-group"><label class="fl">Commentaire (optionnel)</label>
           <input type="text" id="v-comment" placeholder="Remarque, précision..."></div>
       </div>
+      <!-- PARTAGE DE COMMISSION -->
+      <div id="v-partage-bloc" style="border:1.5px solid #e0e7ff;border-radius:10px;padding:12px 14px;margin-bottom:14px;background:#f5f3ff">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:.9rem;color:#4c1d95">
+            <input type="checkbox" id="v-partage" onchange="togglePartageBloc()" style="width:18px;height:18px;accent-color:#7c3aed;cursor:pointer">
+            ⚡ Commission partagée à 50/50
+          </label>
+          <span style="font-size:.78rem;color:#7c3aed">Si une collègue a initié ou terminé le dossier</span>
+        </div>
+        <div id="v-partage-collab-zone" style="display:none;margin-top:10px">
+          <label style="font-size:.82rem;color:#6b7280;display:block;margin-bottom:4px">Partager avec :</label>
+          <select id="v-partage-collab" style="width:100%;max-width:280px;padding:8px 10px;border:1.5px solid #c4b5fd;border-radius:8px;font-size:.9rem;font-weight:600;color:#4c1d95">
+            <option value="">-- Choisir la collaboratrice --</option>
+            ${getCollabNames().filter(n=>n!==currentUser.name).map(n=>'<option value="'+n+'">'+n+'</option>').join('')}
+          </select>
+          <div style="margin-top:8px;font-size:.8rem;color:#7c3aed;background:#ede9fe;border-radius:6px;padding:6px 10px">
+            💡 Deux fiches seront créées automatiquement — 50% de la commission pour chacune
+          </div>
+        </div>
+      </div>
       <div class="btn-group">
         <button class="btn btn-primary" onclick="saveVente()">✚ Enregistrer</button>
         <button class="btn btn-ghost" onclick="resetVenteForm()">Effacer</button>
@@ -1895,30 +1917,64 @@ function updateCommPreview() {
   </div>`;
 }
 
+function togglePartageBloc() {
+  var cb = document.getElementById('v-partage');
+  var zone = document.getElementById('v-partage-collab-zone');
+  if (zone) zone.style.display = cb && cb.checked ? '' : 'none';
+}
+
 function saveVente() {
   const produit = document.getElementById('v-produit').value;
-  const client = document.getElementById('v-client').value.trim();
+  const client  = document.getElementById('v-client').value.trim();
   if (!produit) { toast('Choisissez un produit', 'error'); return; }
-  if (!client) { toast('Renseignez le nom du client', 'error'); return; }
-  const prime = parseFloat(document.getElementById('v-prime').value)||0;
-  const { mois: moisAtt, annee: anneeAtt } = getVenteMoisAtt(); // mois de rattachement choisi
+  if (!client)  { toast('Renseignez le nom du client', 'error'); return; }
+  const prime   = parseFloat(document.getElementById('v-prime').value)||0;
+  const { mois: moisAtt, annee: anneeAtt } = getVenteMoisAtt();
   const isRetro = moisAtt !== nowMois() || anneeAtt !== nowAnnee();
-  DB.ventes.push({
-    id: uid(), collab: currentUser.name,
-    mois: moisAtt, annee: anneeAtt,  // rattachement comptable (peut être rétroactif)
+
+  const partage     = document.getElementById('v-partage')?.checked || false;
+  const collab2     = partage ? (document.getElementById('v-partage-collab')?.value || '') : '';
+  if (partage && !collab2) { toast('Choisissez la collaboratrice avec qui partager', 'error'); return; }
+
+  const linkedId  = partage ? uid() : undefined;
+  const baseVente = {
+    mois: moisAtt, annee: anneeAtt,
     produit, client,
-    contrat: document.getElementById('v-contrat').value.trim(),
+    contrat:         document.getElementById('v-contrat').value.trim(),
     prime,
-    moisEffet: parseInt(document.getElementById('v-moiseffet').value),
-    anneeEffet: anneeAtt,
+    moisEffet:       parseInt(document.getElementById('v-moiseffet').value),
+    anneeEffet:      anneeAtt,
     affaireNouvelle: document.getElementById('v-an').value,
-    commentaire: document.getElementById('v-comment').value.trim(),
-    source: document.getElementById('v-source')?.value || 'Prospect pur',
-    createdAt: new Date().toISOString(),
-    saisieRetroactive: isRetro || undefined
-  });
+    commentaire:     document.getElementById('v-comment').value.trim(),
+    source:          document.getElementById('v-source')?.value || '',
+    createdAt:       new Date().toISOString(),
+    saisieRetroactive: isRetro || undefined,
+    partage:         partage || undefined,
+    partageRatio:    partage ? 0.5 : undefined,
+    linkedVenteId:   linkedId,
+  };
+
+  // Fiche 1 — collaboratrice qui saisit
+  DB.ventes.push(Object.assign({}, baseVente, {
+    id: uid(),
+    collab: currentUser.name,
+    partageAvec: partage ? collab2 : undefined,
+  }));
+
+  // Fiche 2 — 2e collaboratrice (si partage)
+  if (partage) {
+    DB.ventes.push(Object.assign({}, baseVente, {
+      id: uid(),
+      collab: collab2,
+      partageAvec: currentUser.name,
+    }));
+  }
+
   saveDB(DB);
-  toast(isRetro ? '✅ Vente rétroactive enregistrée en ' + MOIS_FULL[moisAtt] + ' ' + anneeAtt : 'Vente enregistrée !', 'success');
+  var msg = partage
+    ? '✅ Vente partagée 50/50 avec ' + collab2 + ' !'
+    : isRetro ? '✅ Vente rétroactive enregistrée en ' + MOIS_FULL[moisAtt] + ' ' + anneeAtt : 'Vente enregistrée !';
+  toast(msg, 'success');
   resetVenteForm();
   renderMesVentes();
 }
@@ -1946,8 +2002,8 @@ function renderMesVentes() {
       const col = PROD_COLORS[v.produit]||'#6B7280';
       return `<tr>
         <td style="color:var(--gray-400);font-size:12px">${i+1}</td>
-        <td><span style="background:${col};color:white;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">${v.produit}</span>${PRIO.includes(v.produit)?` <span style="font-size:9px;color:${col}">⭐</span>`:''}</td>
-        <td class="fw600">${v.client}</td>
+        <td><span style="background:${col};color:white;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">${v.produit}</span>${PRIO.includes(v.produit)?` <span style="font-size:9px;color:${col}">⭐</span>`:''}${v.partage?` <span style="background:#ede9fe;color:#6d28d9;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700">⚡50%</span>`:''}</td>
+        <td class="fw600">${v.client}${v.partage?`<div style="font-size:10px;color:#7c3aed">avec ${v.partageAvec||'?'}</div>`:''}</td>
         <td class="muted" style="font-size:12px">${v.contrat||'—'}</td>
         <td>${v.affaireNouvelle==='Oui'?'<span class="pill pill-green">AN</span>':'<span class="pill pill-gray">Non</span>'}</td>
         <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="editVenteCollab('${v.id}')" title="Modifier">✏️</button> <button class="btn btn-ghost btn-sm" onclick="deleteVente('${v.id}')" title="Supprimer">✕</button></td>
@@ -11546,13 +11602,15 @@ function calcCommissionCollabMensuel(collab, mois, annee) {
   var obj     = getObjectifsStatus(collab, mois, annee);
   var ventesM = getVentesMoisCollab(collab, mois, annee);
   return ventesM.reduce(function(s, v) {
-    if (v.produit === 'Auto' && !obj.autoOK) return s;  // ≥10 Auto + ≥4 NOP requis
-    if (v.produit === 'MRH'  && !obj.mrhOK)  return s;  // ≥8 MRH + ≥4 NOP requis
+    if (v.produit === 'Auto' && !obj.autoOK) return s;
+    if (v.produit === 'MRH'  && !obj.mrhOK)  return s;
     var comm = calcCommissionCollab(v.produit, v.prime);
     // Décote -30% si AN < 28 (dès mai 2026), sauf produits exemptés
     if (obj.regle28actif && !obj.anOK && EXEMPTES_28AN.indexOf(v.produit) === -1) {
       comm = comm * DECOTE_28AN;
     }
+    // Partage de commission 50/50
+    if (v.partageRatio && v.partageRatio < 1) comm = comm * v.partageRatio;
     return s + comm;
   }, 0);
 }
