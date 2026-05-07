@@ -661,7 +661,7 @@ input[type=number] { font-family: 'DM Mono', monospace; }
       </div>
 <button id="pwa-install-btn" onclick="triggerPWAInstall()" style="display:none;align-items:center;gap:5px;background:#C8960C;color:white;border:none;border-radius:7px;padding:5px 11px;font-size:.78rem;font-weight:600;cursor:pointer;margin-right:8px">📲 Installer</button>
       <button id="btn-guide-op" onclick="openGuide()" title="Guide opérationnel agence" style="display:flex;align-items:center;gap:6px;background:#C8960C;border:none;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;margin-right:6px;box-shadow:0 2px 6px rgba(0,0,0,.25);" onmouseover="this.style.background='#a37609'" onmouseout="this.style.background='#C8960C'">📖 Guide opérationnel</button>
-      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.0</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      <button id="btn-sync" onclick="fbForceSync()" title="Synchroniser avec Firebase" style="background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;margin-right:6px">🔄 Sync</button><span style="font-size:.7rem;color:#aaa;margin-right:8px">v3.6.1</span><button class="btn-logout" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
 
@@ -9340,10 +9340,57 @@ ${hasAI ? `
 function saveEntretienDB() {
   const d = collectEntretien();
   d.id = uid();
+  // 1) Archiver dans DB.entretiens (vue admin complète)
   DB.entretiens = DB.entretiens.filter(e => !(e.collab===d.collab&&e.mois===d.mois&&e.annee===d.annee));
   DB.entretiens.push(d);
+
+  // 2) Publier automatiquement dans DB.entretiensIA (vue collab)
+  if (!DB.entretiensIA) DB.entretiensIA = [];
+  var pctAN = d.perf.an > 0 ? Math.round(d.perf.an / 28 * 100) : 0;
+  var leadsTotal    = d.tel.leads  || 0;
+  var leadsContactes = d.tel.leadsC || 0;
+  var tauxContact   = leadsTotal > 0 ? Math.round(leadsContactes / leadsTotal * 100) : 0;
+  var totEnt = d.tel.totEnt || 0, decEnt = d.tel.decEnt || 0;
+  var tauxDec = totEnt > 0 ? Math.round(decEnt / totEnt * 100) : 0;
+  // Récupérer le texte IA s'il a été généré dans la page
+  var aiEl = document.getElementById('ai-zone');
+  var aiText = aiEl ? aiEl.innerText.replace(/\s+/g,' ').trim() : '';
+  // Construire la synthèse : notes + IA + engagements
+  var synthese = '';
+  if (d.notes && d.notes.trim()) synthese += d.notes.trim();
+  if (aiText && !aiText.includes('Génération en cours')) {
+    synthese += (synthese ? '\n\n' : '') + aiText;
+  }
+  if (d.engagements.next && d.engagements.next.trim()) {
+    synthese += (synthese ? '\n\n' : '') + '📌 Engagements : ' + d.engagements.next.trim();
+  }
+  if (d.engagements.bilan && d.engagements.bilan.trim()) {
+    synthese += (synthese ? '\n' : '') + '✅ Bilan précédent : ' + d.engagements.bilan.trim();
+  }
+  if (!synthese) {
+    synthese = d.collab + ' — Entretien ' + MOIS_LABELS[d.mois] + ' ' + d.annee + '. ' + d.perf.an + ' AN réalisées (objectif 28).';
+  }
+  var eiaEntry = {
+    id: 'eia_manual_' + (d.collab||'').replace(/\s+/g,'_') + '_' + d.mois + '_' + d.annee,
+    collab: d.collab, mois: d.mois, annee: d.annee,
+    dateGeneration: new Date().toISOString(),
+    datePublication: new Date().toISOString(),
+    statut: 'publié',
+    source: 'manuel',
+    data: {
+      an: d.perf.an || 0, objAN: 28, pctAN,
+      primeAN: d.perf.prime || 0, comm: d.perf.prime || 0,
+      leadsTotal, leadsContactes, tauxContact,
+      devisTotal: 0, devisGagnes: 0, tauxConversion: tauxDec,
+      formCompletees: 0, byProd: {}
+    },
+    synthese
+  };
+  DB.entretiensIA = DB.entretiensIA.filter(function(e){ return !(e.collab===d.collab&&e.mois===d.mois&&e.annee===d.annee); });
+  DB.entretiensIA.push(eiaEntry);
+
   saveDB(DB);
-  toast('Entretien archivé !', 'success');
+  toast('✅ Entretien archivé et publié pour ' + d.collab, 'success');
 }
 
 // ---- CSV HELPERS ----
@@ -10353,9 +10400,16 @@ function renderEntretienCard(e) {
   const pillTxt = function(pct){ return pct >= 100 ? '✅ Objectif atteint' : pct >= 70 ? '📈 En progression' : '⚠️ Sous objectif'; };
   const pillBg  = function(pct){ return pct >= 100 ? '#d1fae5' : pct >= 70 ? '#dbeafe' : '#fee2e2'; };
   const pillCol = function(pct){ return pct >= 100 ? '#065f46' : pct >= 70 ? '#1e40af' : '#991b1b'; };
+  // Pour les entretiens manuels : la 2e case affiche décrochage entrant, pas conversion devis
+  var isManuel = e.source === 'manuel';
+  var col2Val  = isManuel ? e.data.tauxConversion + '%' : e.data.tauxConversion + '%';
+  var col2Lbl  = isManuel ? 'Décrochage entrant' : 'Taux conversion devis';
+  var col2Sub  = isManuel ? (e.data.devisGagnes + ' décr. / ' + e.data.devisTotal + ' appels') : (e.data.devisGagnes + ' gagné / ' + e.data.devisTotal + ' devis');
+  var synthLines = e.synthese.replace(/\n/g, '<br>');
+  var pubBadge = isManuel ? '<span style="font-size:.72rem;background:#d1fae5;color:#065f46;border-radius:4px;padding:2px 7px;margin-left:8px;font-weight:600">📝 Entretien individuel</span>' : '';
   return '<div class="card" style="border:2px solid var(--blue-pale);margin-bottom:12px">'
     + '<div class="card-header" style="background:linear-gradient(135deg,#eff6ff 0%,#fff 100%)">'
-    + '<div class="card-title" style="font-size:1rem">📄 Compte-rendu mensuel — ' + MOIS_LABELS[e.mois] + ' ' + e.annee + '</div></div>'
+    + '<div class="card-title" style="font-size:1rem">📄 Compte-rendu mensuel — ' + MOIS_LABELS[e.mois] + ' ' + e.annee + pubBadge + '</div></div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:12px 0 16px">'
     + '<div style="text-align:center;background:#f8fafc;border-radius:8px;padding:12px">'
     + '<div style="font-size:1.6rem;font-weight:800;color:' + sc(e.data.pctAN) + '">' + e.data.an + '</div>'
@@ -10364,9 +10418,9 @@ function renderEntretienCard(e) {
     + '<div style="margin-top:6px"><span style="background:' + pillBg(e.data.pctAN) + ';color:' + pillCol(e.data.pctAN) + ';border-radius:5px;padding:2px 8px;font-size:.73rem;font-weight:600">' + pillTxt(e.data.pctAN) + '</span></div>'
     + '</div>'
     + '<div style="text-align:center;background:#f8fafc;border-radius:8px;padding:12px">'
-    + '<div style="font-size:1.6rem;font-weight:800;color:var(--blue)">' + e.data.tauxConversion + '%</div>'
-    + '<div style="font-size:.75rem;color:#6b7280">Taux conversion devis</div>'
-    + '<div style="font-size:.75rem;margin-top:4px">' + e.data.devisGagnes + ' gagné / ' + e.data.devisTotal + ' devis</div>'
+    + '<div style="font-size:1.6rem;font-weight:800;color:var(--blue)">' + col2Val + '</div>'
+    + '<div style="font-size:.75rem;color:#6b7280">' + col2Lbl + '</div>'
+    + '<div style="font-size:.75rem;margin-top:4px">' + col2Sub + '</div>'
     + '</div>'
     + '<div style="text-align:center;background:#f8fafc;border-radius:8px;padding:12px">'
     + '<div style="font-size:1.6rem;font-weight:800;color:var(--blue)">' + e.data.tauxContact + '%</div>'
@@ -10375,7 +10429,7 @@ function renderEntretienCard(e) {
     + '</div></div>'
     + '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:14px;margin:0 0 4px">'
     + '<div style="font-weight:700;margin-bottom:6px;color:#0369a1">Appréciation</div>'
-    + '<p style="line-height:1.7;color:#1e3a5f;font-size:.9rem;margin:0">' + e.synthese + '</p>'
+    + '<p style="line-height:1.7;color:#1e3a5f;font-size:.9rem;margin:0">' + synthLines + '</p>'
     + '</div></div>';
 }
 
