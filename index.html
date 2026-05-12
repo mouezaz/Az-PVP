@@ -2763,9 +2763,19 @@ function renderLeadsKanban() {
   var isAdmin = currentUser.role === 'admin';
   var today = new Date(); today.setHours(0,0,0,0);
 
+  var _nowM = nowMois(), _nowA = nowAnnee();
   var cols = LEAD_PIPELINE_STAGES.map(function(statut) {
     var meta = LEAD_STATUT_META[statut];
-    var cards = leads.filter(function(l){ return l.statut === statut; });
+    var cards = leads.filter(function(l) {
+      if (l.statut !== statut) return false;
+      // Pour la colonne Contrat signé : n'afficher que les contrats du mois en cours
+      if (statut === 'Contrat signé') {
+        var sM = l.signedMois || (l.signedAt ? parseInt(l.signedAt.slice(5,7)) : null) || (l.updatedAt ? parseInt(l.updatedAt.slice(5,7)) : null);
+        var sA = l.signedAnnee || (l.signedAt ? parseInt(l.signedAt.slice(0,4)) : null) || (l.updatedAt ? parseInt(l.updatedAt.slice(0,4)) : null);
+        if (sM && sA) return sM === _nowM && sA === _nowA;
+      }
+      return true;
+    });
     cards.sort(function(a, b) {
       return sortByUrgence(a, b, today);
     });
@@ -4336,7 +4346,7 @@ PAGES['collab-home'] = function(mc) {
 
     // Relances du jour (leads + prospects combinés)
     var relancesLeads = (DB.leads||[]).filter(function(l){
-      return l.collab===collab && l.rappel && l.rappel<=today && !['Contrat signé','Sans suite'].includes(l.statut);
+      return l.collab===collab && !l.archived && l.rappel && l.rappel<=today && !['Contrat signé','Sans suite'].includes(l.statut);
     });
     var toutesRelances = relances.concat(relancesLeads).sort(function(a,b){ return (a.rappel||'')>(b.rappel||'')?1:-1; });
     // dédoublonner si même client
