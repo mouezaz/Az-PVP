@@ -2764,17 +2764,19 @@ function renderLeadsKanban() {
   var today = new Date(); today.setHours(0,0,0,0);
 
   var _nowM = nowMois(), _nowA = nowAnnee();
+  var filtCollab = getLeadFilterCollab();
+  // Contrats signés du mois en cours (exclus de getFilteredLeadsActive, on les charge séparément)
+  var signedMoisCours = getAllContacts().filter(function(l) {
+    if (l.archived || l.statut !== 'Contrat signé') return false;
+    if (filtCollab && l.collab !== filtCollab) return false;
+    var sM = l.signedMois || (l.signedAt ? new Date(l.signedAt).getMonth()+1 : null) || (l.updatedAt ? new Date(l.updatedAt).getMonth()+1 : null);
+    var sA = l.signedAnnee || (l.signedAt ? new Date(l.signedAt).getFullYear() : null) || (l.updatedAt ? new Date(l.updatedAt).getFullYear() : null);
+    return sM === _nowM && sA === _nowA;
+  });
   var cols = LEAD_PIPELINE_STAGES.map(function(statut) {
     var meta = LEAD_STATUT_META[statut];
-    var cards = leads.filter(function(l) {
-      if (l.statut !== statut) return false;
-      // Pour la colonne Contrat signé : n'afficher que les contrats du mois en cours
-      if (statut === 'Contrat signé') {
-        var sM = l.signedMois || (l.signedAt ? parseInt(l.signedAt.slice(5,7)) : null) || (l.updatedAt ? parseInt(l.updatedAt.slice(5,7)) : null);
-        var sA = l.signedAnnee || (l.signedAt ? parseInt(l.signedAt.slice(0,4)) : null) || (l.updatedAt ? parseInt(l.updatedAt.slice(0,4)) : null);
-        if (sM && sA) return sM === _nowM && sA === _nowA;
-      }
-      return true;
+    var cards = (statut === 'Contrat signé') ? signedMoisCours : leads.filter(function(l) {
+      return l.statut === statut;
     });
     cards.sort(function(a, b) {
       return sortByUrgence(a, b, today);
