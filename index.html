@@ -8112,28 +8112,117 @@ function renderStatsVentes() {
   html += '</tr>';
   html += '</tbody></table></div>';
 
-  // ── Liste détaillée ──
-  html += '<div class="card" style="padding:16px;">';
-  html += '<div style="font-weight:700;font-size:.88rem;color:#1e293b;margin-bottom:12px;">📋 Détail des ventes ('+sorted.length+') — triées par date</div>';
-  html += '<div style="overflow-x:auto;">';
-  html += '<table style="width:100%;border-collapse:collapse;font-size:.82rem;">';
-  html += '<thead><tr style="background:#f8fafc;">';
-  html += '<th style="padding:8px 10px;text-align:left;font-weight:600;color:#374151;">Date</th>';
-  html += '<th style="padding:8px 10px;text-align:left;font-weight:600;color:#374151;">Collab</th>';
-  html += '<th style="padding:8px 10px;text-align:left;font-weight:600;color:#374151;">Client</th>';
-  html += '<th style="padding:8px 10px;text-align:left;font-weight:600;color:#374151;">Produit</th>';
-  html += '<th style="padding:8px 10px;text-align:left;font-weight:600;color:#374151;">Contrat</th>';
-  html += '<th style="padding:8px 10px;text-align:right;font-weight:600;color:#374151;">Prime</th>';
+  // ── Liste détaillée filtrable ──
+  window._svVentes = sorted;
+  window._svSortCol = window._svSortCol || 'date';
+  window._svSortAsc = (window._svSortAsc !== undefined) ? window._svSortAsc : false;
+
+  html += '<div class="card" style="padding:16px;" id="sv-detail-card">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">';
+  html += '<div style="font-weight:700;font-size:.88rem;color:#1e293b;">📋 Détail des ventes</div>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+  html += '<input id="sv-detail-search" type="text" placeholder="🔍 Client, contrat…" oninput="renderSvDetail()" style="font-size:12px;padding:5px 10px;border:1.5px solid #e2e8f0;border-radius:7px;min-width:150px;">';
+  html += '<select id="sv-detail-mois" onchange="renderSvDetail()" style="font-size:12px;padding:5px 8px;border:1.5px solid #e2e8f0;border-radius:7px;">';
+  html += '<option value="">Tous mois</option>';
+  var _ML2=['','Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  for(var _m=1;_m<=12;_m++) html += '<option value="'+_m+'">'+_ML2[_m]+'</option>';
+  html += '</select>';
+  html += '<select id="sv-detail-collab" onchange="renderSvDetail()" style="font-size:12px;padding:5px 8px;border:1.5px solid #e2e8f0;border-radius:7px;">';
+  html += '<option value="">Tous collabs</option>'+getCollabNames().map(function(n){return '<option>'+n+'</option>';}).join('');
+  html += '</select>';
+  html += '<select id="sv-detail-produit" onchange="renderSvDetail()" style="font-size:12px;padding:5px 8px;border:1.5px solid #e2e8f0;border-radius:7px;">';
+  html += '<option value="">Tous produits</option>'+(PRODUITS||[]).map(function(p){return '<option>'+p+'</option>';}).join('');
+  html += '</select>';
+  html += '<select id="sv-detail-an" onchange="renderSvDetail()" style="font-size:12px;padding:5px 8px;border:1.5px solid #e2e8f0;border-radius:7px;">';
+  html += '<option value="">AN + Non</option><option value="Oui">✅ AN seul</option><option value="Non">✕ Non AN</option>';
+  html += '</select>';
+  html += '</div></div>';
+  html += '<div id="sv-detail-table"></div>';
+  html += '</div>';
+
+  document.getElementById('sv-content').innerHTML = html;
+  renderSvDetail();
+}
+
+function renderSvDetail() {
+  var search = ((document.getElementById('sv-detail-search')||{}).value||'').toLowerCase().trim();
+  var fMois   = ((document.getElementById('sv-detail-mois')||{}).value)||'';
+  var fCollab = ((document.getElementById('sv-detail-collab')||{}).value)||'';
+  var fProduit= ((document.getElementById('sv-detail-produit')||{}).value)||'';
+  var fAn     = ((document.getElementById('sv-detail-an')||{}).value)||'';
+  var COLLAB_COLORS = getCollabColors();
+  var ML = ['','Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  var zone = document.getElementById('sv-detail-table');
+  if (!zone) return;
+
+  var data = (window._svVentes||[]).filter(function(v){
+    if (fMois && String(v.mois) !== fMois) return false;
+    if (fCollab && v.collab !== fCollab) return false;
+    if (fProduit && v.produit !== fProduit) return false;
+    if (fAn === 'Oui' && v.affaireNouvelle !== 'Oui') return false;
+    if (fAn === 'Non' && v.affaireNouvelle === 'Oui') return false;
+    if (search) {
+      var hay = ((v.client||'')+' '+(v.contrat||'')+' '+(v.collab||'')+' '+(v.produit||'')).toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  var sc = window._svSortCol||'date', sa = !!window._svSortAsc;
+  data.sort(function(a,b){
+    var va, vb;
+    if (sc==='date')   { va=a.annee*100+a.mois; vb=b.annee*100+b.mois; }
+    else if (sc==='collab')  { va=(a.collab||'').toLowerCase(); vb=(b.collab||'').toLowerCase(); }
+    else if (sc==='client')  { va=(a.client||'').toLowerCase(); vb=(b.client||'').toLowerCase(); }
+    else if (sc==='produit') { va=(a.produit||'').toLowerCase(); vb=(b.produit||'').toLowerCase(); }
+    else if (sc==='prime')   { va=parseFloat(a.prime)||0; vb=parseFloat(b.prime)||0; }
+    else { va=a.annee*100+a.mois; vb=b.annee*100+b.mois; }
+    if (va<vb) return sa?-1:1;
+    if (va>vb) return sa?1:-1;
+    return (a.client||'').localeCompare(b.client||'');
+  });
+
+  var totalFiltré = data.reduce(function(s,v){return s+(parseFloat(v.prime)||0);},0);
+
+  function _th(label, col, align) {
+    var active = window._svSortCol === col;
+    var arrow = active ? (window._svSortAsc ? ' ▲' : ' ▼') : ' ⇅';
+    return '<th onclick="window._svSortCol=\''+col+'\';window._svSortAsc='+(active?'!window._svSortAsc':'false')+';renderSvDetail();" '
+      + 'style="padding:8px 10px;text-align:'+(align||'left')+';font-weight:600;cursor:pointer;user-select:none;white-space:nowrap;'
+      + (active?'background:#eff6ff;color:#003DA5;':'color:#374151;')
+      + '">'
+      + label+'<span style="font-size:.65rem;color:#94a3b8;margin-left:3px;">'+arrow+'</span></th>';
+  }
+
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:.8rem;color:#64748b;">';
+  html += '<span><b style="color:#1e293b;">'+data.length+'</b> vente'+(data.length>1?'s':'')+' affichée'+(data.length>1?'s':'')+'</span>';
+  html += '<span>Total filtré : <b style="color:#003DA5;">'+fmtEuro(totalFiltré)+'</b></span>';
+  html += '</div>';
+
+  if (!data.length) {
+    html += '<div style="padding:30px;text-align:center;color:#9ca3af;font-size:.85rem;border:2px dashed #e5e7eb;border-radius:8px;">Aucune vente ne correspond aux filtres.</div>';
+    zone.innerHTML = html;
+    return;
+  }
+
+  html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.82rem;">';
+  html += '<thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">';
+  html += _th('Date','date');
+  html += _th('Collab','collab');
+  html += _th('Client','client');
+  html += _th('Produit','produit');
+  html += '<th style="padding:8px 10px;font-weight:600;color:#374151;">Contrat</th>';
+  html += _th('Prime','prime','right');
   html += '<th style="padding:8px 10px;text-align:center;font-weight:600;color:#374151;">AN</th>';
   html += '</tr></thead><tbody>';
-  sorted.forEach(function(v){
+
+  data.forEach(function(v,i){
     var col = COLLAB_COLORS[v.collab]||'#6b7280';
-    var dateLabel = (MOIS_LABELS[v.mois]||'?') + ' ' + v.annee;
     var anBadge = v.affaireNouvelle==='Oui'
-      ? '<span style="color:#059669;font-weight:700;font-size:.75rem;">✅</span>'
-      : '<span style="color:#dc2626;font-size:.75rem;">✕</span>';
-    html += '<tr style="border-bottom:1px solid #f8fafc;">';
-    html += '<td style="padding:7px 10px;color:#64748b;white-space:nowrap;">'+dateLabel+'</td>';
+      ? '<span style="color:#059669;font-weight:700;">✅</span>'
+      : '<span style="color:#dc2626;">✕</span>';
+    html += '<tr style="background:'+(i%2===0?'white':'#fafbfc')+';border-bottom:1px solid #f1f5f9;">';
+    html += '<td style="padding:7px 10px;color:#64748b;white-space:nowrap;">'+(ML[v.mois]||'?')+' '+v.annee+'</td>';
     html += '<td style="padding:7px 10px;font-weight:600;color:'+col+';">'+escHtml(v.collab||'')+'</td>';
     html += '<td style="padding:7px 10px;font-weight:600;color:#1e293b;">'+escHtml(v.client||'')+'</td>';
     html += '<td style="padding:7px 10px;"><span style="background:#f1f5f9;border-radius:5px;padding:2px 6px;font-size:.76rem;color:#374151;">'+escHtml(v.produit||'')+'</span></td>';
@@ -8142,9 +8231,8 @@ function renderStatsVentes() {
     html += '<td style="padding:7px 10px;text-align:center;">'+anBadge+'</td>';
     html += '</tr>';
   });
-  html += '</tbody></table></div></div>';
-
-  document.getElementById('sv-content').innerHTML = html;
+  html += '</tbody></table></div>';
+  zone.innerHTML = html;
 }
 
 function _svKpi(label, val, color) {
