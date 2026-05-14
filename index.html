@@ -792,7 +792,7 @@ function _fbListen() {
       'collab-home','collab-ventes','collab-resil',
       'collab-leads','collab-suivi','collab-stats','collab-prospection','collab-formation',
       'collab-decouverte','collab-conges','collab-taches',
-      'admin-dashboard','admin-performance','admin-ventes','admin-resil',
+      'admin-dashboard','admin-performance','admin-ventes','admin-stats-ventes','admin-resil',
       'admin-prospects','admin-commissions','admin-import','admin-export',
       'admin-tel','admin-rh-conges','admin-rh-entretiens','admin-taches',
       'admin-compta','collab-compta'
@@ -1175,6 +1175,7 @@ function buildAdminSidebar() {
   ];
   const commercial = [
     { id: 'admin-ventes',       icon: '📋', label: 'Toutes les ventes' },
+    { id: 'admin-stats-ventes',   icon: '📈', label: 'Stats Ventes' },
     { id: 'admin-resil',        icon: '🛡', label: 'Résiliations' },
     { id: 'admin-prospects',    icon: '🔍', label: 'Prospects & Relances' },
   ];
@@ -7914,6 +7915,244 @@ PAGES['admin-ventes'] = (mc) => {
     <div class="card"><div id="admin-ventes-table"></div></div>`;
   renderAdminVentes();
 };
+
+
+// ---- ADMIN: STATS VENTES ----
+PAGES['admin-stats-ventes'] = (mc) => {
+  mc.innerHTML = `
+    <div class="page-header flex-between">
+      <div><h1>📈 Stats Ventes</h1><p>Qui vend quoi — dates, produits, performances</p></div>
+      <div class="flex-gap" style="flex-wrap:wrap;">
+        <select id="sv-annee" onchange="renderStatsVentes()" style="font-size:13px;padding:7px 10px">
+          ${[2024,2025,2026,2027].map(y=>`<option value="${y}"${y===nowAnnee()?' selected':''}>${y}</option>`).join('')}
+        </select>
+        <select id="sv-collab" onchange="renderStatsVentes()" style="font-size:13px;padding:7px 10px">
+          <option value="">Tous les collabs</option>${getCollabNames().map(n=>`<option>${n}</option>`).join('')}
+        </select>
+        <select id="sv-produit" onchange="renderStatsVentes()" style="font-size:13px;padding:7px 10px">
+          <option value="">Tous les produits</option>${(PRODUITS||[]).map(p=>`<option>${p}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div id="sv-content"></div>`;
+  renderStatsVentes();
+};
+
+function renderStatsVentes() {
+  var annee = parseInt(document.getElementById('sv-annee').value);
+  var filtCollab = document.getElementById('sv-collab').value;
+  var filtProduit = document.getElementById('sv-produit').value;
+  var COLLAB_COLORS = getCollabColors();
+  var MOIS_LABELS = ['','Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+
+  var ventes = (DB.ventes||[]).filter(function(v){
+    if (v.annee !== annee) return false;
+    if (filtCollab && v.collab !== filtCollab) return false;
+    if (filtProduit && v.produit !== filtProduit) return false;
+    return true;
+  });
+
+  if (!ventes.length) {
+    document.getElementById('sv-content').innerHTML = '<div style="padding:60px;text-align:center;color:#9ca3af;font-size:.9rem;">Aucune vente pour cette sélection.</div>';
+    return;
+  }
+
+  // ── Données agrégées ──
+  var collabs = getCollabNames();
+  var totalPrime = ventes.reduce(function(s,v){ return s+(parseFloat(v.prime)||0); }, 0);
+  var totalNb = ventes.length;
+
+  // Par mois
+  var byMois = {};
+  for (var m=1; m<=12; m++) byMois[m] = { nb:0, prime:0 };
+  ventes.forEach(function(v){
+    if (v.mois>=1 && v.mois<=12) { byMois[v.mois].nb++; byMois[v.mois].prime += parseFloat(v.prime)||0; }
+  });
+
+  // Par collab
+  var byCollab = {};
+  ventes.forEach(function(v){
+    if (!byCollab[v.collab]) byCollab[v.collab] = { nb:0, prime:0 };
+    byCollab[v.collab].nb++;
+    byCollab[v.collab].prime += parseFloat(v.prime)||0;
+  });
+
+  // Par produit
+  var byProduit = {};
+  ventes.forEach(function(v){
+    var p = v.produit||'Autre';
+    if (!byProduit[p]) byProduit[p] = { nb:0, prime:0 };
+    byProduit[p].nb++;
+    byProduit[p].prime += parseFloat(v.prime)||0;
+  });
+
+  // Collab × Produit
+  var collabProduit = {};
+  ventes.forEach(function(v){
+    var k = v.collab;
+    if (!collabProduit[k]) collabProduit[k] = {};
+    var p = v.produit||'Autre';
+    if (!collabProduit[k][p]) collabProduit[k][p] = { nb:0, prime:0 };
+    collabProduit[k][p].nb++;
+    collabProduit[k][p].prime += parseFloat(v.prime)||0;
+  });
+
+  // Produits présents
+  var produitsPresents = Object.keys(byProduit).sort(function(a,b){
+    return byProduit[b].prime - byProduit[a].prime;
+  });
+
+  // Mois pic
+  var maxMois = 1;
+  for (var m=1; m<=12; m++) if (byMois[m].prime > byMois[maxMois].prime) maxMois = m;
+
+  // Meilleur collab
+  var bestCollab = Object.keys(byCollab).sort(function(a,b){ return byCollab[b].prime-byCollab[a].prime; })[0];
+
+  // ── Liste détaillée triée par date ──
+  var sorted = ventes.slice().sort(function(a,b){
+    var ma = a.annee*100+a.mois, mb = b.annee*100+b.mois;
+    return ma!==mb ? mb-ma : (a.client||'').localeCompare(b.client||'');
+  });
+
+  // ── Barre mensuelle max ──
+  var maxPrimeMois = Math.max.apply(null, Object.values(byMois).map(function(x){ return x.prime; }));
+
+  var html = '';
+
+  // ── KPI Cards ──
+  html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">';
+  html += _svKpi('💰 Total primes', fmtEuro(totalPrime), '#003DA5');
+  html += _svKpi('📄 Nb ventes', totalNb, '#157A45');
+  html += _svKpi('🏆 Top collab', bestCollab||'—', COLLAB_COLORS[bestCollab]||'#6b7280');
+  html += _svKpi('📅 Mois pic', MOIS_LABELS[maxMois], '#D4711A');
+  html += '</div>';
+
+  // ── Évolution mensuelle ──
+  html += '<div class="card" style="margin-bottom:16px;padding:16px;">';
+  html += '<div style="font-weight:700;font-size:.88rem;color:#1e293b;margin-bottom:12px;">📅 Évolution mensuelle — ' + annee + '</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:80px;">';
+  for (var m=1; m<=12; m++) {
+    var h = maxPrimeMois > 0 ? Math.round((byMois[m].prime/maxPrimeMois)*72) : 0;
+    var isMax = m===maxMois;
+    html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">';
+    html += '<div title="' + MOIS_LABELS[m] + ': ' + fmtEuro(byMois[m].prime) + ' — ' + byMois[m].nb + ' ventes" style="width:100%;background:' + (isMax?'#003DA5':'#93c5fd') + ';height:' + h + 'px;border-radius:4px 4px 0 0;cursor:help;"></div>';
+    html += '<div style="font-size:.6rem;color:#64748b;">' + MOIS_LABELS[m] + '</div>';
+    html += '</div>';
+  }
+  html += '</div></div>';
+
+  // ── Stats par collab ──
+  var collabsSorted = Object.keys(byCollab).sort(function(a,b){ return byCollab[b].prime-byCollab[a].prime; });
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">';
+
+  // Bloc collab
+  html += '<div class="card" style="padding:16px;">';
+  html += '<div style="font-weight:700;font-size:.88rem;color:#1e293b;margin-bottom:12px;">👤 Performance par collaborateur</div>';
+  collabsSorted.forEach(function(c){
+    var pct = totalPrime>0 ? Math.round(byCollab[c].prime/totalPrime*100) : 0;
+    var col = COLLAB_COLORS[c]||'#6b7280';
+    html += '<div style="margin-bottom:10px;">';
+    html += '<div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:3px;">';
+    html += '<span style="font-weight:600;color:'+col+';">'+escHtml(c)+'</span>';
+    html += '<span style="color:#374151;">'+byCollab[c].nb+' ventes &nbsp;|&nbsp; <b>'+fmtEuro(byCollab[c].prime)+'</b> ('+pct+'%)</span>';
+    html += '</div>';
+    html += '<div style="background:#f1f5f9;border-radius:99px;height:8px;">';
+    html += '<div style="background:'+col+';width:'+pct+'%;height:8px;border-radius:99px;transition:width .4s;"></div>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  // Bloc produit
+  html += '<div class="card" style="padding:16px;">';
+  html += '<div style="font-weight:700;font-size:.88rem;color:#1e293b;margin-bottom:12px;">📦 Répartition par produit</div>';
+  var PIE_C = ['#003DA5','#157A45','#C0322B','#D4711A','#6B3FA0','#0F7B7B','#C8960C','#7B2D8B','#1A5CB8','#3A7A3A'];
+  produitsPresents.forEach(function(p, idx){
+    var pct = totalPrime>0 ? Math.round(byProduit[p].prime/totalPrime*100) : 0;
+    var col = PIE_C[idx%PIE_C.length];
+    html += '<div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">';
+    html += '<div style="width:10px;height:10px;border-radius:50%;background:'+col+';flex-shrink:0;"></div>';
+    html += '<div style="flex:1;font-size:.82rem;color:#374151;">'+escHtml(p)+'</div>';
+    html += '<div style="font-size:.82rem;font-weight:600;color:#1e293b;white-space:nowrap;">'+byProduit[p].nb+' &nbsp; '+fmtEuro(byProduit[p].prime)+' &nbsp;<span style="color:#64748b;font-weight:400;">('+pct+'%)</span></div>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+
+  // ── Tableau croisé Collab × Produit ──
+  html += '<div class="card" style="margin-bottom:16px;padding:16px;overflow-x:auto;">';
+  html += '<div style="font-weight:700;font-size:.88rem;color:#1e293b;margin-bottom:12px;">🔀 Qui vend quoi — Tableau croisé (primes €)</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:.8rem;">';
+  html += '<thead><tr style="background:#f8fafc;">';
+  html += '<th style="padding:8px 10px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #e2e8f0;">Collaborateur</th>';
+  produitsPresents.forEach(function(p){ html += '<th style="padding:8px 6px;text-align:right;font-weight:600;color:#374151;border-bottom:2px solid #e2e8f0;">'+escHtml(p)+'</th>'; });
+  html += '<th style="padding:8px 10px;text-align:right;font-weight:700;color:#003DA5;border-bottom:2px solid #e2e8f0;">TOTAL</th>';
+  html += '</tr></thead><tbody>';
+  collabsSorted.forEach(function(c, ci){
+    var col = COLLAB_COLORS[c]||'#6b7280';
+    html += '<tr style="border-bottom:1px solid #f1f5f9;">';
+    html += '<td style="padding:8px 10px;font-weight:700;color:'+col+';">'+escHtml(c)+'</td>';
+    produitsPresents.forEach(function(p){
+      var d = (collabProduit[c]&&collabProduit[c][p]);
+      if (d) {
+        html += '<td style="padding:8px 6px;text-align:right;"><div style="font-size:.78rem;font-weight:600;">'+fmtEuro(d.prime)+'</div><div style="font-size:.68rem;color:#64748b;">'+d.nb+' vte'+(d.nb>1?'s':'')+'</div></td>';
+      } else {
+        html += '<td style="padding:8px 6px;text-align:right;color:#d1d5db;font-size:.75rem;">—</td>';
+      }
+    });
+    html += '<td style="padding:8px 10px;text-align:right;font-weight:700;color:#003DA5;">'+fmtEuro(byCollab[c].prime)+'</td>';
+    html += '</tr>';
+  });
+  // Ligne total
+  html += '<tr style="background:#f0f7ff;border-top:2px solid #bfdbfe;">';
+  html += '<td style="padding:8px 10px;font-weight:700;color:#1e293b;">TOTAL</td>';
+  produitsPresents.forEach(function(p){
+    html += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:#374151;">'+fmtEuro(byProduit[p].prime)+'</td>';
+  });
+  html += '<td style="padding:8px 10px;text-align:right;font-weight:800;color:#003DA5;">'+fmtEuro(totalPrime)+'</td>';
+  html += '</tr>';
+  html += '</tbody></table></div>';
+
+  // ── Liste détaillée ──
+  html += '<div class="card" style="padding:16px;">';
+  html += '<div style="font-weight:700;font-size:.88rem;color:#1e293b;margin-bottom:12px;">📋 Détail des ventes ('+sorted.length+') — triées par date</div>';
+  html += '<div style="overflow-x:auto;">';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:.82rem;">';
+  html += '<thead><tr style="background:#f8fafc;">';
+  html += '<th style="padding:8px 10px;text-align:left;font-weight:600;color:#374151;">Date</th>';
+  html += '<th style="padding:8px 10px;text-align:left;font-weight:600;color:#374151;">Collab</th>';
+  html += '<th style="padding:8px 10px;text-align:left;font-weight:600;color:#374151;">Client</th>';
+  html += '<th style="padding:8px 10px;text-align:left;font-weight:600;color:#374151;">Produit</th>';
+  html += '<th style="padding:8px 10px;text-align:left;font-weight:600;color:#374151;">Contrat</th>';
+  html += '<th style="padding:8px 10px;text-align:right;font-weight:600;color:#374151;">Prime</th>';
+  html += '<th style="padding:8px 10px;text-align:center;font-weight:600;color:#374151;">AN</th>';
+  html += '</tr></thead><tbody>';
+  sorted.forEach(function(v){
+    var col = COLLAB_COLORS[v.collab]||'#6b7280';
+    var dateLabel = (MOIS_LABELS[v.mois]||'?') + ' ' + v.annee;
+    var anBadge = v.affaireNouvelle==='Oui'
+      ? '<span style="color:#059669;font-weight:700;font-size:.75rem;">✅</span>'
+      : '<span style="color:#dc2626;font-size:.75rem;">✕</span>';
+    html += '<tr style="border-bottom:1px solid #f8fafc;">';
+    html += '<td style="padding:7px 10px;color:#64748b;white-space:nowrap;">'+dateLabel+'</td>';
+    html += '<td style="padding:7px 10px;font-weight:600;color:'+col+';">'+escHtml(v.collab||'')+'</td>';
+    html += '<td style="padding:7px 10px;font-weight:600;color:#1e293b;">'+escHtml(v.client||'')+'</td>';
+    html += '<td style="padding:7px 10px;"><span style="background:#f1f5f9;border-radius:5px;padding:2px 6px;font-size:.76rem;color:#374151;">'+escHtml(v.produit||'')+'</span></td>';
+    html += '<td style="padding:7px 10px;font-family:monospace;font-size:.78rem;color:#64748b;">'+escHtml(v.contrat||'—')+'</td>';
+    html += '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#003DA5;">'+fmtEuro(v.prime||0)+'</td>';
+    html += '<td style="padding:7px 10px;text-align:center;">'+anBadge+'</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div></div>';
+
+  document.getElementById('sv-content').innerHTML = html;
+}
+
+function _svKpi(label, val, color) {
+  return '<div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06);">'
+    + '<div style="font-size:.72rem;font-weight:600;color:#64748b;margin-bottom:4px;">'+label+'</div>'
+    + '<div style="font-size:1.25rem;font-weight:800;color:'+(color||'#003DA5')+';">'+val+'</div>'
+    + '</div>';
+}
 
 const PIE_COLORS = ['#003DA5','#157A45','#C0322B','#D4711A','#6B3FA0','#0F7B7B','#C8960C','#7B2D8B','#1A5CB8','#3A7A3A'];
 
