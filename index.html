@@ -7203,7 +7203,45 @@ function renderAdminDashboard() {
       </div>`;
     })()}
 
-    <!-- 2. TABLEAU ÉCONOMIQUE DU MOIS - Hero section with KPIs -->
+    <!-- 2. CHALLENGE widget -->
+    ${buildChallengeAdminWidget()}
+
+    <!-- 3. PRÉSENCES + TÂCHES: Tâches widget + Présences équipe -->
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;margin-bottom:12px;">
+      <!-- LEFT: Tâches dashboard -->
+      <div>
+        ${buildDashboardTachesWidget()}
+      </div>
+
+      <!-- RIGHT: Présences équipe -->
+      <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+        <div style="font-weight:700;font-size:.9rem;color:#1f2937;margin-bottom:12px;">👥 Présences équipe</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${(()=>{
+            const colorsMap = getCollabColors();
+            return getCollabNames().map(function(n){
+              const absent = isAbsent(n);
+              const pl = (DB.leads||[]).filter(function(l){return l.collab===n && ['À contacter','Contacté — en attente'].includes(l.statut);}).length;
+              const pd = (DB.devis||[]).filter(function(d){return d.collab===n && !['Gagné','Perdu','Abandonné'].includes(d.statut);}).length;
+              const tot = pl + pd;
+              const bg  = absent ? '#fef3c7' : '#f0fdf4';
+              const br  = absent ? '#f59e0b' : '#86efac';
+              const btnBg = absent ? '#d97706' : '#16a34a';
+              const btnLbl = absent ? '🏖️' : '✅';
+              const initials = n.slice(0,2).toUpperCase();
+              const col = colorsMap[n] || '#6b7280';
+              return '<div style="display:flex;align-items:center;gap:10px;background:' + bg + ';border:1.5px solid ' + br + ';border-radius:10px;padding:9px 12px;font-size:.78rem;">'
+                + '<div style="width:24px;height:24px;border-radius:50%;background:' + col + ';color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">' + initials + '</div>'
+                + '<div style="flex:1;"><div style="font-weight:600;">' + n + '</div><div style="color:#6b7280;font-size:.7rem;">📞' + pl + ' 📋' + pd + '</div></div>'
+                + '<button onclick="toggleAbsence(\'' + n + '\')" style="background:' + btnBg + ';color:white;border:none;border-radius:6px;padding:3px 8px;font-size:.75rem;font-weight:600;cursor:pointer;">' + btnLbl + '</button>'
+                + '</div>';
+            }).join('');
+          })()}
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. BILAN DU MOIS DU MOIS - Hero section with KPIs -->
     <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
         <div style="font-weight:700;font-size:1rem;color:#1f2937;">📊 Bilan du mois — ${MOIS_FULL[mois]} ${annee}</div>
@@ -7283,7 +7321,7 @@ function renderAdminDashboard() {
       </div>
     </div>
 
-    <!-- 3. OBJECTIFS ÉQUIPE - Compact white card -->
+    <!-- 5. OBJECTIFS ÉQUIPE - Compact white card -->
     <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
       <div style="font-weight:700;font-size:.95rem;color:#1f2937;margin-bottom:14px;">🎯 Objectifs — ${MOIS_FULL[mois]}</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
@@ -7309,54 +7347,6 @@ function renderAdminDashboard() {
         }).join('')}
       </div>
     </div>
-
-    <!-- 4. Two-column grid: Tâches widget + Présences équipe -->
-    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;margin-bottom:12px;">
-      <!-- LEFT: Tâches dashboard -->
-      <div>
-        ${buildDashboardTachesWidget()}
-      </div>
-
-      <!-- RIGHT: Présences équipe -->
-      <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
-        <div style="font-weight:700;font-size:.9rem;color:#1f2937;margin-bottom:12px;">👥 Présences équipe</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          ${(()=>{
-            const colorsMap = getCollabColors();
-            return getCollabNames().map(function(n){
-              const absent = isAbsent(n);
-              const pl = (DB.leads||[]).filter(function(l){return l.collab===n && ['À contacter','Contacté — en attente'].includes(l.statut);}).length;
-              const pd = (DB.devis||[]).filter(function(d){return d.collab===n && !['Gagné','Perdu','Abandonné'].includes(d.statut);}).length;
-              const tot = pl + pd;
-              const bg  = absent ? '#fef3c7' : '#f0fdf4';
-              const br  = absent ? '#f59e0b' : '#86efac';
-              const btnBg = absent ? '#d97706' : '#16a34a';
-              const btnLbl = absent ? '🏖️' : '✅';
-              const initials = n.slice(0,2).toUpperCase();
-              const col = colorsMap[n] || '#6b7280';
-              return '<div style="display:flex;align-items:center;gap:10px;background:' + bg + ';border:1.5px solid ' + br + ';border-radius:10px;padding:9px 12px;font-size:.78rem;">'
-                + '<div style="width:24px;height:24px;border-radius:50%;background:' + col + ';color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">' + initials + '</div>'
-                + '<div style="flex:1;"><div style="font-weight:600;">' + n + '</div><div style="color:#6b7280;font-size:.7rem;">📞' + pl + ' 📋' + pd + '</div></div>'
-                + '<button onclick="toggleAbsence(\'' + n + '\')" style="background:' + btnBg + ';color:white;border:none;border-radius:6px;padding:3px 8px;font-size:.75rem;font-weight:600;cursor:pointer;">' + btnLbl + '</button>'
-                + '</div>';
-            }).join('');
-          })()}
-        </div>
-      </div>
-    </div>
-
-    <!-- GUIDE OPÉRATIONNEL -->
-    <div onclick="openGuide()" style="display:flex;align-items:center;gap:14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-bottom:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06);" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.06)'">
-      <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#003DA5,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;">📖</div>
-      <div style="flex:1;">
-        <div style="font-weight:700;font-size:.92rem;color:#1f2937;">Guide opérationnel agence Essid</div>
-        <div style="font-size:.78rem;color:#6b7280;margin-top:2px;">Procédures, produits, tarification, conseils</div>
-      </div>
-      <span style="font-size:.82rem;color:#1d4ed8;font-weight:700;white-space:nowrap;background:#eff6ff;padding:6px 14px;border-radius:8px;">Ouvrir →</span>
-    </div>
-
-    <!-- 5. CHALLENGE widget -->
-    ${buildChallengeAdminWidget()}
 
     <!-- 6. CARTES COLLABORATRICES -->
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
@@ -7456,7 +7446,17 @@ function renderAdminDashboard() {
       </div>
     </div>
 
-    <!-- 8. DEVIS BLOC -->
+    <!-- 9. GUIDE OPÉRATIONNEL -->
+    <div onclick="openGuide()" style="display:flex;align-items:center;gap:14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-bottom:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06);" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.06)'">
+      <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#003DA5,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;">📖</div>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:.92rem;color:#1f2937;">Guide opérationnel agence Essid</div>
+        <div style="font-size:.78rem;color:#6b7280;margin-top:2px;">Procédures, produits, tarification, conseils</div>
+      </div>
+      <span style="font-size:.82rem;color:#1d4ed8;font-weight:700;white-space:nowrap;background:#eff6ff;padding:6px 14px;border-radius:8px;">Ouvrir →</span>
+    </div>
+
+    <!-- 10. DEVIS BLOC -->
     <div class="card">
       <div class="card-header"><div class="card-title"><div class="card-icon">📋</div>Devis en cours — Équipe</div></div>
       ${renderAdminDevisBlock()}
