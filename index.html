@@ -7206,42 +7206,7 @@ function renderAdminDashboard() {
     <!-- 2. CHALLENGE widget -->
     ${buildChallengeAdminWidget()}
 
-    <!-- 3. PRÉSENCES + TÂCHES: Tâches widget + Présences équipe -->
-    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;margin-bottom:12px;">
-      <!-- LEFT: Tâches dashboard -->
-      <div>
-        ${buildDashboardTachesWidget()}
-      </div>
-
-      <!-- RIGHT: Présences équipe -->
-      <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
-        <div style="font-weight:700;font-size:.9rem;color:#1f2937;margin-bottom:12px;">👥 Présences équipe</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          ${(()=>{
-            const colorsMap = getCollabColors();
-            return getCollabNames().map(function(n){
-              const absent = isAbsent(n);
-              const pl = (DB.leads||[]).filter(function(l){return l.collab===n && ['À contacter','Contacté — en attente'].includes(l.statut);}).length;
-              const pd = (DB.devis||[]).filter(function(d){return d.collab===n && !['Gagné','Perdu','Abandonné'].includes(d.statut);}).length;
-              const tot = pl + pd;
-              const bg  = absent ? '#fef3c7' : '#f0fdf4';
-              const br  = absent ? '#f59e0b' : '#86efac';
-              const btnBg = absent ? '#d97706' : '#16a34a';
-              const btnLbl = absent ? '🏖️' : '✅';
-              const initials = n.slice(0,2).toUpperCase();
-              const col = colorsMap[n] || '#6b7280';
-              return '<div style="display:flex;align-items:center;gap:10px;background:' + bg + ';border:1.5px solid ' + br + ';border-radius:10px;padding:9px 12px;font-size:.78rem;">'
-                + '<div style="width:24px;height:24px;border-radius:50%;background:' + col + ';color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">' + initials + '</div>'
-                + '<div style="flex:1;"><div style="font-weight:600;">' + n + '</div><div style="color:#6b7280;font-size:.7rem;">📞' + pl + ' 📋' + pd + '</div></div>'
-                + '<button onclick="toggleAbsence(\'' + n + '\')" style="background:' + btnBg + ';color:white;border:none;border-radius:6px;padding:3px 8px;font-size:.75rem;font-weight:600;cursor:pointer;">' + btnLbl + '</button>'
-                + '</div>';
-            }).join('');
-          })()}
-        </div>
-      </div>
-    </div>
-
-    <!-- 4. BILAN DU MOIS DU MOIS - Hero section with KPIs -->
+    <!-- 3. BILAN DU MOIS DU MOIS - Hero section with KPIs -->
     <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
         <div style="font-weight:700;font-size:1rem;color:#1f2937;">📊 Bilan du mois — ${MOIS_FULL[mois]} ${annee}</div>
@@ -7321,39 +7286,7 @@ function renderAdminDashboard() {
       </div>
     </div>
 
-    <!-- 5. OBJECTIFS ÉQUIPE - Compact white card -->
-    <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
-      <div style="font-weight:700;font-size:.95rem;color:#1f2937;margin-bottom:14px;">🎯 Objectifs — ${MOIS_FULL[mois]}</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        ${collabData.map(cd=>{
-          const objStatus = getObjectifsStatus(cd.name, mois, annee);
-          const commStatus = calcCommissionCollabMensuel(cd.name, mois, annee);
-          const allOK = objStatus.autoOK && objStatus.mrhOK && objStatus.nopOK;
-          const pctAuto = Math.min(100, Math.round(objStatus.nbAuto/10*100));
-          const pctMRH = Math.min(100, Math.round(objStatus.nbMRH/8*100));
-          const pctNOP = Math.min(100, Math.round(objStatus.nbNOP/4*100));
-          return `<div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--gray-50);border-radius:10px;">
-            <div style="width:32px;height:32px;border-radius:50%;background:${cd.color};color:white;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;">${cd.init}</div>
-            <div style="flex:1;">
-              <div style="font-weight:600;font-size:.85rem;color:#1f2937;margin-bottom:4px;">${cd.name}</div>
-              <div style="display:flex;gap:8px;font-size:.75rem;">
-                <span style="background:white;padding:2px 8px;border-radius:6px;color:#003DA5;">Auto: ${objStatus.nbAuto}/10</span>
-                <span style="background:white;padding:2px 8px;border-radius:6px;color:#15803D;">MRH: ${objStatus.nbMRH}/8</span>
-                <span style="background:white;padding:2px 8px;border-radius:6px;color:#6D28D9;">NOP: ${objStatus.nbNOP}/4</span>
-              </div>
-            </div>
-            <div style="text-align:right;font-weight:700;font-size:.85rem;padding:6px 12px;border-radius:8px;${allOK?'background:#f0fdf4;color:#15803d;':'background:white;color:#6b7280;'}">${allOK?'✅ Comm.':commStatus>0?fmtEuro(commStatus):'🔒'}</div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
-
-    <!-- 6. CARTES COLLABORATRICES -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
-      ${collabData.map(cd=>mkCard(cd)).join('')}
-    </div>
-
-    <!-- 7. GRAPHIQUE MENSUEL -->
+    <!-- 4. GRAPHIQUE MENSUEL -->
     <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
         <span style="font-size:13px;font-weight:600;color:var(--gray-800)">📊 Activité mensuelle ${annee} — AN vs Résiliations</span>
@@ -7395,7 +7328,7 @@ function renderAdminDashboard() {
       </div>
     </div>
 
-    <!-- 8. TABLEAU MENSUEL COMPLET -->
+    <!-- 5. TABLEAU MENSUEL COMPLET -->
     <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden">
       <div style="padding:12px 18px;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between">
         <span style="font-size:13px;font-weight:600;color:var(--gray-800)">Tableau mensuel complet ${annee}</span>
@@ -7446,7 +7379,80 @@ function renderAdminDashboard() {
       </div>
     </div>
 
-    <!-- 9. GUIDE OPÉRATIONNEL -->
+    <!-- 6. OBJECTIFS ÉQUIPE - Compact white card -->
+    <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+      <div style="font-weight:700;font-size:.95rem;color:#1f2937;margin-bottom:14px;">🎯 Objectifs — ${MOIS_FULL[mois]}</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${collabData.map(cd=>{
+          const objStatus = getObjectifsStatus(cd.name, mois, annee);
+          const commStatus = calcCommissionCollabMensuel(cd.name, mois, annee);
+          const allOK = objStatus.autoOK && objStatus.mrhOK && objStatus.nopOK;
+          const pctAuto = Math.min(100, Math.round(objStatus.nbAuto/10*100));
+          const pctMRH = Math.min(100, Math.round(objStatus.nbMRH/8*100));
+          const pctNOP = Math.min(100, Math.round(objStatus.nbNOP/4*100));
+          return `<div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--gray-50);border-radius:10px;">
+            <div style="width:32px;height:32px;border-radius:50%;background:${cd.color};color:white;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;">${cd.init}</div>
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:.85rem;color:#1f2937;margin-bottom:4px;">${cd.name}</div>
+              <div style="display:flex;gap:8px;font-size:.75rem;">
+                <span style="background:white;padding:2px 8px;border-radius:6px;color:#003DA5;">Auto: ${objStatus.nbAuto}/10</span>
+                <span style="background:white;padding:2px 8px;border-radius:6px;color:#15803D;">MRH: ${objStatus.nbMRH}/8</span>
+                <span style="background:white;padding:2px 8px;border-radius:6px;color:#6D28D9;">NOP: ${objStatus.nbNOP}/4</span>
+              </div>
+            </div>
+            <div style="text-align:right;font-weight:700;font-size:.85rem;padding:6px 12px;border-radius:8px;${allOK?'background:#f0fdf4;color:#15803d;':'background:white;color:#6b7280;'}">${allOK?'✅ Comm.':commStatus>0?fmtEuro(commStatus):'🔒'}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- 7. CARTES COLLABORATRICES -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
+      ${collabData.map(cd=>mkCard(cd)).join('')}
+    </div>
+
+    <!-- 8. DEVIS BLOC -->
+    <div class="card">
+      <div class="card-header"><div class="card-title"><div class="card-icon">📋</div>Devis en cours — Équipe</div></div>
+      ${renderAdminDevisBlock()}
+    </div>
+
+    <!-- 9. PRÉSENCES + TÂCHES: Tâches widget + Présences équipe -->
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;margin-bottom:12px;">
+      <!-- LEFT: Tâches dashboard -->
+      <div>
+        ${buildDashboardTachesWidget()}
+      </div>
+
+      <!-- RIGHT: Présences équipe -->
+      <div style="background:white;border:1px solid var(--gray-100);border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+        <div style="font-weight:700;font-size:.9rem;color:#1f2937;margin-bottom:12px;">👥 Présences équipe</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${(()=>{
+            const colorsMap = getCollabColors();
+            return getCollabNames().map(function(n){
+              const absent = isAbsent(n);
+              const pl = (DB.leads||[]).filter(function(l){return l.collab===n && ['À contacter','Contacté — en attente'].includes(l.statut);}).length;
+              const pd = (DB.devis||[]).filter(function(d){return d.collab===n && !['Gagné','Perdu','Abandonné'].includes(d.statut);}).length;
+              const tot = pl + pd;
+              const bg  = absent ? '#fef3c7' : '#f0fdf4';
+              const br  = absent ? '#f59e0b' : '#86efac';
+              const btnBg = absent ? '#d97706' : '#16a34a';
+              const btnLbl = absent ? '🏖️' : '✅';
+              const initials = n.slice(0,2).toUpperCase();
+              const col = colorsMap[n] || '#6b7280';
+              return '<div style="display:flex;align-items:center;gap:10px;background:' + bg + ';border:1.5px solid ' + br + ';border-radius:10px;padding:9px 12px;font-size:.78rem;">'
+                + '<div style="width:24px;height:24px;border-radius:50%;background:' + col + ';color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">' + initials + '</div>'
+                + '<div style="flex:1;"><div style="font-weight:600;">' + n + '</div><div style="color:#6b7280;font-size:.7rem;">📞' + pl + ' 📋' + pd + '</div></div>'
+                + '<button onclick="toggleAbsence(\'' + n + '\')" style="background:' + btnBg + ';color:white;border:none;border-radius:6px;padding:3px 8px;font-size:.75rem;font-weight:600;cursor:pointer;">' + btnLbl + '</button>'
+                + '</div>';
+            }).join('');
+          })()}
+        </div>
+      </div>
+    </div>
+
+    <!-- 10. GUIDE OPÉRATIONNEL -->
     <div onclick="openGuide()" style="display:flex;align-items:center;gap:14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-bottom:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06);" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.06)'">
       <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#003DA5,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;">📖</div>
       <div style="flex:1;">
@@ -7456,11 +7462,7 @@ function renderAdminDashboard() {
       <span style="font-size:.82rem;color:#1d4ed8;font-weight:700;white-space:nowrap;background:#eff6ff;padding:6px 14px;border-radius:8px;">Ouvrir →</span>
     </div>
 
-    <!-- 10. DEVIS BLOC -->
-    <div class="card">
-      <div class="card-header"><div class="card-title"><div class="card-icon">📋</div>Devis en cours — Équipe</div></div>
-      ${renderAdminDevisBlock()}
-    </div>`;
+`;
 }
 
 function refreshDashboard() { renderAdminDashboard(); }
