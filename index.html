@@ -7604,7 +7604,8 @@ PAGES['admin-commissions'] = (mc) => {
       </td>
       <td style="text-align:center">${c.nbM}</td>
       <td style="text-align:right;color:#059669;font-weight:600">${fmtEuro(c.commGrossM)}</td>
-      <td style="text-align:right;font-weight:700;background:#f0fdf4;border-radius:4px">${fmtEuro(c.commNetM)}</td>
+      <td style="text-align:right;color:#6b7280;font-size:11px">—</td>
+      <td style="text-align:right;font-weight:700;background:#f0fdf4;border-radius:4px">${fmtEuro(c.commGrossM)}</td>
       <td style="text-align:right">
         <div style="font-size:10px;line-height:1.6">
           ${Object.entries(c.prods).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,3).map(([p,v])=>`<span style="display:inline-block;background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 5px;margin:1px;">${p} ${fmtEuro(v)}</span>`).join('')}
@@ -7728,6 +7729,7 @@ PAGES['admin-commissions'] = (mc) => {
           <th>Collaborateur</th>
           <th style="text-align:center">Contrats</th>
           <th style="text-align:right;color:#059669">Comm. brute</th>
+          <th style="text-align:right;color:#dc2626">Résil. agence</th>
           <th style="text-align:right">Comm. nette</th>
           <th>Répartition produits</th>
         </tr></thead>
@@ -7736,6 +7738,7 @@ PAGES['admin-commissions'] = (mc) => {
           <td>Total équipe</td>
           <td style="text-align:center">${ventesM.length}</td>
           <td style="text-align:right;color:#059669">${fmtEuro(commM)}</td>
+          <td style="text-align:right;color:#dc2626;font-weight:700">${commResM>0?'- '+fmtEuro(commResM):'—'}</td>
           <td style="text-align:right;font-weight:800">${fmtEuro(commNetM)}</td>
           <td></td>
         </tfoot>
