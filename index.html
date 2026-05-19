@@ -11114,6 +11114,8 @@ function saveConge() {
   const fin   = document.getElementById('cg-fin').value;
   const type  = document.getElementById('cg-type').value;
   const motif = document.getElementById('cg-motif').value.trim();
+  const debutDemi = !!(document.getElementById('cg-debut-demi')||{}).checked;
+  const finDemi   = !!(document.getElementById('cg-fin-demi')||{}).checked;
   if (!debut || !fin) { toast('Veuillez saisir les dates de début et fin', 'error'); return; }
   if (new Date(fin) < new Date(debut)) { toast('La date de fin doit être après la date de début', 'error'); return; }
   if (!DB.conges) DB.conges = [];
@@ -11124,6 +11126,8 @@ function saveConge() {
     collab: currentUser.name,
     dateDebut: debut,
     dateFin: fin,
+    debutDemi: debutDemi || undefined,
+    finDemi:   finDemi   || undefined,
     type,
     motif,
     statut: 'En attente',
@@ -11148,6 +11152,98 @@ function updateCongeStatut(id, statut) {
   try { updateCongeBadge(); } catch(e){}
   toast(statut === 'Approuvé' ? '✅ Congé approuvé' : '❌ Congé refusé', statut === 'Approuvé' ? 'success' : 'error');
   showPage('admin-rh-conges');
+}
+
+function openEditCongeModal(id) {
+  var cg = (DB.conges||[]).find(function(c){ return c.id===id; });
+  if (!cg) return;
+  var isAdmin = currentUser && currentUser.role === 'admin';
+  var collabs = isAdmin ? getCollabNames().filter(function(n){ return n!=='Admin'; }) : [cg.collab];
+  var collabOpts = collabs.map(function(n){ return '<option value="'+n+'"'+(n===cg.collab?' selected':'')+'>'+n+'</option>'; }).join('');
+  var typeOpts = ['Congés payés','Récupération (½ journée)','Récupération (journée entière)','Congé sans solde','Congé exceptionnel','Arrêt maladie']
+    .map(function(t){ return '<option'+(t===cg.type?' selected':'')+'>'+t+'</option>'; }).join('');
+  var statutOpts = isAdmin
+    ? ['Approuvé','En attente','Refusé'].map(function(s){ return '<option'+(s===cg.statut?' selected':'')+'>'+s+'</option>'; }).join('')
+    : '<option selected>'+cg.statut+'</option>';
+
+  var modal = document.createElement('div');
+  modal.id = 'edit-conge-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  modal.innerHTML = '<div style="background:white;border-radius:14px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.3);">'
+    + '<div style="background:#3b82f6;color:white;padding:14px 20px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;">'
+    + '<div style="font-weight:800;font-size:1rem;">✏️ Modifier le congé</div>'
+    + '<button onclick="document.getElementById('edit-conge-modal').remove()" style="background:rgba(255,255,255,.2);border:none;color:white;border-radius:50%;width:28px;height:28px;cursor:pointer;">✕</button>'
+    + '</div>'
+    + '<div style="padding:20px;display:flex;flex-direction:column;gap:12px;">'
+    + (isAdmin ? '<div><label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Collaboratrice</label><select id="ec-collab" class="form-input">'+collabOpts+'</select></div>' : '')
+    + '<div><label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Type</label><select id="ec-type" class="form-input">'+typeOpts+'</select></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+    + '<div><label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Date de début</label>'
+    + '<input type="date" id="ec-debut" value="'+cg.dateDebut+'" class="form-input" oninput="ecUpdatePreview()">'
+    + '<label style="display:flex;align-items:center;gap:5px;margin-top:5px;font-size:.76rem;color:#6b7280;cursor:pointer;">'
+    + '<input type="checkbox" id="ec-debut-demi"'+(cg.debutDemi?' checked':'')+' onchange="ecUpdatePreview()"> Départ après-midi (½j)</label></div>'
+    + '<div><label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Date de fin</label>'
+    + '<input type="date" id="ec-fin" value="'+cg.dateFin+'" class="form-input" oninput="ecUpdatePreview()">'
+    + '<label style="display:flex;align-items:center;gap:5px;margin-top:5px;font-size:.76rem;color:#6b7280;cursor:pointer;">'
+    + '<input type="checkbox" id="ec-fin-demi"'+(cg.finDemi?' checked':'')+' onchange="ecUpdatePreview()"> Retour le matin (½j)</label></div>'
+    + '</div>'
+    + '<div style="background:#f0f9ff;border-radius:8px;padding:8px 12px;font-size:.82rem;font-weight:700;color:#1e40af;" id="ec-preview"></div>'
+    + (isAdmin ? '<div><label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Statut</label><select id="ec-statut" class="form-input">'+statutOpts+'</select></div>' : '')
+    + '<div><label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Commentaire</label>'
+    + '<input type="text" id="ec-motif" class="form-input" value="'+(cg.motif||'')+'" placeholder="Optionnel…"></div>'
+    + (isAdmin ? '<div><label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Réponse admin</label>'
+    + '<input type="text" id="ec-rep" class="form-input" value="'+(cg.commentaireAdmin||'')+'" placeholder="Optionnel…"></div>' : '')
+    + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+    + '<button onclick="document.getElementById('edit-conge-modal').remove()" style="padding:10px 20px;border:1.5px solid #e5e7eb;border-radius:10px;background:white;font-weight:600;cursor:pointer;">Annuler</button>'
+    + '<button onclick="saveEditConge(''+id+'')" style="padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:10px;font-weight:700;cursor:pointer;">💾 Enregistrer</button>'
+    + '</div></div></div>';
+  document.body.appendChild(modal);
+  setTimeout(function(){ ecUpdatePreview(); }, 50);
+}
+
+function ecUpdatePreview() {
+  var debut = (document.getElementById('ec-debut')||{}).value;
+  var fin   = (document.getElementById('ec-fin')||{}).value;
+  var dd    = !!(document.getElementById('ec-debut-demi')||{}).checked;
+  var fd    = !!(document.getElementById('ec-fin-demi')||{}).checked;
+  var el    = document.getElementById('ec-preview');
+  if (!el) return;
+  if (!debut || !fin || new Date(fin) < new Date(debut)) { el.textContent = ''; return; }
+  var nb = countJoursOuvrables(debut, fin);
+  if (dd) nb -= 0.5;
+  if (fd) nb -= 0.5;
+  nb = Math.max(0, Math.round(nb*10)/10);
+  el.textContent = '📅 ' + nb + ' jour' + (nb > 1 ? 's' : '') + ' ouvrable' + (nb > 1 ? 's' : '');
+}
+
+function saveEditConge(id) {
+  var cg = (DB.conges||[]).find(function(c){ return c.id===id; });
+  if (!cg) return;
+  var isAdmin = currentUser && currentUser.role === 'admin';
+  var debut = (document.getElementById('ec-debut')||{}).value;
+  var fin   = (document.getElementById('ec-fin')||{}).value;
+  if (!debut || !fin) { toast('Dates requises', 'error'); return; }
+  if (new Date(fin) < new Date(debut)) { toast('La date de fin doit être après le début', 'error'); return; }
+  cg.dateDebut  = debut;
+  cg.dateFin    = fin;
+  cg.debutDemi  = !!(document.getElementById('ec-debut-demi')||{}).checked || undefined;
+  cg.finDemi    = !!(document.getElementById('ec-fin-demi')||{}).checked || undefined;
+  cg.type       = (document.getElementById('ec-type')||{}).value || cg.type;
+  cg.motif      = ((document.getElementById('ec-motif')||{}).value||'').trim();
+  if (isAdmin) {
+    cg.statut           = (document.getElementById('ec-statut')||{}).value || cg.statut;
+    cg.commentaireAdmin = ((document.getElementById('ec-rep')||{}).value||'').trim();
+    if (cg.collab !== (document.getElementById('ec-collab')||{}).value) {
+      cg.collab = document.getElementById('ec-collab').value;
+    }
+    if (cg.statut === 'Approuvé') cg.dateReponse = cg.dateReponse || new Date().toISOString();
+  }
+  cg.modifiedAt = new Date().toISOString();
+  saveDB(DB);
+  try { updateCongeBadge(); } catch(e){}
+  document.getElementById('edit-conge-modal').remove();
+  toast('Congé modifié ✅', 'success');
+  showPage(isAdmin ? 'admin-rh-conges' : 'collab-conges');
 }
 
 function annulerConge(id) {
@@ -11341,7 +11437,11 @@ function countJoursOuvrables(debut,fin) {
 }
 function countJoursConge(c) {
   if(!c.dateDebut||!c.dateFin) return 0;
-  return countJoursOuvrables(c.dateDebut,c.dateFin);
+  var nb = countJoursOuvrables(c.dateDebut,c.dateFin);
+  // Demi-journées : déduire 0.5 par extrémité si demi-journée
+  if(c.debutDemi) nb -= 0.5;
+  if(c.finDemi)   nb -= 0.5;
+  return Math.max(0, Math.round(nb*10)/10);
 }
 // ---- Périodes de référence congés : 1 juin → 31 mai ----
 // Les droits acquis de juin N à mai N+1 sont UTILISABLES de juin N+1 à mai N+2
@@ -11562,7 +11662,12 @@ function updateJoursPreview() {
   var badge=document.getElementById('cg-retro-badge');
   if(!el) return;
   if(!debut||!fin||new Date(fin)<new Date(debut)){el.textContent='';if(badge)badge.style.display='none';return;}
-  var nb=countJoursOuvrables(debut,fin);
+  var debutDemi = (document.getElementById('cg-debut-demi')||{}).checked;
+  var finDemi   = (document.getElementById('cg-fin-demi')||{}).checked;
+  var nb = countJoursOuvrables(debut,fin);
+  if(debutDemi) nb -= 0.5;
+  if(finDemi)   nb -= 0.5;
+  nb = Math.max(0, Math.round(nb*10)/10);
   el.textContent=nb+' jour'+(nb>1?'s':'')+' ouvrable'+(nb>1?'s':'');
   // Retroactive check: dates before current utilization period
   if(badge){
@@ -12000,8 +12105,8 @@ PAGES['collab-conges'] = function(mc) {
   var utilPStart = getUtilPeriod().start;
   var formHtml = '<div class="card"><div class="card-header"><div class="card-title">📤 Nouvelle demande</div></div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:4px 0 12px">'
-    + '<div class="form-group"><label class="fl">Date de début</label><input type="date" id="cg-debut" class="form-input" oninput="updateJoursPreview()"></div>'
-    + '<div class="form-group"><label class="fl">Date de fin</label><input type="date" id="cg-fin" class="form-input" oninput="updateJoursPreview()"></div>'
+    + '<div class="form-group"><label class="fl">Date de début</label><input type="date" id="cg-debut" class="form-input" oninput="updateJoursPreview()"><label style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:.78rem;color:#6b7280;cursor:pointer"><input type="checkbox" id="cg-debut-demi" onchange="updateJoursPreview()"> Départ en après-midi (½j)</label></div>'
+    + '<div class="form-group"><label class="fl">Date de fin</label><input type="date" id="cg-fin" class="form-input" oninput="updateJoursPreview()"><label style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:.78rem;color:#6b7280;cursor:pointer"><input type="checkbox" id="cg-fin-demi" onchange="updateJoursPreview()"> Retour le matin (½j)</label></div>'
     + '<div class="form-group"><label class="fl">Type</label><select id="cg-type" class="form-input"><option>Congés payés</option><option>Récupération (½ journée)</option><option>Récupération (journée entière)</option><option>Congé sans solde</option><option>Congé exceptionnel</option><option>Arrêt maladie</option></select></div>'
     + '<div class="form-group"><label class="fl">Commentaire (optionnel)</label><input type="text" id="cg-motif" class="form-input" placeholder="Ex : vacances été…"></div>'
     + '</div>'
@@ -12043,6 +12148,7 @@ PAGES['collab-conges'] = function(mc) {
       +'<span style="font-size:.85rem;color:#6b7280">'+new Date(c.dateDebut+'T12:00:00').toLocaleDateString('fr-FR')+' → '+new Date(c.dateFin+'T12:00:00').toLocaleDateString('fr-FR')+'</span>'
       +'<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:2px 8px;font-size:.78rem;font-weight:700">'+countJoursConge(c)+'j ouvrés</span>'
       +'</div>'
+      +'<button onclick="openEditCongeModal(\''+c.id+'\')" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:4px 12px;font-size:.78rem;cursor:pointer;white-space:nowrap">✏️ Modifier</button>'
       +(canCancel ? '<button onclick="annulerConge(\''+c.id+'\')" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;border-radius:6px;padding:4px 12px;font-size:.78rem;cursor:pointer;white-space:nowrap">🗑 Annuler</button>' : '')
       +'</div>'
       +(c.motif ? '<div style="font-size:.83rem;color:#374151;margin-bottom:4px">📝 <strong>Motif :</strong> '+c.motif+'</div>' : '')
@@ -12416,6 +12522,7 @@ PAGES['admin-rh-conges'] = function(mc) {
               + '<input type="text" id="rep-'+c.id+'" placeholder="Commentaire (optionnel)" style="padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.8rem;width:180px">'
               + '<button onclick="updateCongeStatut(&quot;'+c.id+'&quot;,&quot;Approuvé&quot;)" class="btn btn-sm" style="background:#16a34a;color:white;border:none;cursor:pointer">✅ Approuver</button>'
               + '<button onclick="updateCongeStatut(&quot;'+c.id+'&quot;,&quot;Refusé&quot;)" class="btn btn-sm" style="background:#dc2626;color:white;border:none;cursor:pointer">❌ Refuser</button>'
+              + '<button onclick="openEditCongeModal(&quot;'+c.id+'&quot;)" class="btn btn-sm" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;cursor:pointer">✏️ Modifier</button>'
               + '</div></div>';
           }).join('')
         + '</div></div>';
@@ -12605,6 +12712,7 @@ PAGES['admin-rh-conges'] = function(mc) {
             + '<input type="text" id="rep-'+c.id+'" placeholder="Commentaire (optionnel)" style="padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.8rem;width:180px">'
             + '<button onclick="updateCongeStatut(\''+c.id+'\',\'Approuvé\')" class="btn btn-sm" style="background:#16a34a;color:white;border:none;cursor:pointer">✅ Approuver</button>'
             + '<button onclick="updateCongeStatut(\''+c.id+'\',\'Refusé\')" class="btn btn-sm" style="background:#dc2626;color:white;border:none;cursor:pointer">❌ Refuser</button>'
+            + '<button onclick="openEditCongeModal(\''+c.id+'\')" class="btn btn-sm" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;cursor:pointer">✏️ Modifier</button>'
             + '</div></div>';
         }).join('')
       + '</div></div>';
@@ -12627,12 +12735,12 @@ PAGES['admin-rh-conges'] = function(mc) {
       +'<td>'+new Date(c.dateFin+'T12:00:00').toLocaleDateString('fr-FR')+'</td>'
       +'<td class="fw600">'+countJoursConge(c)+'j</td>'
       +'<td>'+statutBadge(c.statut)+'</td>'
-      +'<td class="muted" style="font-size:.8rem">'+(c.commentaireAdmin||'—')+'</td></tr>';
+      +'<td class="muted" style="font-size:.8rem">'+(c.commentaireAdmin||'—')+'</td>'      +'<td><button onclick="openEditCongeModal(\''+c.id+'\')" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:5px;padding:3px 8px;font-size:.75rem;cursor:pointer;white-space:nowrap">✏️</button></td></tr>';
   }).join('');
   var archiveHtml = '<div class="card"><div class="card-header"><div class="card-title">📋 Historique ('+archives.length+')</div></div>'
     +(archives.length===0
       ? '<p class="muted">Aucun historique.</p>'
-      : '<div style="overflow-x:auto"><table class="table"><thead><tr><th>Collaboratrice</th><th>Type</th><th>Du</th><th>Au</th><th>Jours ouvrés</th><th>Statut</th><th>Commentaire</th></tr></thead><tbody>'+archiveRows+'</tbody></table></div>')
+      : '<div style="overflow-x:auto"><table class="table"><thead><tr><th>Collaboratrice</th><th>Type</th><th>Du</th><th>Au</th><th>Jours ouvrés</th><th>Statut</th><th>Commentaire</th><th></th></tr></thead><tbody>'+archiveRows+'</tbody></table></div>')
     +'</div>';
 
   // --- Append remaining sections with isolated error handling ---
