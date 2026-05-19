@@ -11172,7 +11172,7 @@ function openEditCongeModal(id) {
   modal.innerHTML = '<div style="background:white;border-radius:14px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.3);">'
     + '<div style="background:#3b82f6;color:white;padding:14px 20px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;">'
     + '<div style="font-weight:800;font-size:1rem;">✏️ Modifier le congé</div>'
-    + '<button onclick="document.getElementById('edit-conge-modal').remove()" style="background:rgba(255,255,255,.2);border:none;color:white;border-radius:50%;width:28px;height:28px;cursor:pointer;">✕</button>'
+    + '<button onclick="document.getElementById(\'edit-conge-modal\').remove()" style="background:rgba(255,255,255,.2);border:none;color:white;border-radius:50%;width:28px;height:28px;cursor:pointer;">✕</button>'
     + '</div>'
     + '<div style="padding:20px;display:flex;flex-direction:column;gap:12px;">'
     + (isAdmin ? '<div><label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Collaboratrice</label><select id="ec-collab" class="form-input">'+collabOpts+'</select></div>' : '')
@@ -11194,8 +11194,8 @@ function openEditCongeModal(id) {
     + (isAdmin ? '<div><label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Réponse admin</label>'
     + '<input type="text" id="ec-rep" class="form-input" value="'+(cg.commentaireAdmin||'')+'" placeholder="Optionnel…"></div>' : '')
     + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
-    + '<button onclick="document.getElementById('edit-conge-modal').remove()" style="padding:10px 20px;border:1.5px solid #e5e7eb;border-radius:10px;background:white;font-weight:600;cursor:pointer;">Annuler</button>'
-    + '<button onclick="saveEditConge(''+id+'')" style="padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:10px;font-weight:700;cursor:pointer;">💾 Enregistrer</button>'
+    + '<button onclick="document.getElementById(\'edit-conge-modal\').remove()" style="padding:10px 20px;border:1.5px solid #e5e7eb;border-radius:10px;background:white;font-weight:600;cursor:pointer;">Annuler</button>'
+    + '<button onclick="saveEditConge(\''+id+'\')" style="padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:10px;font-weight:700;cursor:pointer;">💾 Enregistrer</button>'
     + '</div></div></div>';
   document.body.appendChild(modal);
   setTimeout(function(){ ecUpdatePreview(); }, 50);
