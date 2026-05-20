@@ -11749,16 +11749,15 @@ function getMondayOfWeek(date) {
 // CHALLENGE TEMPORAIRE : 15 avril → 15 mai — 2 Santé chacune
 // ============================================================
 var CHALLENGE_CONFIG = {
-  debut:    '2026-04-15',
-  fin:      '2026-05-15',
-  produit:  'Santé',
-  objectif: 2,
-  reward:   'Week-end à Marseille 🏖️',
+  debut:    '2026-05-20',
+  fin:      '2026-06-06',
+  produit:  null,
+  objectif: 20,
+  reward:   'Week-end en équipe 🧳',
 };
 
 function buildChallengeWidget(collab) {
-  // Seules Dorina et Rihem participent au challenge
-  if (collab !== 'Dorina' && collab !== 'Rihem') return '';
+  // Toutes les collaboratrices participent au challenge
 
   // Parsing LOCAL pour éviter les décalages UTC (France = UTC+2)
   var today = new Date();
@@ -11774,7 +11773,8 @@ function buildChallengeWidget(collab) {
 
   // Comptage Santé dans la période pour cette collab
   var nbSante = (DB.ventes||[]).filter(function(v){
-    if (v.collab !== collab || v.produit !== CHALLENGE_CONFIG.produit) return false;
+    if (v.collab !== collab) return false;
+    if (CHALLENGE_CONFIG.produit && v.produit !== CHALLENGE_CONFIG.produit) return false;
     // Ventes avec date précise
     if (v.createdAt || v.date) {
       var d = new Date(v.createdAt || v.date);
@@ -11799,18 +11799,19 @@ function buildChallengeWidget(collab) {
       ? 'linear-gradient(135deg,#7f1d1d,#dc2626,#f97316)'
       : 'linear-gradient(135deg,#0c4a6e,#0369a1,#0ea5e9)';
 
-  var stars = [1,2].map(function(i){
-    return '<span style="font-size:1.6rem;filter:' + (nbSante>=i?'none':'grayscale(1) opacity(.35)') + ';transition:filter .4s;">' + (nbSante>=i?'⭐':'☆') + '</span>';
+  var starThresh = [5, 10, 15, 20];
+  var stars = starThresh.map(function(t){
+    return '<span style="font-size:1.4rem;filter:' + (nbSante>=t?'none':'grayscale(1) opacity(.35)') + ';transition:filter .4s;" title="'+t+' ventes">' + (nbSante>=t?'⭐':'☆') + '</span>';
   }).join('');
 
   // Statut message
   var statusMsg = atteint
-    ? '🎉 Félicitations ! Vous avez décroché le challenge !'
-    : nbSante === 1
-      ? 'Plus qu\'une Santé à signer — vous y êtes presque !'
+    ? '🎉 Challenge relevé ! Week-end en équipe confirmé 🧳'
+    : reste === 1
+      ? '⚡ Plus qu\'une vente — vous y êtes presque !'
       : urgence
-        ? '⚡ Dernière ligne droite ! ' + joursRestants + ' jour' + (joursRestants>1?'s':'') + ' restant' + (joursRestants>1?'s':'') + '…'
-        : joursRestants + ' jours restants pour relever le challenge';
+        ? '⚡ Dernière ligne droite ! ' + reste + ' vente' + (reste>1?'s':'') + ' à faire en ' + joursRestants + ' jour' + (joursRestants>1?'s':'') + ' !'
+        : reste + ' ventes à faire — ' + joursRestants + ' jour' + (joursRestants>1?'s':'') + ' restant' + (joursRestants>1?'s':'');
 
   return '<div style="background:' + bgGrad + ';border-radius:16px;padding:0;margin-bottom:20px;overflow:hidden;position:relative;box-shadow:0 8px 30px rgba(0,0,0,.18);">'
 
@@ -11836,10 +11837,10 @@ function buildChallengeWidget(collab) {
 
     // Récompense
     + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">'
-    + '<div style="font-size:2.8rem;">🏖️</div>'
+    + '<div style="font-size:2.8rem;">🧳</div>'
     + '<div style="flex:1;">'
-    + '<div style="font-size:1.05rem;font-weight:800;line-height:1.2;">Week-end à Marseille</div>'
-    + '<div style="font-size:.82rem;opacity:.8;margin-top:3px;">Objectif : <strong>' + CHALLENGE_CONFIG.objectif + ' contrats Santé</strong> du 15 avr. au 15 mai</div>'
+    + '<div style="font-size:1.05rem;font-weight:800;line-height:1.2;">Week-end en équipe</div>'
+    + '<div style="font-size:.82rem;opacity:.8;margin-top:3px;">Objectif : <strong>' + CHALLENGE_CONFIG.objectif + ' ventes</strong> avant le 6 juin</div>'
     + '</div>'
     + '<div style="text-align:center;">' + stars + '</div>'
     + '</div>'
@@ -11847,7 +11848,7 @@ function buildChallengeWidget(collab) {
     // Barre de progression
     + '<div style="margin-bottom:10px;">'
     + '<div style="display:flex;justify-content:space-between;font-size:.75rem;opacity:.8;margin-bottom:5px;">'
-    + '<span>' + nbSante + ' / ' + CHALLENGE_CONFIG.objectif + ' Santé signés</span>'
+    + '<span>' + nbSante + ' / ' + CHALLENGE_CONFIG.objectif + ' ventes</span>'
     + '<span>' + pct + '%</span>'
     + '</div>'
     + '<div style="background:rgba(255,255,255,.2);border-radius:99px;height:12px;">'
@@ -11878,7 +11879,8 @@ function buildChallengeAdminWidget() {
 
   var rows = collabs.map(function(c) {
     var nb = (DB.ventes||[]).filter(function(v){
-      if (v.collab !== c || v.produit !== CHALLENGE_CONFIG.produit) return false;
+      if (v.collab !== c) return false;
+      if (CHALLENGE_CONFIG.produit && v.produit !== CHALLENGE_CONFIG.produit) return false;
       if (v.createdAt || v.date) {
         var d = new Date(v.createdAt || v.date);
         return !isNaN(d) && d >= dDebut && d <= dFin;
@@ -11912,7 +11914,8 @@ function buildChallengeAdminWidget() {
 
   var allAtteint = collabs.every(function(c){
     var nb = (DB.ventes||[]).filter(function(v){
-      if (v.collab !== c || v.produit !== CHALLENGE_CONFIG.produit) return false;
+      if (v.collab !== c) return false;
+      if (CHALLENGE_CONFIG.produit && v.produit !== CHALLENGE_CONFIG.produit) return false;
       if (v.createdAt || v.date) {
         var d = new Date(v.createdAt || v.date);
         return !isNaN(d) && d >= dDebut && d <= dFin;
@@ -11935,8 +11938,8 @@ function buildChallengeAdminWidget() {
     + '</div>'
     + '<div style="padding:16px 18px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">'
     + '<div style="flex:1;min-width:200px;">'
-    + '<div style="font-size:.85rem;font-weight:800;color:#fff;margin-bottom:2px;">🏖️ Week-end à Marseille</div>'
-    + '<div style="font-size:.76rem;color:rgba(255,255,255,.7);margin-bottom:12px;">2 Santé / collab · 15 avr → 15 mai</div>'
+    + '<div style="font-size:.85rem;font-weight:800;color:#fff;margin-bottom:2px;">🧳 Week-end en équipe</div>'
+    + '<div style="font-size:.76rem;color:rgba(255,255,255,.7);margin-bottom:12px;">' + CHALLENGE_CONFIG.objectif + ' ventes / collab · 20 mai → 6 juin</div>'
     + rows
     + '</div>'
     + '<div style="background:rgba(255,255,255,.1);border-radius:10px;padding:14px 16px;min-width:160px;text-align:center;">'
