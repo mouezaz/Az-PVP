@@ -8991,7 +8991,7 @@ function renderTelPage(mois, annee) {
       </div>
     </div>
 
-    <!-- ── Comparaison multi-mois ── -->
+    <!-- Comparaison multi-mois -->
     <div id="tel-multi-container" style="margin-top:16px"></div>
 
     `;
@@ -12179,8 +12179,8 @@ PAGES['collab-conges'] = function(mc) {
       +'<span style="font-size:.85rem;color:#6b7280">'+dateLabel+'</span>'
       +jBadge
       +'</div>'
-      +'<button onclick="openEditCongeModal('\''+c.id+'\')" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:4px 12px;font-size:.78rem;cursor:pointer;white-space:nowrap">✏️ Modifier</button>'
-      +(canCancel ? '<button onclick="annulerConge('\''+c.id+'\')" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;border-radius:6px;padding:4px 12px;font-size:.78rem;cursor:pointer;white-space:nowrap">🗑 Annuler</button>' : '')
+      +'<button onclick="openEditCongeModal(&quot;'+c.id+'&quot;)" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:4px 12px;font-size:.78rem;cursor:pointer;white-space:nowrap">✏️ Modifier</button>'
+      +(canCancel ? '<button onclick="annulerConge(&quot;'+c.id+'&quot;)" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;border-radius:6px;padding:4px 12px;font-size:.78rem;cursor:pointer;white-space:nowrap">🗑 Annuler</button>' : '')
       +'</div>'
       +(c.motif ? '<div style="font-size:.83rem;color:#374151;margin-bottom:4px">'+(isExcCard ? '🙋 <strong>Demande :</strong>' : '📝 <strong>Motif :</strong>')+' '+c.motif+'</div>' : '')
       +(c.commentaireAdmin ? '<div style="font-size:.82rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:7px 12px;margin-top:6px">💬 <strong>Réponse de Mouez :</strong> '+c.commentaireAdmin+'</div>' : '')
