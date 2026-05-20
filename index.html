@@ -11753,11 +11753,12 @@ var CHALLENGE_CONFIG = {
   fin:      '2026-06-06',
   produit:  null,
   objectif: 20,
-  reward:   'Week-end en équipe 🧳',
+  reward:   'Week-end au soleil ☀️',
 };
 
 function buildChallengeWidget(collab) {
-  // Toutes les collaboratrices participent au challenge
+  // Dorina et Rihem participent — Mael est exclu
+  if (collab === 'Mael') return '';
 
   // Parsing LOCAL pour éviter les décalages UTC (France = UTC+2)
   var today = new Date();
@@ -11806,7 +11807,7 @@ function buildChallengeWidget(collab) {
 
   // Statut message
   var statusMsg = atteint
-    ? '🎉 Challenge relevé ! Week-end en équipe confirmé 🧳'
+    ? '🎉 Challenge relevé ! Week-end au soleil confirmé ☀️'
     : reste === 1
       ? '⚡ Plus qu\'une vente — vous y êtes presque !'
       : urgence
@@ -11837,9 +11838,9 @@ function buildChallengeWidget(collab) {
 
     // Récompense
     + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">'
-    + '<div style="font-size:2.8rem;">🧳</div>'
+    + '<div style="font-size:2.8rem;">☀️</div>'
     + '<div style="flex:1;">'
-    + '<div style="font-size:1.05rem;font-weight:800;line-height:1.2;">Week-end en équipe</div>'
+    + '<div style="font-size:1.05rem;font-weight:800;line-height:1.2;">Week-end au soleil</div>'
     + '<div style="font-size:.82rem;opacity:.8;margin-top:3px;">Objectif : <strong>' + CHALLENGE_CONFIG.objectif + ' ventes</strong> avant le 6 juin</div>'
     + '</div>'
     + '<div style="text-align:center;">' + stars + '</div>'
@@ -11874,7 +11875,7 @@ function buildChallengeAdminWidget() {
   if (today < dDebut || today > dFin) return '';
 
   var joursRestants = Math.ceil((dFin - today) / (1000*3600*24));
-  var collabs = getCollabNames().filter(function(n){ return n !== 'Admin'; });
+  var collabs = getCollabNames().filter(function(n){ return n !== 'Admin' && n !== 'Mael'; });
   var colorsMap = getCollabColors();
 
   var rows = collabs.map(function(c) {
@@ -11938,7 +11939,7 @@ function buildChallengeAdminWidget() {
     + '</div>'
     + '<div style="padding:16px 18px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">'
     + '<div style="flex:1;min-width:200px;">'
-    + '<div style="font-size:.85rem;font-weight:800;color:#fff;margin-bottom:2px;">🧳 Week-end en équipe</div>'
+    + '<div style="font-size:.85rem;font-weight:800;color:#fff;margin-bottom:2px;">☀️ Week-end au soleil</div>'
     + '<div style="font-size:.76rem;color:rgba(255,255,255,.7);margin-bottom:12px;">' + CHALLENGE_CONFIG.objectif + ' ventes / collab · 20 mai → 6 juin</div>'
     + rows
     + '</div>'
