@@ -11109,6 +11109,23 @@ PAGES['admin-export'] = (mc) => {
 // RH — HELPER FUNCTIONS
 // ============================================================
 
+function cgCheckExceptionnelle() {
+  var type = (document.getElementById('cg-type')||{}).value || '';
+  var isExc = type === '🙋 Demande exceptionnelle';
+  var finGroup = document.getElementById('cg-fin') ? document.getElementById('cg-fin').closest('.form-group') : null;
+  var heureRow = document.getElementById('cg-heure-row');
+  var motifLbl = document.getElementById('cg-motif-label');
+  var motifInp = document.getElementById('cg-motif');
+  var debutLbl = document.getElementById('cg-debut') ? document.getElementById('cg-debut').closest('.form-group').querySelector('label') : null;
+  var prev     = document.getElementById('cg-jours-preview');
+  if (debutLbl) debutLbl.textContent = isExc ? 'Jour concerné *' : 'Date de début';
+  if (finGroup) finGroup.style.display = isExc ? 'none' : '';
+  if (heureRow) heureRow.style.display = isExc ? '' : 'none';
+  if (motifLbl) motifLbl.textContent = isExc ? 'Description de la demande *' : 'Commentaire (optionnel)';
+  if (motifInp) motifInp.placeholder = isExc ? 'Ex : partir à 16h pour rdv médecin, arriver à 9h30…' : 'Ex : vacances été…';
+  if (prev) prev.style.display = isExc ? 'none' : '';
+}
+
 function saveConge() {
   const debut = document.getElementById('cg-debut').value;
   const fin   = document.getElementById('cg-fin').value;
@@ -11116,8 +11133,13 @@ function saveConge() {
   const motif = document.getElementById('cg-motif').value.trim();
   const debutDemi = !!(document.getElementById('cg-debut-demi')||{}).checked;
   const finDemi   = !!(document.getElementById('cg-fin-demi')||{}).checked;
-  if (!debut || !fin) { toast('Veuillez saisir les dates de début et fin', 'error'); return; }
-  if (new Date(fin) < new Date(debut)) { toast('La date de fin doit être après la date de début', 'error'); return; }
+  const heure     = ((document.getElementById('cg-heure')||{}).value||'').trim();
+  const isExc     = type === '🙋 Demande exceptionnelle';
+  if (!debut) { toast('Veuillez saisir la date', 'error'); return; }
+  if (!isExc && !fin) { toast('Veuillez saisir la date de fin', 'error'); return; }
+  if (!isExc && new Date(fin) < new Date(debut)) { toast('La date de fin doit être après la date de début', 'error'); return; }
+  if (isExc && !motif) { toast('Merci de décrire votre demande', 'error'); return; }
+  const finEffective = isExc ? debut : fin;
   if (!DB.conges) DB.conges = [];
   var utilP = getUtilPeriod();
   var isRetro = debut < utilP.start;
@@ -11125,9 +11147,10 @@ function saveConge() {
     id: 'cg_' + Date.now(),
     collab: currentUser.name,
     dateDebut: debut,
-    dateFin: fin,
+    dateFin: finEffective,
     debutDemi: debutDemi || undefined,
     finDemi:   finDemi   || undefined,
+    heure:     heure     || undefined,
     type,
     motif,
     statut: 'En attente',
@@ -11160,7 +11183,7 @@ function openEditCongeModal(id) {
   var isAdmin = currentUser && currentUser.role === 'admin';
   var collabs = isAdmin ? getCollabNames().filter(function(n){ return n!=='Admin'; }) : [cg.collab];
   var collabOpts = collabs.map(function(n){ return '<option value="'+n+'"'+(n===cg.collab?' selected':'')+'>'+n+'</option>'; }).join('');
-  var typeOpts = ['Congés payés','Récupération (½ journée)','Récupération (journée entière)','Congé sans solde','Congé exceptionnel','Arrêt maladie']
+  var typeOpts = ['Congés payés','Récupération (½ journée)','Récupération (journée entière)','Congé sans solde','Congé exceptionnel','Arrêt maladie','🙋 Demande exceptionnelle']
     .map(function(t){ return '<option'+(t===cg.type?' selected':'')+'>'+t+'</option>'; }).join('');
   var statutOpts = isAdmin
     ? ['Approuvé','En attente','Refusé'].map(function(s){ return '<option'+(s===cg.statut?' selected':'')+'>'+s+'</option>'; }).join('')
@@ -12107,8 +12130,9 @@ PAGES['collab-conges'] = function(mc) {
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:4px 0 12px">'
     + '<div class="form-group"><label class="fl">Date de début</label><input type="date" id="cg-debut" class="form-input" oninput="updateJoursPreview()"><label style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:.78rem;color:#6b7280;cursor:pointer"><input type="checkbox" id="cg-debut-demi" onchange="updateJoursPreview()"> Départ en après-midi (½j)</label></div>'
     + '<div class="form-group"><label class="fl">Date de fin</label><input type="date" id="cg-fin" class="form-input" oninput="updateJoursPreview()"><label style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:.78rem;color:#6b7280;cursor:pointer"><input type="checkbox" id="cg-fin-demi" onchange="updateJoursPreview()"> Retour le matin (½j)</label></div>'
-    + '<div class="form-group"><label class="fl">Type</label><select id="cg-type" class="form-input"><option>Congés payés</option><option>Récupération (½ journée)</option><option>Récupération (journée entière)</option><option>Congé sans solde</option><option>Congé exceptionnel</option><option>Arrêt maladie</option></select></div>'
-    + '<div class="form-group"><label class="fl">Commentaire (optionnel)</label><input type="text" id="cg-motif" class="form-input" placeholder="Ex : vacances été…"></div>'
+    + '<div class="form-group"><label class="fl">Type</label><select id="cg-type" class="form-input" onchange="cgCheckExceptionnelle()"><option>Congés payés</option><option>Récupération (½ journée)</option><option>Récupération (journée entière)</option><option>Congé sans solde</option><option>Congé exceptionnel</option><option>Arrêt maladie</option><option>🙋 Demande exceptionnelle</option></select></div>'
+    + '<div id="cg-heure-row" class="form-group" style="display:none"><label class="fl">Heure concernée (optionnel)</label><input type="time" id="cg-heure" class="form-input" placeholder="ex: 16:00"></div>'
+    + '<div class="form-group"><label class="fl" id="cg-motif-label">Commentaire (optionnel)</label><input type="text" id="cg-motif" class="form-input" placeholder="Ex : vacances été…"></div>'
     + '</div>'
     + '<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.82rem;color:#92400e;display:none" id="cg-retro-info">'
     + '⏪ <strong>Saisie rétroactive possible</strong> — Vous pouvez saisir des congés passés (avant le '
@@ -12139,20 +12163,27 @@ PAGES['collab-conges'] = function(mc) {
     var retroBadge = c.saisieRetroactive
       ? '<span style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">⏪ Rétroactif</span>'
       : '';
-    return '<div style="background:'+bg+';border:1px solid '+border+';border-radius:10px;padding:14px 18px;margin-bottom:10px">'
+    var isExcCard = c.type === '🙋 Demande exceptionnelle';
+    var bgCard     = isExcCard ? '#faf5ff' : bg;
+    var borderCard = isExcCard ? '#c4b5fd' : border;
+    var dateLabel  = isExcCard
+      ? new Date(c.dateDebut+'T12:00:00').toLocaleDateString('fr-FR') + (c.heure ? ' à ' + c.heure : '')
+      : new Date(c.dateDebut+'T12:00:00').toLocaleDateString('fr-FR') + ' → ' + new Date(c.dateFin+'T12:00:00').toLocaleDateString('fr-FR');
+    var jBadge = isExcCard ? '' : '<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:2px 8px;font-size:.78rem;font-weight:700">'+countJoursConge(c)+'j ouvrés</span>';
+    return '<div style="background:'+bgCard+';border:1px solid '+borderCard+';border-radius:10px;padding:14px 18px;margin-bottom:10px">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">'
       +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
       +statutBadge(c.statut)
       +'<span style="font-weight:700;font-size:.9rem">'+c.type+'</span>'
       +retroBadge
-      +'<span style="font-size:.85rem;color:#6b7280">'+new Date(c.dateDebut+'T12:00:00').toLocaleDateString('fr-FR')+' → '+new Date(c.dateFin+'T12:00:00').toLocaleDateString('fr-FR')+'</span>'
-      +'<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:2px 8px;font-size:.78rem;font-weight:700">'+countJoursConge(c)+'j ouvrés</span>'
+      +'<span style="font-size:.85rem;color:#6b7280">'+dateLabel+'</span>'
+      +jBadge
       +'</div>'
-      +'<button onclick="openEditCongeModal(\''+c.id+'\')" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:4px 12px;font-size:.78rem;cursor:pointer;white-space:nowrap">✏️ Modifier</button>'
-      +(canCancel ? '<button onclick="annulerConge(\''+c.id+'\')" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;border-radius:6px;padding:4px 12px;font-size:.78rem;cursor:pointer;white-space:nowrap">🗑 Annuler</button>' : '')
+      +'<button onclick="openEditCongeModal('\''+c.id+'\')" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:4px 12px;font-size:.78rem;cursor:pointer;white-space:nowrap">✏️ Modifier</button>'
+      +(canCancel ? '<button onclick="annulerConge('\''+c.id+'\')" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;border-radius:6px;padding:4px 12px;font-size:.78rem;cursor:pointer;white-space:nowrap">🗑 Annuler</button>' : '')
       +'</div>'
-      +(c.motif ? '<div style="font-size:.83rem;color:#374151;margin-bottom:4px">📝 <strong>Motif :</strong> '+c.motif+'</div>' : '')
-      +(c.commentaireAdmin ? '<div style="font-size:.8rem;color:#6b7280;margin-top:4px">💬 <em>Réponse admin :</em> '+c.commentaireAdmin+'</div>' : '')
+      +(c.motif ? '<div style="font-size:.83rem;color:#374151;margin-bottom:4px">'+(isExcCard ? '🙋 <strong>Demande :</strong>' : '📝 <strong>Motif :</strong>')+' '+c.motif+'</div>' : '')
+      +(c.commentaireAdmin ? '<div style="font-size:.82rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:7px 12px;margin-top:6px">💬 <strong>Réponse de Mouez :</strong> '+c.commentaireAdmin+'</div>' : '')
       +'</div>';
   }).join('');
   var listHtml = '<div class="card"><div class="card-header"><div class="card-title">📋 Mes demandes ('+mesConges.length+')</div></div>'
@@ -12258,7 +12289,7 @@ function adminAddConge() {
     + '<div style="background:white;border-radius:12px;padding:24px;width:380px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
     + '<h3 style="margin:0 0 16px;font-size:1rem">➕ Ajouter un congé manuellement</h3>'
     + '<div class="form-group"><label class="fl">Collaboratrice</label><select id="adm-collab" class="form-input">'+opts+'</select></div>'
-    + '<div class="form-group"><label class="fl">Type</label><select id="adm-type" class="form-input"><option>Congés payés</option><option>Récupération (½ journée)</option><option>Récupération (journée entière)</option><option>Congé sans solde</option><option>Congé exceptionnel</option><option>Arrêt maladie</option></select></div>'
+    + '<div class="form-group"><label class="fl">Type</label><select id="adm-type" class="form-input"><option>Congés payés</option><option>Récupération (½ journée)</option><option>Récupération (journée entière)</option><option>Congé sans solde</option><option>Congé exceptionnel</option><option>Arrêt maladie</option><option>🙋 Demande exceptionnelle</option></select></div>'
     + '<div class="form-group"><label class="fl">Date de début</label><input type="date" id="adm-debut" class="form-input"></div>'
     + '<div class="form-group"><label class="fl">Date de fin</label><input type="date" id="adm-fin" class="form-input"></div>'
     + '<div class="form-group"><label class="fl">Statut</label><select id="adm-statut" class="form-input"><option value="Approuvé">Approuvé</option><option value="En attente">En attente</option></select></div>'
@@ -12505,7 +12536,9 @@ PAGES['admin-rh-conges'] = function(mc) {
     var fbStatus2 = (typeof _fbEnabled !== 'undefined' && _fbEnabled && typeof _fbReady !== 'undefined' && _fbReady)
       ? '<span style="background:#d1fae5;color:#065f46;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">🟢 Firebase connecté</span>'
       : '<span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">🔴 Firebase déconnecté</span>';
-    var enAttenteEarly = DB.conges.filter(function(c){ return c.statut==='En attente'; })
+    var demandesExcAll = DB.conges.filter(function(c){ return c.type==='🙋 Demande exceptionnelle'; })
+      .sort(function(a,b){ return b.dateCreation.localeCompare(a.dateCreation); });
+    var enAttenteEarly = DB.conges.filter(function(c){ return c.statut==='En attente' && c.type !== '🙋 Demande exceptionnelle'; })
       .sort(function(a,b){ return a.dateCreation.localeCompare(b.dateCreation); });
     var attEarly = enAttenteEarly.length===0
       ? '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:.85rem;color:#166534">✅ Aucune demande en attente.</div>'
@@ -12526,6 +12559,36 @@ PAGES['admin-rh-conges'] = function(mc) {
               + '</div></div>';
           }).join('')
         + '</div></div>';
+    // Bloc demandes exceptionnelles
+    var excBlock = '';
+    if (demandesExcAll.length > 0) {
+      var excRows = demandesExcAll.map(function(c) {
+        var col    = colorsMap[c.collab] || '#6b7280';
+        var isA    = c.statut === 'Approuvé', isR = c.statut === 'Refusé';
+        var sBg    = isA ? '#d1fae5' : (isR ? '#fee2e2' : '#ede9fe');
+        var sCol   = isA ? '#065f46' : (isR ? '#991b1b' : '#5b21b6');
+        var sTxt   = isA ? '✅ Approuvée' : (isR ? '❌ Refusée' : '⏳ En attente');
+        var dl     = new Date(c.dateDebut + 'T12:00:00').toLocaleDateString('fr-FR') + (c.heure ? ' à ' + c.heure : '');
+        var repVal = (c.commentaireAdmin || '').replace(/"/g, '&quot;');
+        return '<div style="background:#faf5ff;border:1px solid #c4b5fd;border-radius:8px;padding:14px 16px;">'
+          + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
+          + '<div style="width:34px;height:34px;border-radius:50%;background:' + col + ';color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">' + c.collab.slice(0,2).toUpperCase() + '</div>'
+          + '<div style="flex:1"><div style="font-weight:700;color:#1e293b">' + c.collab + '</div>'
+          + '<div style="font-size:.8rem;color:#6b7280">📅 ' + dl + '</div></div>'
+          + '<span style="background:' + sBg + ';color:' + sCol + ';border-radius:6px;padding:3px 10px;font-size:.78rem;font-weight:700">' + sTxt + '</span>'
+          + '</div>'
+          + (c.motif ? '<div style="background:white;border:1px solid #e5e7eb;border-radius:6px;padding:8px 12px;font-size:.83rem;color:#374151;margin-bottom:10px">🙋 <strong>Demande :</strong> ' + c.motif + '</div>' : '')
+          + (c.commentaireAdmin ? '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 12px;font-size:.82rem;color:#166534;margin-bottom:10px">💬 <strong>Réponse :</strong> ' + c.commentaireAdmin + '</div>' : '')
+          + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+          + '<input type="text" id="rep-' + c.id + '" placeholder="Votre réponse (ex : OK pour 16h, préviens-moi...)" value="' + repVal + '" style="flex:1;min-width:200px;padding:6px 10px;border:1.5px solid #c4b5fd;border-radius:6px;font-size:.8rem">'
+          + '<button onclick="updateCongeStatut(&quot;' + c.id + '&quot;,&quot;Approuvé&quot;)" class="btn btn-sm" style="background:#16a34a;color:white;border:none;cursor:pointer">✅ Approuver</button>'
+          + '<button onclick="updateCongeStatut(&quot;' + c.id + '&quot;,&quot;Refusé&quot;)" class="btn btn-sm" style="background:#dc2626;color:white;border:none;cursor:pointer">❌ Refuser</button>'
+          + '</div></div>';
+      }).join('');
+      excBlock = '<div class="card" style="border-left:4px solid #7c3aed;margin-bottom:14px">'
+        + '<div class="card-header"><div class="card-title">🙋 Demandes exceptionnelles (' + demandesExcAll.length + ')</div></div>'
+        + '<div style="display:flex;flex-direction:column;gap:10px">' + excRows + '</div></div>';
+    }
     mc.innerHTML = '<div class="page-header"><h1>🏖️ Congés équipe</h1><p>Compteurs, planning, jours fériés et approbations</p>'
       + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">'
       + fbStatus2
@@ -12534,6 +12597,7 @@ PAGES['admin-rh-conges'] = function(mc) {
       + '<button onclick="adminAddConge()" style="background:#16a34a;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">➕ Ajouter un congé</button>'
       + '<button onclick="alert(\'DB.conges ('+DB.conges.length+' entrées):\\n\'+JSON.stringify(DB.conges).slice(0,800))" style="background:#6b7280;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">🔍 Debug DB</button>'
       + '</div></div>'
+      + excBlock
       + attEarly;
   } catch(err) {
     mc.innerHTML += '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:12px;margin-bottom:12px;font-size:.8rem;color:#991b1b">⚠️ Erreur rendu en-tête : '+String(err)+'</div>';
