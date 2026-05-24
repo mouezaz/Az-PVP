@@ -12540,7 +12540,7 @@ PAGES['admin-rh-conges'] = function(mc) {
     var fbStatus2 = (typeof _fbEnabled !== 'undefined' && _fbEnabled && typeof _fbReady !== 'undefined' && _fbReady)
       ? '<span style="background:#d1fae5;color:#065f46;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">🟢 Firebase connecté</span>'
       : '<span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:700">🔴 Firebase déconnecté</span>';
-    var demandesExcAll = DB.conges.filter(function(c){ return c.type==='🙋 Demande exceptionnelle'; })
+    var demandesExcAll = DB.conges.filter(function(c){ return c.type==='🙋 Demande exceptionnelle' && c.statut==='En attente'; })
       .sort(function(a,b){ return b.dateCreation.localeCompare(a.dateCreation); });
     var enAttenteEarly = DB.conges.filter(function(c){ return c.statut==='En attente' && c.type !== '🙋 Demande exceptionnelle'; })
       .sort(function(a,b){ return a.dateCreation.localeCompare(b.dateCreation); });
