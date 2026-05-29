@@ -4164,7 +4164,7 @@ PAGES['collab-stats'] = function(mc) {
       + '<td style="text-align:center;">'+roBadge(s.wRO)+'</td>'
       // Mois — événements + contrats avec barre objectif 28
       + '<td>'+statCell(s.mContacts,'événements','#6d28d9')+'</td>'
-      + (function(){ var p=Math.min(100,Math.round(s.mContrats/OBJECTIF_CONTRATS*100)); var c=p>=100?'#15803d':p>=70?'#d97706':'#dc2626'; return '<td style="padding:6px 10px;min-width:110px;"><div style="display:flex;align-items:baseline;gap:4px;"><span style="font-size:1.2rem;font-weight:900;color:'+c+';">'+s.mContrats+'</span><span style="font-size:.72rem;color:#94a3b8;">/ '+OBJECTIF_CONTRATS+'</span></div><div style="background:#e5e7eb;border-radius:999px;height:7px;overflow:hidden;margin-top:3px;"><div style="background:'+c+';width:'+p+'%;height:100%;border-radius:999px;"></div></div><div style="font-size:.65rem;color:#94a3b8;margin-top:2px;">'+p+'% de l\'objectif</div></td>'; })()
+      + (function(){ var p=Math.min(100,Math.round(s.mContrats/OBJECTIF_CONTRATS*100)); var c=p>=100?'#15803d':p>=70?'#d97706':'#dc2626'; return '<td style="padding:6px 10px;min-width:110px;"><div style="display:flex;align-items:baseline;gap:4px;"><span style="font-size:1.2rem;font-weight:900;color:'+c+';">'+s.mContrats+'</span><span style="font-size:.72rem;color:#94a3b8;">/ '+OBJECTIF_CONTRATS+'</span></div><div style="background:#e5e7eb;border-radius:999px;height:7px;overflow:hidden;margin-top:3px;"><div style="background:'+c+';width:'+p+'%;height:100%;border-radius:999px;"></div></div><div style="font-size:.65rem;color:#94a3b8;margin-top:2px;">'+p+'% de l&apos;objectif</div></td>'; })()
       + '<td style="text-align:center;">'+roBadge(s.mRO)+'</td>'
       + '</tr>';
   });
@@ -4181,8 +4181,7 @@ PAGES['collab-stats'] = function(mc) {
   mc.innerHTML = '<div style="max-width:960px;margin:0 auto;padding:20px;">'
 
     // Header
-    + '<div><div style="font-size:1.3rem;font-weight:800;">' + (isAdmin ? '📊 Stats équipe &amp; R/O' : '📊 Ma contribution à l\'agence') + '</div>'
-    + '<div><div style="font-size:1.3rem;font-weight:800;">' + (isAdmin ? '📊 Stats équipe & Taux de concrétisation' : '📊 Ma contribution à l\'agence') + '</div>'
+    + '<div><div style="font-size:1.3rem;font-weight:800;">' + (isAdmin ? '📊 Stats équipe &amp; R/O' : "📊 Ma contribution à l'agence") + '</div>'
     + '<div style="opacity:.8;font-size:.85rem;margin-top:4px;">Contacts → Contrats · R/O = contrats ÷ objectif '+OBJECTIF_CONTRATS+'</div></div>'
     + '<div style="text-align:right;font-size:.8rem;opacity:.7;">Semaine du '+mondayLabel+' → '+sundayLabel+'<br>Mois : '+MOIS_FULL[mois]+' '+annee+'</div>'
     + '</div>'
@@ -4243,7 +4242,6 @@ PAGES['collab-stats'] = function(mc) {
           return total > 0 ? Math.round(mine / total * 100) : 0;
         }
         var pContrats = contribPct(s.mContrats, teamStats.mContrats);
-        var pDevis    = contribPct(s.mDevis,    teamStats.mDevis);
         var pContacts = contribPct(s.mContacts, teamStats.mContacts);
 
         function bar(pct, color) {
@@ -4258,7 +4256,7 @@ PAGES['collab-stats'] = function(mc) {
             + '<span style="font-size:1.6rem;font-weight:900;color:'+color+';">'+mine+'</span>'
             + '<span style="font-size:.8rem;color:#94a3b8;">/ '+total+' agence</span>'
             + '</div>'
-            + '<div style="font-size:.78rem;font-weight:700;color:'+color+';margin-bottom:4px;">'+pct+'% de l\'agence</div>'
+            + '<div style="font-size:.78rem;font-weight:700;color:'+color+';margin-bottom:4px;">'+pct+'% de l&apos;agence</div>'
             + bar(pct, color)
             + '</div>';
         }
@@ -4267,11 +4265,10 @@ PAGES['collab-stats'] = function(mc) {
           + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
           + '<div style="width:36px;height:36px;border-radius:50%;background:'+col+';color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;">'+collab.slice(0,2).toUpperCase()+'</div>'
           + '<div><div style="font-weight:800;font-size:1rem;color:#1e293b;">Ma contribution ce mois — '+MOIS_FULL[mois]+' '+annee+'</div>'
-          + '<div style="font-size:.78rem;color:#64748b;">Ta part dans les résultats de l\'agence</div></div>'
+          + '<div style="font-size:.78rem;color:#64748b;">Ta part dans les résultats de l&apos;agence</div></div>'
           + '</div>'
           + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">'
           + kpi('🏆 Contrats signés', s.mContrats, teamStats.mContrats, pContrats, '#15803d')
-          + kpi('📄 Devis transmis',  s.mDevis,    teamStats.mDevis,    pDevis,    '#7c3aed')
           + kpi('📞 Contacts',        s.mContacts, teamStats.mContacts, pContacts, '#0369a1')
           + '</div>'
           + (true ? '<div style="margin-top:12px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:12px;padding:14px 20px;color:#fff;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">'
