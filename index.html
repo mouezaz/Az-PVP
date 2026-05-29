@@ -4118,29 +4118,28 @@ PAGES['collab-stats'] = function(mc) {
     return '<span style="background:'+bg+';color:'+color+';border:1.5px solid '+color+'33;border-radius:20px;padding:2px 10px;font-size:.8rem;font-weight:800;">R/O '+ratio+'%</span>';
   }
 
+  var OBJECTIF_CONTRATS = 28;
+
   function getStats(name) {
     var allLeads  = (DB.leads||[]).filter(function(l){ return l.collab===name; });
     var allVentes = (DB.ventes||[]).filter(function(v){ return v.collab===name && v.affaireNouvelle==='Oui'; });
-    var allDevis  = (DB.devis||[]).filter(function(d){ return d.collab===name; });
 
     // Semaine
     var wLeadsNew = allLeads.filter(function(l){ return inWeek(l.createdAt); }).length;
-    var wLeadsRel = allLeads.filter(function(l){ return inWeek(l.relanceDate); }).length;
+    var wLeadsRel = allLeads.filter(function(l){ return inWeek(l.rappel||l.relanceDate||''); }).length;
     var wContacts = wLeadsNew + wLeadsRel;
-    var wDevis    = allDevis.filter(function(d){ return inWeek(d.dateDevis||d.createdAt||''); }).length;
     var wContrats = allVentes.filter(function(v){ return inWeek(v.createdAt||v.date||''); }).length;
-    var wRO       = pct(wContrats, wDevis); // R/O = contrats / devis
+    var wRO       = pct(wContrats, OBJECTIF_CONTRATS);
 
-    // Mois
+    // Mois : événements = leads créés ce mois + leads relancés ce mois
     var mLeadsNew = allLeads.filter(function(l){ return inMonth(l.createdAt); }).length;
-    var mLeadsRel = allLeads.filter(function(l){ return inMonth(l.relanceDate); }).length;
+    var mLeadsRel = allLeads.filter(function(l){ return inMonth(l.rappel||l.relanceDate||''); }).length;
     var mContacts = mLeadsNew + mLeadsRel;
-    var mDevis    = allDevis.filter(function(d){ return inMonth(d.dateDevis||d.createdAt||''); }).length;
     var mContrats = allVentes.filter(function(v){ return inMonth(v.createdAt||v.date||''); }).length;
-    var mRO       = pct(mContrats, mDevis); // R/O = contrats / devis
+    var mRO       = pct(mContrats, OBJECTIF_CONTRATS); // R/O = contrats / objectif 28
 
-    return { wContacts:wContacts, wDevis:wDevis, wContrats:wContrats, wRO:wRO,
-             mContacts:mContacts, mDevis:mDevis, mContrats:mContrats, mRO:mRO };
+    return { wContacts:wContacts, wContrats:wContrats, wRO:wRO,
+             mContacts:mContacts, mContrats:mContrats, mRO:mRO };
   }
 
   function statCell(val, sub, color) {
@@ -4161,13 +4160,11 @@ PAGES['collab-stats'] = function(mc) {
         + '<span style="font-weight:700;">'+name+(isSelf&&isAdmin?' (moi)':'')+'</span></div></td>'
       // Semaine
       + '<td>'+statCell(s.wContacts,'leads+relances','#0369a1')+'</td>'
-      + '<td>'+statCell(s.wDevis,'','#0891b2')+'</td>'
       + '<td>'+statCell(s.wContrats,'AN','#15803d')+'</td>'
       + '<td style="text-align:center;">'+roBadge(s.wRO)+'</td>'
-      // Mois
-      + '<td>'+statCell(s.mContacts,'leads+relances','#6d28d9')+'</td>'
-      + '<td>'+statCell(s.mDevis,'','#7c3aed')+'</td>'
-      + '<td>'+statCell(s.mContrats,'AN','#15803d')+'</td>'
+      // Mois — événements + contrats avec barre objectif 28
+      + '<td>'+statCell(s.mContacts,'événements','#6d28d9')+'</td>'
+      + (function(){ var p=Math.min(100,Math.round(s.mContrats/OBJECTIF_CONTRATS*100)); var c=p>=100?'#15803d':p>=70?'#d97706':'#dc2626'; return '<td style="padding:6px 10px;min-width:110px;"><div style="display:flex;align-items:baseline;gap:4px;"><span style="font-size:1.2rem;font-weight:900;color:'+c+';">'+s.mContrats+'</span><span style="font-size:.72rem;color:#94a3b8;">/ '+OBJECTIF_CONTRATS+'</span></div><div style="background:#e5e7eb;border-radius:999px;height:7px;overflow:hidden;margin-top:3px;"><div style="background:'+c+';width:'+p+'%;height:100%;border-radius:999px;"></div></div><div style="font-size:.65rem;color:#94a3b8;margin-top:2px;">'+p+'% de l\'objectif</div></td>'; })()
       + '<td style="text-align:center;">'+roBadge(s.mRO)+'</td>'
       + '</tr>';
   });
@@ -4176,22 +4173,23 @@ PAGES['collab-stats'] = function(mc) {
   var teamStats = null;
   if (true) {
     var tWC=0,tWD=0,tWK=0,tMC=0,tMD=0,tMK=0;
-    collabsToShow.forEach(function(name){ var s=getStats(name); tWC+=s.wContacts;tWD+=s.wDevis;tWK+=s.wContrats;tMC+=s.mContacts;tMD+=s.mDevis;tMK+=s.mContrats; });
-    teamStats = { wContacts:tWC, wDevis:tWD, wContrats:tWK, wRO:pct(tWK,tWC), mContacts:tMC, mDevis:tMD, mContrats:tMK, mRO:pct(tMK,tMC) };
+    collabsToShow.forEach(function(name){ var s=getStats(name); tWC+=s.wContacts;tWK+=s.wContrats;tMC+=s.mContacts;tMK+=s.mContrats; });
+    var tObjM = OBJECTIF_CONTRATS * collabsToShow.length;
+    teamStats = { wContacts:tWC, wContrats:tWK, wRO:pct(tWK,tObjM), mContacts:tMC, mContrats:tMK, mRO:pct(tMK,tObjM) };
   }
 
   mc.innerHTML = '<div style="max-width:960px;margin:0 auto;padding:20px;">'
 
     // Header
-    + '<div style="background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:16px;padding:22px 28px;color:#fff;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+    + '<div><div style="font-size:1.3rem;font-weight:800;">' + (isAdmin ? '📊 Stats équipe &amp; R/O' : '📊 Ma contribution à l\'agence') + '</div>'
     + '<div><div style="font-size:1.3rem;font-weight:800;">' + (isAdmin ? '📊 Stats équipe & Taux de concrétisation' : '📊 Ma contribution à l\'agence') + '</div>'
-    + '<div style="opacity:.8;font-size:.85rem;margin-top:4px;">Contacts → Devis → Contrats · R/O = contrats / contacts</div></div>'
+    + '<div style="opacity:.8;font-size:.85rem;margin-top:4px;">Contacts → Contrats · R/O = contrats ÷ objectif '+OBJECTIF_CONTRATS+'</div></div>'
     + '<div style="text-align:right;font-size:.8rem;opacity:.7;">Semaine du '+mondayLabel+' → '+sundayLabel+'<br>Mois : '+MOIS_FULL[mois]+' '+annee+'</div>'
     + '</div>'
 
     // Légende R/O
     + '<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 16px;margin-bottom:16px;font-size:.78rem;color:#64748b;">'
-    + '💡 <strong>R/O</strong> = Taux de concrétisation (contrats signés ÷ devis transmis × 100) — '
+    + '💡 <strong>R/O</strong> = Résultat sur Objectif (contrats signés ÷ objectif '+OBJECTIF_CONTRATS+' × 100) — '
     + '<span style="color:#15803d;font-weight:700;">≥30% excellent</span> · '
     + '<span style="color:#d97706;font-weight:700;">15–29% correct</span> · '
     + '<span style="color:#dc2626;font-weight:700;">&lt;15% à améliorer</span>'
@@ -4204,35 +4202,35 @@ PAGES['collab-stats'] = function(mc) {
     + '<thead>'
     + '<tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
     + '<th rowspan="2" style="padding:10px 14px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase;border-right:2px solid #e2e8f0;">Collaboratrice</th>'
-    + '<th colspan="4" style="padding:8px;text-align:center;font-size:.72rem;color:#0369a1;text-transform:uppercase;border-right:2px solid #bae6fd;background:#f0f9ff;">📅 Semaine '+mondayLabel+'–'+sundayLabel+'</th>'
-    + '<th colspan="4" style="padding:8px;text-align:center;font-size:.72rem;color:#6d28d9;text-transform:uppercase;background:#f5f3ff;">📆 '+MOIS_FULL[mois]+' '+annee+'</th>'
+     + '<th colspan="3" style="padding:8px;text-align:center;font-size:.72rem;color:#0369a1;text-transform:uppercase;border-right:2px solid #bae6fd;background:#f0f9ff;">📅 Semaine '+mondayLabel+'–'+sundayLabel+'</th>'
+     + '<th colspan="4" style="padding:8px;text-align:center;font-size:.72rem;color:#6d28d9;text-transform:uppercase;background:#f5f3ff;">📆 '+MOIS_FULL[mois]+' '+annee+' — Objectif '+OBJECTIF_CONTRATS+' contrats</th>'
     + '</tr>'
     + '<tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
     + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f0f9ff;">📞 Contacts</th>'
-    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f0f9ff;">📄 Devis</th>'
-    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f0f9ff;">🏆 Contrats</th>'
-    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#e0f2fe;border-right:2px solid #bae6fd;">R/O</th>'
-    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f5f3ff;">📞 Contacts</th>'
-    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f5f3ff;">📄 Devis</th>'
-    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f5f3ff;">🏆 Contrats</th>'
-    + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#ede9fe;">R/O</th>'
+     + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f0f9ff;">📞 Contacts</th>'
+     + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f0f9ff;">🏆 Contrats</th>'
+     + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#e0f2fe;border-right:2px solid #bae6fd;">R/O sem.</th>'
+     + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#f5f3ff;">📞 Contacts</th>'
+     + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#ede9fe;">🏆 Contrats / Obj.</th>'
+     + '<th style="padding:8px;text-align:center;font-size:.7rem;color:#64748b;background:#ede9fe;">R/O mois</th>'
+     + '</tr>'
     + '</tr>'
     + '</thead>'
     + '<tbody>'
     + rows.join('')
     + (teamStats ? (
         '<tr style="background:#0f172a;color:#fff;font-weight:700;border-top:2px solid #0f172a;">'
-        + '<td style="padding:10px 14px;font-size:.82rem;">🏢 Total équipe</td>'
-        + '<td>'+statCell(teamStats.wContacts,'','#93c5fd')+'</td>'
-        + '<td>'+statCell(teamStats.wDevis,'','#67e8f9')+'</td>'
-        + '<td>'+statCell(teamStats.wContrats,'','#86efac')+'</td>'
-        + '<td style="text-align:center;"><span style="background:#1e3a5f;color:#93c5fd;border-radius:20px;padding:2px 10px;font-size:.8rem;font-weight:800;">R/O '+teamStats.wRO+'%</span></td>'
-        + '<td>'+statCell(teamStats.mContacts,'','#c4b5fd')+'</td>'
-        + '<td>'+statCell(teamStats.mDevis,'','#a78bfa')+'</td>'
-        + '<td>'+statCell(teamStats.mContrats,'','#86efac')+'</td>'
-        + '<td style="text-align:center;"><span style="background:#3b1f6b;color:#c4b5fd;border-radius:20px;padding:2px 10px;font-size:.8rem;font-weight:800;">R/O '+teamStats.mRO+'%</span></td>'
-        + '</tr>'
-      ) : '')
+         '<tr style="background:#0f172a;color:#fff;font-weight:700;border-top:2px solid #0f172a;">'
+         + '<td style="padding:10px 14px;font-size:.82rem;">🏢 Total équipe</td>'
+         + '<td>'+statCell(teamStats.wContacts,'','#93c5fd')+'</td>'
+         + '<td>'+statCell(teamStats.wContrats,'','#86efac')+'</td>'
+         + '<td style="text-align:center;"><span style="background:#1e3a5f;color:#93c5fd;border-radius:20px;padding:2px 10px;font-size:.8rem;font-weight:800;">R/O '+teamStats.wRO+'%</span></td>'
+         + '<td>'+statCell(teamStats.mContacts,'','#c4b5fd')+'</td>'
+         + (function(){ var tObj=OBJECTIF_CONTRATS*collabsToShow.length; var p=Math.min(100,Math.round(teamStats.mContrats/tObj*100)); return '<td style="padding:6px 10px;"><div style="font-size:1.1rem;font-weight:900;">'+teamStats.mContrats+' <span style="font-size:.72rem;opacity:.5;">/'+tObj+'</span></div><div style="background:rgba(255,255,255,.15);border-radius:999px;height:6px;overflow:hidden;margin-top:3px;"><div style="background:#86efac;width:'+p+'%;height:100%;border-radius:999px;"></div></div></td>'; })()
+         + '<td style="text-align:center;"><span style="background:#3b1f6b;color:#c4b5fd;border-radius:20px;padding:2px 10px;font-size:.8rem;font-weight:800;">R/O '+teamStats.mRO+'%</span></td>'
+         + '</tr>'
+       ) : '')
+     + '</tbody>'
     + '</tbody>'
     + '</table>'
     + '</div></div>'
@@ -4276,8 +4274,8 @@ PAGES['collab-stats'] = function(mc) {
           + kpi('📄 Devis transmis',  s.mDevis,    teamStats.mDevis,    pDevis,    '#7c3aed')
           + kpi('📞 Contacts',        s.mContacts, teamStats.mContacts, pContacts, '#0369a1')
           + '</div>'
-          + (s.mRO > 0 ? '<div style="margin-top:12px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:12px;padding:14px 20px;color:#fff;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">'
-            + '<div style="font-size:.85rem;opacity:.8;">Ton R/O ce mois vs l\'agence</div>'
+          + (true ? '<div style="margin-top:12px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:12px;padding:14px 20px;color:#fff;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">'
+            + '<div style="font-size:.85rem;opacity:.8;">Résultat vs Objectif '+OBJECTIF_CONTRATS+' contrats</div>'
             + '<div style="display:flex;gap:16px;align-items:center;">'
             + '<div style="text-align:center;"><div style="font-size:1.5rem;font-weight:900;color:#86efac;">'+s.mRO+'%</div><div style="font-size:.7rem;opacity:.7;">Moi</div></div>'
             + '<div style="color:#94a3b8;font-size:1.2rem;">vs</div>'
