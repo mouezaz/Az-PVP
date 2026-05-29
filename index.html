@@ -4091,7 +4091,7 @@ PAGES['collab-stats'] = function(mc) {
   var colorsMap = getCollabColors();
 
   // Liste des collabs à afficher : admin voit tout le monde, collab voit juste elle
-  var collabsToShow = isAdmin ? getCollabNames() : [collab];
+  var collabsToShow = getCollabNames().filter(function(n){ return n !== 'Admin'; });
 
   // ── Helpers période ──
   var now2 = new Date();
@@ -4174,7 +4174,7 @@ PAGES['collab-stats'] = function(mc) {
 
   // ── Totaux équipe (si admin ou pour info) ──
   var teamStats = null;
-  if (isAdmin || collabsToShow.length > 1) {
+  if (true) {
     var tWC=0,tWD=0,tWK=0,tMC=0,tMD=0,tMK=0;
     collabsToShow.forEach(function(name){ var s=getStats(name); tWC+=s.wContacts;tWD+=s.wDevis;tWK+=s.wContrats;tMC+=s.mContacts;tMD+=s.mDevis;tMK+=s.mContrats; });
     teamStats = { wContacts:tWC, wDevis:tWD, wContrats:tWK, wRO:pct(tWK,tWC), mContacts:tMC, mDevis:tMD, mContrats:tMK, mRO:pct(tMK,tMC) };
@@ -4184,7 +4184,7 @@ PAGES['collab-stats'] = function(mc) {
 
     // Header
     + '<div style="background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:16px;padding:22px 28px;color:#fff;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
-    + '<div><div style="font-size:1.3rem;font-weight:800;">📊 Mes stats & Taux de concrétisation</div>'
+    + '<div><div style="font-size:1.3rem;font-weight:800;">' + (isAdmin ? '📊 Stats équipe & Taux de concrétisation' : '📊 Ma contribution à l\'agence') + '</div>'
     + '<div style="opacity:.8;font-size:.85rem;margin-top:4px;">Contacts → Devis → Contrats · R/O = contrats / contacts</div></div>'
     + '<div style="text-align:right;font-size:.8rem;opacity:.7;">Semaine du '+mondayLabel+' → '+sundayLabel+'<br>Mois : '+MOIS_FULL[mois]+' '+annee+'</div>'
     + '</div>'
@@ -4236,6 +4236,55 @@ PAGES['collab-stats'] = function(mc) {
     + '</tbody>'
     + '</table>'
     + '</div></div>'
+
+    // ── Bloc contribution collab (non admin uniquement) ──
+    + (!isAdmin && teamStats ? (function(){
+        var s = getStats(collab);
+        var col = colorsMap[collab] || '#6b7280';
+        function contribPct(mine, total) {
+          return total > 0 ? Math.round(mine / total * 100) : 0;
+        }
+        var pContrats = contribPct(s.mContrats, teamStats.mContrats);
+        var pDevis    = contribPct(s.mDevis,    teamStats.mDevis);
+        var pContacts = contribPct(s.mContacts, teamStats.mContacts);
+
+        function bar(pct, color) {
+          return '<div style="background:#e5e7eb;border-radius:999px;height:10px;overflow:hidden;margin-top:4px;">'
+            + '<div style="background:'+color+';width:'+pct+'%;height:100%;border-radius:999px;transition:width .5s ease;"></div>'
+            + '</div>';
+        }
+        function kpi(label, mine, total, pct, color) {
+          return '<div style="background:white;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 16px;">'
+            + '<div style="font-size:.72rem;font-weight:600;color:#64748b;margin-bottom:6px;text-transform:uppercase;">'+label+'</div>'
+            + '<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:2px;">'
+            + '<span style="font-size:1.6rem;font-weight:900;color:'+color+';">'+mine+'</span>'
+            + '<span style="font-size:.8rem;color:#94a3b8;">/ '+total+' agence</span>'
+            + '</div>'
+            + '<div style="font-size:.78rem;font-weight:700;color:'+color+';margin-bottom:4px;">'+pct+'% de l\'agence</div>'
+            + bar(pct, color)
+            + '</div>';
+        }
+
+        return '<div style="margin-top:20px;">'
+          + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
+          + '<div style="width:36px;height:36px;border-radius:50%;background:'+col+';color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;">'+collab.slice(0,2).toUpperCase()+'</div>'
+          + '<div><div style="font-weight:800;font-size:1rem;color:#1e293b;">Ma contribution ce mois — '+MOIS_FULL[mois]+' '+annee+'</div>'
+          + '<div style="font-size:.78rem;color:#64748b;">Ta part dans les résultats de l\'agence</div></div>'
+          + '</div>'
+          + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">'
+          + kpi('🏆 Contrats signés', s.mContrats, teamStats.mContrats, pContrats, '#15803d')
+          + kpi('📄 Devis transmis',  s.mDevis,    teamStats.mDevis,    pDevis,    '#7c3aed')
+          + kpi('📞 Contacts',        s.mContacts, teamStats.mContacts, pContacts, '#0369a1')
+          + '</div>'
+          + (s.mRO > 0 ? '<div style="margin-top:12px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:12px;padding:14px 20px;color:#fff;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">'
+            + '<div style="font-size:.85rem;opacity:.8;">Ton R/O ce mois vs l\'agence</div>'
+            + '<div style="display:flex;gap:16px;align-items:center;">'
+            + '<div style="text-align:center;"><div style="font-size:1.5rem;font-weight:900;color:#86efac;">'+s.mRO+'%</div><div style="font-size:.7rem;opacity:.7;">Moi</div></div>'
+            + '<div style="color:#94a3b8;font-size:1.2rem;">vs</div>'
+            + '<div style="text-align:center;"><div style="font-size:1.5rem;font-weight:900;color:#93c5fd;">'+teamStats.mRO+'%</div><div style="font-size:.7rem;opacity:.7;">Agence</div></div>'
+            + '</div></div>' : '')
+          + '</div>';
+      })() : '')
 
     + '</div>';
 };
