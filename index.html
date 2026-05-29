@@ -4219,8 +4219,6 @@ PAGES['collab-stats'] = function(mc) {
     + rows.join('')
     + (teamStats ? (
         '<tr style="background:#0f172a;color:#fff;font-weight:700;border-top:2px solid #0f172a;">'
-         '<tr style="background:#0f172a;color:#fff;font-weight:700;border-top:2px solid #0f172a;">'
-         + '<td style="padding:10px 14px;font-size:.82rem;">🏢 Total équipe</td>'
          + '<td>'+statCell(teamStats.wContacts,'','#93c5fd')+'</td>'
          + '<td>'+statCell(teamStats.wContrats,'','#86efac')+'</td>'
          + '<td style="text-align:center;"><span style="background:#1e3a5f;color:#93c5fd;border-radius:20px;padding:2px 10px;font-size:.8rem;font-weight:800;">R/O '+teamStats.wRO+'%</span></td>'
@@ -4230,7 +4228,6 @@ PAGES['collab-stats'] = function(mc) {
          + '</tr>'
        ) : '')
      + '</tbody>'
-    + '</tbody>'
     + '</table>'
     + '</div></div>'
 
