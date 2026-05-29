@@ -4197,7 +4197,7 @@ PAGES['collab-stats'] = function(mc) {
   thG += '<th colspan="2" style="padding:5px 6px;text-align:center;font-size:.65rem;color:#6d28d9;text-transform:uppercase;background:#f5f3ff;border-left:2px solid #c4b5fd;white-space:nowrap;">📆 Mois — /'+OBJECTIF+'</th>';
 
   // Header rangée 2 : sous-colonnes
-  var thS = '<th style="padding:4px 8px;font-size:.62rem;color:#64748b;border-right:2px solid #e2e8f0;">Nom</th>';
+  var thS = '';
   semaines.forEach(function(s, i) {
     var last = i === semaines.length-1;
     thS += '<th style="padding:4px 5px;text-align:center;font-size:.62rem;color:#15803d;background:#f0fdf4;width:'+colW+';border-left:1px solid #dbeafe;">Cont.</th>';
