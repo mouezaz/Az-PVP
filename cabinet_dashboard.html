@@ -1698,7 +1698,7 @@ function renderAnalyse(){
     const tot=sum(elapsedIdxs.map(i=>catTotal(yr,cat,i))); // Total = mois écoulés
     const prevVals=prevIdxs.map(i=>catTotal(prev,cat,i));
     const prevTot=sum(prevVals);
-    html+=`<tr class="tr-cat" id="grp_${cat}" onclick="toggleAnalyseGroup('grp_${cat}')"><td><span class="g-arr" style="display:inline-block;margin-right:6px;transition:transform .2s">▾</span>${def.icon} ${def.label}</td>${vals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td><strong>${fmtN(tot)}</strong></td>${pca(tot,total_ca)}${pca(prevTot,prev_total_ca)}<td style="color:${tot-prevTot>=0?'#059669':'#dc2626'};font-weight:700">${prevTot>0?(tot-prevTot>=0?'+':'')+fmtN(Math.round(tot-prevTot))+' €':'—'}</td></tr>`;
+    html+=`<tr class="tr-cat" id="grp_${cat}" onclick="toggleAnalyseGroup('grp_${cat}')"><td><span class="g-arr" style="display:inline-block;margin-right:6px;transition:transform .2s">▾</span>${def.icon} ${def.label}</td>${vals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td><strong>${fmtN(tot)}</strong></td>${pca(tot,total_ca)}${pca(prevTot,prev_total_ca)}<td style="color:${tot-prevTot>=0?'#059669':'#dc2626'};font-weight:700">${prevTot>0?(tot-prevTot>=0?'+':'')+fmtN(Math.round(tot-prevTot))+' €  '+(prevTot>0?'('+((tot-prevTot)/prevTot*100).toFixed(1)+'%)':''):'—'}</td></tr>`;
     if(cat==='iard'||cat==='vie'){
       const ksuPerMo=idxs.map(i=>{
         const d=KSU_DATA[yr]?.[i+1];
@@ -1717,7 +1717,7 @@ function renderAnalyse(){
   });
   const revVals=idxs.map(i=>monthComm(yr,i));const totalRev=sum(elapsedIdxs.map(i=>monthComm(yr,i)));
   const totalPrevRev=sum(prevIdxs.map(i=>monthComm(prev,i)));
-  html+=`<tr class="tr-total" style="background:#1e3a5f;font-size:13px"><td>💰 TOTAL COMMISSIONS</td>${revVals.map(v=>`<td style="color:#6ee7b7;font-weight:700">${fmtN(v)}</td>`).join('')}<td style="color:#6ee7b7;font-weight:800;font-size:14px">${fmtN(totalRev)}</td><td>100%</td><td>100%</td><td style="color:${totalRev-totalPrevRev>=0?'#059669':'#dc2626'};font-weight:700">${totalPrevRev>0?(totalRev-totalPrevRev>=0?'+':'')+fmtN(Math.round(totalRev-totalPrevRev))+' €':'—'}</td></tr>`;
+  html+=`<tr class="tr-total" style="background:#1e3a5f;font-size:13px"><td>💰 TOTAL COMMISSIONS</td>${revVals.map(v=>`<td style="color:#6ee7b7;font-weight:700">${fmtN(v)}</td>`).join('')}<td style="color:#6ee7b7;font-weight:800;font-size:14px">${fmtN(totalRev)}</td><td>100%</td><td>100%</td><td style="color:${totalRev-totalPrevRev>=0?'#059669':'#dc2626'};font-weight:700">${totalPrevRev>0?(totalRev-totalPrevRev>=0?'+':'')+fmtN(Math.round(totalRev-totalPrevRev))+' €  ('+((totalRev-totalPrevRev)/totalPrevRev*100).toFixed(1)+'%)':'—'}</td></tr>`;
 
   html+=`<tr class="tr-sep"><td colspan="${idxs.length+5}">CHARGES</td></tr>`;
   CHG_CATS.forEach(cat=>{
@@ -1726,7 +1726,7 @@ function renderAnalyse(){
     const tot=sum(elapsedIdxs.map(i=>catTotal(yr,cat,i))); // Total = mois écoulés
     const prevVals=prevIdxs.map(i=>catTotal(prev,cat,i));
     const prevTot=sum(prevVals);
-    html+=`<tr class="tr-cat" id="grp_${cat}" onclick="toggleAnalyseGroup('grp_${cat}')"><td><span class="g-arr" style="display:inline-block;margin-right:6px;transition:transform .2s">▾</span>${def.icon} ${def.label}</td>${vals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td><strong>${fmtN(tot)}</strong></td>${pca(tot,total_ca)}${pca(prevTot,prev_total_ca)}<td style="color:${tot-prevTot<=0?'#059669':'#dc2626'};font-weight:700">${prevTot>0?(tot-prevTot>=0?'+':'')+fmtN(Math.round(tot-prevTot))+' €':'—'}</td></tr>`;
+    html+=`<tr class="tr-cat" id="grp_${cat}" onclick="toggleAnalyseGroup('grp_${cat}')"><td><span class="g-arr" style="display:inline-block;margin-right:6px;transition:transform .2s">▾</span>${def.icon} ${def.label}</td>${vals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td><strong>${fmtN(tot)}</strong></td>${pca(tot,total_ca)}${pca(prevTot,prev_total_ca)}<td style="color:${tot-prevTot<=0?'#059669':'#dc2626'};font-weight:700">${prevTot>0?(tot-prevTot>=0?'+':'')+fmtN(Math.round(tot-prevTot))+' €  '+(prevTot>0?'('+((tot-prevTot)/prevTot*100).toFixed(1)+'%)':''):'—'}</td></tr>`;
     const d=getDetail(yr,idxs[0]+1);
     if(d&&d[cat]){
       const items=CATS[cat].items||Object.keys(d[cat]);
@@ -1738,7 +1738,7 @@ function renderAnalyse(){
   });
   const chgVals=idxs.map(i=>monthChg(yr,i));const totalChg=sum(elapsedIdxs.map(i=>monthChg(yr,i)));
   const totalPrevChg=sum(prevIdxs.map(i=>monthChg(prev,i)));
-  html+=`<tr class="tr-charges"><td>TOTAL CHARGES</td>${chgVals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td>${fmtN(totalChg)}</td>${pca(totalChg,total_ca)}${pca(totalPrevChg,prev_total_ca)}<td style="color:${totalChg-totalPrevChg<=0?'#059669':'#dc2626'};font-weight:700">${totalPrevChg>0?(totalChg-totalPrevChg>=0?'+':'')+fmtN(Math.round(totalChg-totalPrevChg))+' €':'—'}</td></tr>`;
+  html+=`<tr class="tr-charges"><td>TOTAL CHARGES</td>${chgVals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td>${fmtN(totalChg)}</td>${pca(totalChg,total_ca)}${pca(totalPrevChg,prev_total_ca)}<td style="color:${totalChg-totalPrevChg<=0?'#059669':'#dc2626'};font-weight:700">${totalPrevChg>0?(totalChg-totalPrevChg>=0?'+':'')+fmtN(Math.round(totalChg-totalPrevChg))+' €  ('+((totalChg-totalPrevChg)/totalPrevChg*100).toFixed(1)+'%)':'—'}</td></tr>`;
   const soldeVals=idxs.map(i=>monthSolde(yr,i));const totalSolde=sum(elapsedIdxs.map(i=>monthSolde(yr,i)));
   html+=`<tr class="tr-solde"><td>SOLDE NET</td>${soldeVals.map(v=>`<td style="color:${v>=0?'#6ee7b7':'#fca5a5'}">${fmtN(v)}</td>`).join('')}<td>${fmtN(totalSolde)}</td><td colspan="3"></td></tr>`;
   html+='</tbody></table>';
@@ -1848,6 +1848,10 @@ function saveKsu(){
     if(iardLine) USER_RD[ksu_yr][ksu_mo+1].iard=[{desc:iardLine.label,amount:iardLine.amount}];
     if(vieLine)  USER_RD[ksu_yr][ksu_mo+1].vie=[{desc:vieLine.label,amount:vieLine.amount}];
   }
+  // Mettre à jour BASE pour que Dashboard/Grille/Analyse reflètent les nouvelles valeurs
+  const yr=ksu_yr, mo=ksu_mo;
+  if(BASE[yr]?.iard) BASE[yr].iard[mo]=ksuCatTotal(yr,mo+1,'iard');
+  if(BASE[yr]?.vie)  BASE[yr].vie[mo]=ksuCatTotal(yr,mo+1,'vie');
   saveLocal();
   showNotif('✅ KSU enregistré');
   renderKsuKpi();
