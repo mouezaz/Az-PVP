@@ -13040,6 +13040,7 @@ PAGES['admin-rh-primes'] = function(mc) {
             ? '<button onclick="resetPrimeOverride(\'' + collab + '\',' + m + ',' + annee + ')" title="Revenir au calcul auto" '
               + 'style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#f97316;border:none;color:#fff;font-size:.6rem;cursor:pointer;line-height:16px;text-align:center;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.2);">↺</button>'
             : '')
+        + '<button onclick="openPrimeDetailModal(\'' + collab + '\',' + m + ',' + annee + ')" title="Détail du calcul" style="margin-top:4px;background:none;border:1px solid #bfdbfe;color:#3b82f6;border-radius:5px;font-size:.6rem;padding:1px 5px;cursor:pointer;width:100%;">🔍</button>'
         + '</div>';
     }).join('');
 
@@ -13327,6 +13328,126 @@ function _kpiCard(icon, label, val, bg, color) {
     + '<div style="font-size:.75rem;color:' + color + ';font-weight:600;text-transform:uppercase;letter-spacing:.05em;">' + label + '</div>'
     + '<div style="font-size:1.25rem;font-weight:800;color:' + color + ';margin-top:4px;">' + val + '</div>'
     + '</div>';
+}
+
+
+function openPrimeDetailModal(collab, mois, annee) {
+  var manual = (DB.primes||[]).find(function(p){ return p.collab===collab && p.mois===mois && p.annee===annee; });
+  var obj     = getObjectifsStatus(collab, mois, annee);
+  var ventesM = getVentesMoisCollab(collab, mois, annee);
+  var col     = (getCollabColors()[collab] || '#3b82f6');
+  var moisLbl = MOIS_FULL[mois] + ' ' + annee;
+
+  var rows = '', total = 0;
+
+  if (manual !== undefined) {
+    rows = '<tr><td colspan="5" style="padding:10px 14px;font-size:.85rem;color:#15803d;font-weight:600;">💚 Montant saisi manuellement : ' + fmtEuro(manual.montant||0) + '</td></tr>';
+    total = manual.montant||0;
+  } else if (!ventesM.length) {
+    rows = '<tr><td colspan="5" style="padding:14px;color:#94a3b8;text-align:center;">Aucune vente ce mois — prime = 0 €</td></tr>';
+  } else {
+    var byProd = {};
+    ventesM.forEach(function(v){ if(!byProd[v.produit]) byProd[v.produit]=[]; byProd[v.produit].push(v); });
+    Object.keys(byProd).forEach(function(prod) {
+      var ventes = byProd[prod];
+      var nb  = ventes.length;
+      var r   = (COMM_RATES_COLLAB[prod]) || null;
+      if (!r) {
+        rows += '<tr style="background:#fafafa;">'
+          + '<td style="padding:8px 12px;font-weight:600;">'+prod+'</td>'
+          + '<td style="padding:8px 12px;text-align:center;">'+nb+'</td>'
+          + '<td style="padding:8px 12px;color:#94a3b8;">—</td>'
+          + '<td style="padding:8px 12px;color:#94a3b8;">—</td>'
+          + '<td style="padding:8px 12px;color:#94a3b8;font-weight:600;">non rémunéré</td>'
+          + '</tr>';
+        return;
+      }
+      var bloque = false, raisonBlocage = '';
+      if (prod==='Auto' && !obj.autoOK) { bloque=true; raisonBlocage = !obj.nopOK ? 'NOP insuff. ('+obj.nbNOP+'/4)' : 'Auto insuff. ('+obj.nbAuto+'/10)'; }
+      if (prod==='MRH'  && !obj.mrhOK)  { bloque=true; raisonBlocage = !obj.nopOK ? 'NOP insuff. ('+obj.nbNOP+'/4)' : 'MRH insuff. ('+obj.nbMRH+'/8)'; }
+      if (bloque) {
+        rows += '<tr style="background:#fef2f2;">'
+          + '<td style="padding:8px 12px;font-weight:600;color:#dc2626;">'+prod+'</td>'
+          + '<td style="padding:8px 12px;text-align:center;color:#dc2626;">'+nb+'</td>'
+          + '<td colspan="2" style="padding:8px 12px;color:#dc2626;">🔒 '+raisonBlocage+'</td>'
+          + '<td style="padding:8px 12px;color:#dc2626;font-weight:700;">0,00 €</td>'
+          + '</tr>';
+        return;
+      }
+      var decote28 = obj.regle28actif && !obj.anOK && EXEMPTES_28AN.indexOf(prod)===-1;
+      var tauxStr, baseStr, montant;
+      if (r.type==='forfait') {
+        tauxStr = r.val + ' € / contrat';
+        baseStr = nb + ' × ' + r.val + ' €';
+        montant = nb * r.val;
+      } else {
+        var primeSum = ventes.reduce(function(s,v){ return s+(parseFloat(v.prime)||0); },0);
+        tauxStr = (r.val*100) + '%';
+        baseStr = fmtEuro(primeSum) + ' × ' + (r.val*100) + '%';
+        montant = primeSum * r.val;
+      }
+      var montantFinal = decote28 ? montant * DECOTE_28AN : montant;
+      total += montantFinal;
+      var decoteStr = decote28
+        ? '<br><span style="font-size:.72rem;color:#d97706;">⚠ ×70% décote (AN='+obj.nbAN+'/28)</span>'
+        : (EXEMPTES_28AN.indexOf(prod)!==-1 && obj.regle28actif ? '<br><span style="font-size:.72rem;color:#10b981;">✓ exempté règle 28</span>' : '');
+      rows += '<tr style="border-bottom:1px solid #f1f5f9;">'
+        + '<td style="padding:8px 12px;font-weight:600;">'+prod+'</td>'
+        + '<td style="padding:8px 12px;text-align:center;">'+nb+'</td>'
+        + '<td style="padding:8px 12px;color:#64748b;font-size:.82rem;">'+tauxStr+'</td>'
+        + '<td style="padding:8px 12px;color:#64748b;font-size:.82rem;">'+baseStr+'</td>'
+        + '<td style="padding:8px 12px;font-weight:800;color:'+(decote28?'#d97706':'#15803d')+';">'+fmtEuro(montantFinal)+decoteStr+'</td>'
+        + '</tr>';
+    });
+  }
+
+  // Conditions résumées
+  var condHtml = '';
+  if (obj.regle28actif) {
+    var anStatus = obj.anOK
+      ? '<span style="color:#15803d;font-weight:700;">✅ '+obj.nbAN+'/28 AN atteint</span>'
+      : '<span style="color:#dc2626;font-weight:700;">❌ '+obj.nbAN+'/28 AN — décote -30% sur produits non exemptés</span>';
+    condHtml += '<div style="font-size:.8rem;margin-top:8px;">'+anStatus+'</div>';
+  }
+  condHtml += '<div style="font-size:.8rem;margin-top:4px;">'
+    + (obj.nopOK ? '<span style="color:#15803d;">✅ NOP '+obj.nbNOP+'/4</span>' : '<span style="color:#dc2626;">❌ NOP '+obj.nbNOP+'/4 → Auto & MRH bloqués</span>')
+    + ' &nbsp;·&nbsp; '
+    + (obj.autoOK ? '<span style="color:#15803d;">✅ Auto '+obj.nbAuto+'/10</span>' : '<span style="color:#94a3b8;">Auto '+obj.nbAuto+'/10</span>')
+    + ' &nbsp;·&nbsp; '
+    + (obj.mrhOK  ? '<span style="color:#15803d;">✅ MRH '+obj.nbMRH+'/8</span>'   : '<span style="color:#94a3b8;">MRH '+obj.nbMRH+'/8</span>')
+    + '</div>';
+
+  var modal = document.createElement('div');
+  modal.id = 'prime-detail-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  modal.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);">'
+    + '<div style="background:'+col+';color:#fff;padding:14px 20px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;">'
+    + '<div><div style="font-weight:800;font-size:1rem;">🎁 Détail prime — '+collab+'</div>'
+    + '<div style="font-size:.78rem;opacity:.85;margin-top:2px;">'+moisLbl+'</div></div>'
+    + '<button onclick="document.getElementById(\'prime-detail-modal\').remove()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:1rem;">✕</button>'
+    + '</div>'
+    + '<div style="padding:18px 20px;">'
+    + condHtml
+    + '<div style="margin-top:14px;border-radius:10px;overflow:hidden;border:1.5px solid #e2e8f0;">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:.83rem;">'
+    + '<thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
+    + '<th style="padding:8px 12px;text-align:left;color:#64748b;font-weight:700;">Produit</th>'
+    + '<th style="padding:8px 12px;text-align:center;color:#64748b;font-weight:700;">Nb</th>'
+    + '<th style="padding:8px 12px;color:#64748b;font-weight:700;">Taux</th>'
+    + '<th style="padding:8px 12px;color:#64748b;font-weight:700;">Base</th>'
+    + '<th style="padding:8px 12px;color:#64748b;font-weight:700;">Prime</th>'
+    + '</tr></thead>'
+    + '<tbody>'+rows+'</tbody>'
+    + '</table></div>'
+    + '<div style="margin-top:14px;background:#f0fdf4;border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">'
+    + '<span style="font-size:.85rem;font-weight:700;color:#0f172a;">💰 Total prime '+moisLbl+'</span>'
+    + '<span style="font-size:1.3rem;font-weight:900;color:'+col+';">'+fmtEuro(total)+'</span>'
+    + '</div>'
+    + '<div style="text-align:right;margin-top:12px;">'
+    + '<button onclick="document.getElementById(\'prime-detail-modal\').remove()" style="padding:9px 20px;background:#f1f5f9;border:none;border-radius:8px;font-weight:600;cursor:pointer;color:#374151;">Fermer</button>'
+    + '</div>'
+    + '</div></div>';
+  document.body.appendChild(modal);
 }
 
 function getPrimeBreakdown(collab, mois, annee) {
