@@ -593,6 +593,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
         <h3>⚖️ Poids des charges sur le CA — alertes</h3>
         <div id="dPctBars" style="padding:6px 0"></div>
       </div>
+
     </div>
 
     <!-- GRILLE -->
@@ -618,6 +619,10 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
     <div class="view" id="view-analyse">
       <div class="ytabs" id="ay"></div>
       <div class="tbl-wrap" id="aTbl"></div>
+      <div class="ch" style="margin-top:12px" id="a-surcharges-panel">
+        <h3>🚨 Sursauts de charges (+15%)</h3>
+        <div id="aSurcharges" style="padding:4px 0"></div>
+      </div>
       <div class="ch" style="margin-top:12px">
         <h3>📊 Poids des charges (% du CA)</h3>
         <div id="aBars" style="padding:8px 0"></div>
@@ -1144,6 +1149,98 @@ function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 // ================================================================
 // DASHBOARD
 // ================================================================
+
+// ================================================================
+// SURSAUTS DE CHARGES — alertes +15%
+// ================================================================
+function renderSurcharges(yr){
+  const el=document.getElementById('aSurcharges');
+  if(!el) return;
+  const SEUIL=0.15; // 15%
+  const elapsed=elapsedIdx(yr);
+  const alerts=[];
+
+  elapsed.forEach(mo=>{
+    if(mo===0) return; // pas de M-1 pour Janvier
+    const mo1=mo+1;
+    const prevMo=mo-1;
+    const prevYr=yr-1;
+
+    CHG_CATS.forEach(cat=>{
+      const def=CATS[cat];
+      const val=catTotal(yr,cat,mo);
+      if(val===0) return;
+
+      // Comparaison M-1
+      const valM1=catTotal(yr,cat,prevMo);
+      if(valM1>0){
+        const delta=(val-valM1)/valM1;
+        if(delta>=SEUIL){
+          alerts.push({
+            type:'M-1',
+            cat,
+            mo,
+            yr,
+            val,
+            ref:valM1,
+            delta,
+            label:`${MO[mo].substring(0,3)} vs ${MO[prevMo].substring(0,3)}`
+          });
+        }
+      }
+
+      // Comparaison N-1 même mois
+      if(YRS.includes(prevYr)){
+        const valN1=catTotal(prevYr,cat,mo);
+        if(valN1>0){
+          const delta=(val-valN1)/valN1;
+          if(delta>=SEUIL){
+            alerts.push({
+              type:'N-1',
+              cat,
+              mo,
+              yr,
+              val,
+              ref:valN1,
+              delta,
+              label:`${MO[mo].substring(0,3)} ${yr} vs ${MO[mo].substring(0,3)} ${prevYr}`
+            });
+          }
+        }
+      }
+    });
+  });
+
+  if(alerts.length===0){
+    el.innerHTML='<div style="color:#059669;font-size:13px;padding:6px 0">✅ Aucun sursaut détecté sur cette période.</div>';
+    return;
+  }
+
+  // Trier par delta décroissant
+  alerts.sort((a,b)=>b.delta-a.delta);
+
+  el.innerHTML=alerts.map(a=>{
+    const def=CATS[a.cat];
+    const pct=(a.delta*100).toFixed(1);
+    const diff=a.val-a.ref;
+    const badge=a.type==='M-1'
+      ?'<span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-right:6px">vs M-1</span>'
+      :'<span style="background:#ede9fe;color:#5b21b6;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-right:6px">vs N-1</span>';
+    const severity=a.delta>=0.30?'#dc2626':a.delta>=0.20?'#ea580c':'#d97706';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:6px;background:#fff7ed;border-radius:8px;border-left:4px solid ${severity}">
+      <span style="font-size:18px">${def.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:700;color:#1e293b">${badge}${def.label}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px">${a.label} — ${fmt(a.ref)} → ${fmt(a.val)}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:14px;font-weight:800;color:${severity}">+${pct}%</div>
+        <div style="font-size:11px;color:#94a3b8">+${fmt(diff)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderDash(){
   const c=document.getElementById('dy');
   c.innerHTML='';
@@ -1233,6 +1330,8 @@ function renderDash(){
   } else {
     barsEl.innerHTML='<div style="color:#94a3b8;font-size:13px;padding:8px">Aucune donnée de revenus.</div>';
   }
+
+  renderSurcharges(yr);
 }
 
 // ================================================================
@@ -1726,14 +1825,102 @@ function renderAnalyse(){
     const tot=sum(elapsedIdxs.map(i=>catTotal(yr,cat,i))); // Total = mois écoulés
     const prevVals=prevIdxs.map(i=>catTotal(prev,cat,i));
     const prevTot=sum(prevVals);
-    html+=`<tr class="tr-cat" id="grp_${cat}" onclick="toggleAnalyseGroup('grp_${cat}')"><td><span class="g-arr" style="display:inline-block;margin-right:6px;transition:transform .2s">▾</span>${def.icon} ${def.label}</td>${vals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td><strong>${fmtN(tot)}</strong></td>${pca(tot,total_ca)}${pca(prevTot,prev_total_ca)}<td style="color:${tot-prevTot<=0?'#059669':'#dc2626'};font-weight:700">${prevTot>0?(tot-prevTot>=0?'+':'')+fmtN(Math.round(tot-prevTot))+' €  '+(prevTot>0?'('+((tot-prevTot)/prevTot*100).toFixed(1)+'%)':''):'—'}</td></tr>`;
+    // Surlignage sursauts par cellule
+    const cellHtml=idxs.map((mo,idx2)=>{
+      const v=vals[idx2];
+      if(v===0) return '<td>'+fmtN(v)+'</td>';
+      const vm1=mo>0?catTotal(yr,cat,mo-1):0;
+      const vsM1=vm1>0?(v-vm1)/vm1:0;
+      const vn1=YRS.includes(yr-1)?catTotal(yr-1,cat,mo):0;
+      const vsN1=vn1>0?(v-vn1)/vn1:0;
+      const alertM1=vsM1>=0.15, alertN1=vsN1>=0.15;
+      if(alertM1||alertN1){
+        const bg=alertM1&&alertN1?'#fee2e2':alertM1?'#fff7ed':'#ede9fe';
+        const border=alertM1&&alertN1?'#dc2626':alertM1?'#f59e0b':'#8b5cf6';
+        const tip=(alertM1?'M-1 +'+(vsM1*100).toFixed(0)+'%':'')+(alertM1&&alertN1?' | ':'')+(alertN1?'N-1 +'+(vsN1*100).toFixed(0)+'%':'');
+        return '<td style="background:'+bg+';border-left:3px solid '+border+';font-weight:700" title="'+tip+'">'+fmtN(v)+' <span style="font-size:9px;color:'+border+'">▲</span></td>';
+      }
+      return '<td>'+fmtN(v)+'</td>';
+    }).join('');
+    html+=`<tr class="tr-cat" id="grp_${cat}" onclick="toggleAnalyseGroup('grp_${cat}')"><td><span class="g-arr" style="display:inline-block;margin-right:6px;transition:transform .2s">▾</span>${def.icon} ${def.label}</td>${cellHtml}<td><strong>${fmtN(tot)}</strong></td>${pca(tot,total_ca)}${pca(prevTot,prev_total_ca)}<td style="color:${tot-prevTot<=0?'#059669':'#dc2626'};font-weight:700">${prevTot>0?(tot-prevTot>=0?'+':'')+fmtN(Math.round(tot-prevTot))+' €  '+(prevTot>0?'('+((tot-prevTot)/prevTot*100).toFixed(1)+'%)':''):'—'}</td></tr>`;
     const d=getDetail(yr,idxs[0]+1);
     if(d&&d[cat]){
       const items=CATS[cat].items||Object.keys(d[cat]);
       items.forEach(item=>{
         const iv=idxs.map(i=>{const dd=getDetail(yr,i+1);return(dd&&dd[cat]&&dd[cat][item])||0;});
-        if(sum(iv)>0) html+=`<tr class="tr-item hr" data-group="grp_${cat}"><td>${item}</td>${iv.map(v=>`<td>${v>0?fmtN(v,2):'—'}</td>`).join('')}<td>${fmtN(sum(iv),2)}</td><td colspan="3"></td></tr>`;
+        if(sum(iv)===0) return;
+        // Surlignage sous-poste par cellule
+        const itemCells=idxs.map((mo,idx2)=>{
+          const v=iv[idx2];
+          if(v===0) return '<td>—</td>';
+          // vs M-1
+          const vm1=idx2>0?iv[idx2-1]:0;
+          const vsM1=vm1>0?(v-vm1)/vm1:0;
+          // vs N-1
+          const ivN1=idxs.map(i=>{const dd=getDetail(yr-1,i+1);return(dd&&dd[cat]&&dd[cat][item])||0;});
+          const vn1=ivN1[idx2]||0;
+          const vsN1=vn1>0?(v-vn1)/vn1:0;
+          const alertM1=vsM1>=0.15, alertN1=vsN1>=0.15;
+          if(alertM1||alertN1){
+            const bg=alertM1&&alertN1?'#fee2e2':alertM1?'#fff7ed':'#ede9fe';
+            const border=alertM1&&alertN1?'#dc2626':alertM1?'#f59e0b':'#8b5cf6';
+            const tip=(alertM1?'M-1 +'+(vsM1*100).toFixed(0)+'%':'')+(alertM1&&alertN1?' | ':'')+(alertN1?'N-1 +'+(vsN1*100).toFixed(0)+'%':'');
+            return '<td style="background:'+bg+';border-left:3px solid '+border+';font-weight:700;font-size:11px" title="'+tip+'">'+fmtN(v,2)+' <span style="font-size:9px;color:'+border+'">▲</span></td>';
+          }
+          return '<td>'+(v>0?fmtN(v,2):'—')+'</td>';
+        }).join('');
+        html+=`<tr class="tr-item hr" data-group="grp_${cat}"><td>${item}</td>${itemCells}<td>${fmtN(sum(iv),2)}</td><td colspan="3"></td></tr>`;
       });
+      // Sous-rubriques Fixes (assurances, téléphonie, abonnements, déjeuners, voyages, achats)
+      if(cat==='fixes'){
+        const subKeys={assurances:{label:'Assurances',items:['Local','Prêt','Moto','CGPA']},telephonie:{label:'Téléphonie',items:['Mouez 0671357397','Agence','Mouez Pro','Naël','Box Internet']},abonnements:{label:'Abonnements',items:["Mil'Nr3 SMS","Clic'issimo",'ApiBots','CockPit','Ringover','IA Google','IA Claude','Agea']}};
+        Object.entries(subKeys).forEach(([key,def])=>{
+          def.items.forEach(subItem=>{
+            const iv2=idxs.map(i=>{const fd=getFixesDetail(yr,i+1);return(fd&&fd[key]&&fd[key][subItem])||0;});
+            if(sum(iv2)===0) return;
+            const itemCells2=idxs.map((mo,idx2)=>{
+              const v=iv2[idx2];
+              if(v===0) return '<td style="color:#c9d5e0;font-size:11px">—</td>';
+              const vm1=idx2>0?iv2[idx2-1]:0;
+              const vsM1=vm1>0?(v-vm1)/vm1:0;
+              const iv2N1=idxs.map(i=>{const fd=getFixesDetail(yr-1,i+1);return(fd&&fd[key]&&fd[key][subItem])||0;});
+              const vn1=iv2N1[idx2]||0;
+              const vsN1=vn1>0?(v-vn1)/vn1:0;
+              const alertM1=vsM1>=0.15, alertN1=vsN1>=0.15;
+              if(alertM1||alertN1){
+                const bg=alertM1&&alertN1?'#fee2e2':alertM1?'#fff7ed':'#ede9fe';
+                const border=alertM1&&alertN1?'#dc2626':alertM1?'#f59e0b':'#8b5cf6';
+                const tip=(alertM1?'M-1 +'+(vsM1*100).toFixed(0)+'%':'')+(alertM1&&alertN1?' | ':'')+(alertN1?'N-1 +'+(vsN1*100).toFixed(0)+'%':'');
+                return '<td style="background:'+bg+';border-left:3px solid '+border+';font-weight:700;font-size:11px" title="'+tip+'">'+fmtN(v,2)+' <span style="font-size:9px;color:'+border+'">▲</span></td>';
+              }
+              return '<td style="font-size:11px">'+fmtN(v,2)+'</td>';
+            }).join('');
+            html+=`<tr class="tr-item hr" data-group="grp_${cat}"><td style="padding-left:24px;color:#64748b">↳ ${subItem}</td>${itemCells2}<td style="font-size:11px">${fmtN(sum(iv2),2)}</td><td colspan="3"></td></tr>`;
+          });
+        });
+        // Déjeuners total
+        const dejVals=idxs.map(i=>{const fd=getFixesDetail(yr,i+1);return fd?.dejeuners?.reduce((s,v)=>s+v,0)||0;});
+        if(sum(dejVals)>0){
+          const dejCells=idxs.map((mo,idx2)=>{
+            const v=dejVals[idx2];
+            if(v===0) return '<td>—</td>';
+            const vm1=idx2>0?dejVals[idx2-1]:0;
+            const vsM1=vm1>0?(v-vm1)/vm1:0;
+            const dejN1=idxs.map(i=>{const fd=getFixesDetail(yr-1,i+1);return fd?.dejeuners?.reduce((s,v)=>s+v,0)||0;});
+            const vn1=dejN1[idx2]||0;
+            const vsN1=vn1>0?(v-vn1)/vn1:0;
+            const alertM1=vsM1>=0.15, alertN1=vsN1>=0.15;
+            if(alertM1||alertN1){
+              const bg=alertM1&&alertN1?'#fee2e2':alertM1?'#fff7ed':'#ede9fe';
+              const border=alertM1&&alertN1?'#dc2626':alertM1?'#f59e0b':'#8b5cf6';
+              const tip=(alertM1?'M-1 +'+(vsM1*100).toFixed(0)+'%':'')+(alertM1&&alertN1?' | ':'')+(alertN1?'N-1 +'+(vsN1*100).toFixed(0)+'%':'');
+              return '<td style="background:'+bg+';border-left:3px solid '+border+';font-weight:700;font-size:11px" title="'+tip+'">'+fmtN(v,2)+' <span style="font-size:9px;color:'+border+'">▲</span></td>';
+            }
+            return '<td style="font-size:11px">'+fmtN(v,2)+'</td>';
+          }).join('');
+          html+=`<tr class="tr-item hr" data-group="grp_fixes"><td style="padding-left:24px;color:#64748b">↳ Déjeuners (total)</td>${dejCells}<td style="font-size:11px">${fmtN(sum(dejVals),2)}</td><td colspan="3"></td></tr>`;
+        }
+      }
     }
   });
   const chgVals=idxs.map(i=>monthChg(yr,i));const totalChg=sum(elapsedIdxs.map(i=>monthChg(yr,i)));
@@ -1743,6 +1930,9 @@ function renderAnalyse(){
   html+=`<tr class="tr-solde"><td>SOLDE NET</td>${soldeVals.map(v=>`<td style="color:${v>=0?'#6ee7b7':'#fca5a5'}">${fmtN(v)}</td>`).join('')}<td>${fmtN(totalSolde)}</td><td colspan="3"></td></tr>`;
   html+='</tbody></table>';
   document.getElementById('aTbl').innerHTML=html;
+
+  // Alertes sursauts
+  renderSurcharges(an_yr);
 
   const barsEl=document.getElementById('aBars');
   if(total_ca>0){
