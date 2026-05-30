@@ -1097,8 +1097,13 @@ function monthChg(yr,mo){return CHG_CATS.reduce((s,c)=>s+catTotal(yr,c,mo),0);}
 function monthSolde(yr,mo){return monthComm(yr,mo)-monthChg(yr,mo);}
 
 function completedIdx(yr){
-  // Toujours 12 mois pour l'année courante
+  // Toujours 12 mois pour l'année courante (affichage complet)
   if(yr===CURRENT_YEAR) return Array.from({length:12},(_,i)=>i);
+  return Array.from({length:COMPLETED_MONTHS[yr]||0},(_,i)=>i);
+}
+// Mois écoulés uniquement — pour comparatif N-1 aux mêmes dates
+function elapsedIdx(yr){
+  if(yr===CURRENT_YEAR) return Array.from({length:CURRENT_MONTH},(_,i)=>i);
   return Array.from({length:COMPLETED_MONTHS[yr]||0},(_,i)=>i);
 }
 
@@ -1151,10 +1156,12 @@ function renderDash(){
   });
   const yr=dash_yr, prev=yr-1;
   const idxs=completedIdx(yr);
-  const prevIdxs=YRS.includes(prev)?completedIdx(prev).slice(0,idxs.length):[];
+  const elapsedIdxs=elapsedIdx(yr); // mois écoulés pour totaux réels
+  const prevIdxs=YRS.includes(prev)?elapsedIdx(prev).slice(0,elapsedIdxs.length):[];
   const comm=idxs.map(i=>monthComm(yr,i)), chgs=idxs.map(i=>monthChg(yr,i)), slds=idxs.map(i=>monthSolde(yr,i));
-  const tc=sum(comm), tch=sum(chgs), ts=tc-tch, tauxChg=tc>0?tch/tc*100:0;
-  const n=idxs.length;
+  // KPIs basés sur les mois écoulés uniquement
+  const tc=sum(elapsedIdxs.map(i=>monthComm(yr,i))), tch=sum(elapsedIdxs.map(i=>monthChg(yr,i))), ts=tc-tch, tauxChg=tc>0?tch/tc*100:0;
+  const n=elapsedIdxs.length;
   const prevComm=prevIdxs.length?sum(prevIdxs.map(i=>monthComm(prev,i))):null;
   const prevChg=prevIdxs.length?sum(prevIdxs.map(i=>monthChg(prev,i))):null;
   const prevSolde=prevComm!==null?prevComm-prevChg:null;
@@ -1324,9 +1331,10 @@ function gRow(cat,yr,showN1,prev){
   const isRev=def.group==='rev';
   let row=`<tr><td class="g-lbl"><div class="g-lbl-in">${def.icon} ${def.label}</div></td>`;
   let total=0;
+  const elapsed=elapsedIdx(yr);
   for(let mo=0;mo<12;mo++){
     const val=catTotal(yr,cat,mo);
-    total+=val;
+    if(elapsed.includes(mo)) total+=val; // Total = mois écoulés uniquement
     const fut=isFuture(yr,mo);
     const hasVal=val>0;
     let cls='gc'+(isRev?' rev-cell':' chg-cell')+(hasVal?' hv':' empty')+(fut?' fut':'');
@@ -1355,22 +1363,25 @@ function gSubRow(type,yr,label,fn,color){
   const isChg=type==='chg';
   let row=`<tr class="g-sub${isChg?' chg':''}"><td class="g-lbl"><div class="g-lbl-in" style="color:${color};font-size:13px">${label}</div></td>`;
   let total=0;
+  const elapsed=elapsedIdx(yr);
   for(let mo=0;mo<12;mo++){
     const val=fn(mo);
-    total+=val;
+    if(elapsed.includes(mo)) total+=val;
     row+=`<td class="sv" style="color:${color}">${val>0?fmtN(Math.round(val)):'—'}</td>`;
   }
-  row+=`<td class="sv tc" style="color:${color}">${total>0?fmtN(Math.round(total)):'—'}</td></tr>`;
+  const nLabel=elapsed.length>0?`Jan–${MO[elapsed[elapsed.length-1]].substring(0,3)}`:'';
+  row+=`<td class="sv tc" style="color:${color}">${total>0?fmtN(Math.round(total)):'—'}<br><span style="font-size:10px;color:#94a3b8;font-weight:400">${nLabel}</span></td></tr>`;
   return row;
 }
 
 function gSoldeRow(yr){
   let row=`<tr class="g-sol"><td class="g-lbl"><div class="g-lbl-in">💰 SOLDE NET</div></td>`;
   let total=0;
+  const elapsed=elapsedIdx(yr);
   for(let mo=0;mo<12;mo++){
     const sol=monthSolde(yr,mo);
     const comm=monthComm(yr,mo);
-    total+=sol;
+    if(elapsed.includes(mo)) total+=sol;
     const color=sol>0?'#6ee7b7':sol<0?'#fca5a5':'#94a3b8';
     row+=`<td class="gc" style="background:#0f172a !important;cursor:default;border-right:1px solid #1e293b;text-align:right;padding:0 10px;vertical-align:middle"><span class="v" style="font-weight:800;color:${comm>0?color:'#475569'}">${comm>0?fmtN(Math.round(sol)):'—'}</span></td>`;
   }
@@ -1661,10 +1672,11 @@ function renderAnalyse(){
   });
   const yr=an_yr, prev=yr-1;
   const idxs=completedIdx(yr);
-  const prevIdxs=YRS.includes(prev)?completedIdx(prev).slice(0,idxs.length):[];
-  const total_ca=sum(idxs.map(i=>monthComm(yr,i)));
+  const elapsedIdxs=elapsedIdx(yr);
+  const prevIdxs=YRS.includes(prev)?elapsedIdx(prev).slice(0,elapsedIdxs.length):[];
+  const total_ca=sum(elapsedIdxs.map(i=>monthComm(yr,i)));
   const prev_total_ca=sum(prevIdxs.map(i=>monthComm(prev,i)));
-  const sub=yr===CURRENT_YEAR?`${idxs.length} mois saisis`:`Exercice complet`;
+  const sub=yr===CURRENT_YEAR?`${elapsedIdxs.length} mois écoulés (sur 12)`:`Exercice complet`;
   document.getElementById('barsub').textContent=sub;
   const mobSub=document.getElementById('mob-barsub');
   if(mobSub) mobSub.textContent=sub;
