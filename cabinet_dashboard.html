@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -7,13 +8,19 @@
 <title>Cabinet — Agent Général</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
-<!-- Firebase SDK (compat) — même base que l'application principale -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
+/* ===============================================================
+   RESET & BASE
+   =============================================================== */
 *{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9;color:#1e293b;display:flex;height:100dvh;overflow:hidden}
-/* SIDEBAR */
+
+/* ===============================================================
+   SIDEBAR (desktop only)
+   =============================================================== */
 #sb{width:210px;background:#0f172a;display:flex;flex-direction:column;flex-shrink:0}
 .sb-logo{padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
 .sb-logo h2{font-size:14px;font-weight:700;color:#f8fafc;line-height:1.3}
@@ -26,19 +33,28 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .sb-info{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08)}
 .sb-badge{display:inline-block;background:#065f46;color:#6ee7b7;font-size:11px;padding:4px 8px;border-radius:20px;font-weight:600}
 .sb-info small{color:#475569;font-size:11px;display:block;margin-top:6px}
-/* MAIN */
+
+/* ===============================================================
+   MAIN LAYOUT
+   =============================================================== */
 #main{flex:1;overflow:hidden;display:flex;flex-direction:column;min-width:0}
 #bar{background:white;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:20;flex-shrink:0}
 #bar h1{font-size:16px;font-weight:700;color:#0f172a}
 #bar .sub{font-size:12px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:20px}
-#ct{flex:1;overflow-y:auto;padding:16px 20px}
+#ct{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 20px;-webkit-overflow-scrolling:touch}
 .view{display:none}.view.active{display:block}
-/* YEAR TABS */
+
+/* ===============================================================
+   YEAR TABS
+   =============================================================== */
 .ytabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
-.ytab{padding:6px 14px;border-radius:20px;border:1.5px solid #e2e8f0;background:white;cursor:pointer;font-size:13px;font-weight:600;color:#64748b;transition:all .15s}
+.ytab{padding:6px 14px;border-radius:20px;border:1.5px solid #e2e8f0;background:white;cursor:pointer;font-size:13px;font-weight:600;color:#64748b;transition:all .15s;min-height:36px}
 .ytab.active{background:#1d4ed8;color:white;border-color:#1d4ed8}
 .ytab:hover:not(.active){border-color:#1d4ed8;color:#1d4ed8}
-/* KPI CARDS */
+
+/* ===============================================================
+   KPI CARDS
+   =============================================================== */
 .krow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
 .krow5{grid-template-columns:repeat(5,1fr)}
 .kc{background:white;border-radius:12px;padding:14px 16px;border-left:4px solid transparent}
@@ -48,12 +64,18 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .kc.k1 .val{color:#2563eb}.kc.k2 .val{color:#dc2626}.kc.k3 .val{color:#059669}.kc.k4 .val{color:#7c3aed}.kc.k5 .val{color:#d97706}
 .kc .delta{font-size:12px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .up{color:#059669!important}.dn{color:#dc2626!important}.nu{color:#94a3b8!important}
-/* CHART PANELS */
+
+/* ===============================================================
+   CHART PANELS
+   =============================================================== */
 .crow{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:14px}
 .crow.full{grid-template-columns:1fr}.crow.half{grid-template-columns:1fr 1fr}
 .ch{background:white;border-radius:12px;padding:16px 18px}
 .ch h3{font-size:11.5px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
-/* GRILLE */
+
+/* ===============================================================
+   GRILLE
+   =============================================================== */
 .grid-toolbar{display:flex;align-items:center;gap:14px;margin-bottom:12px;flex-wrap:wrap}
 .grid-toolbar select{padding:7px 12px;border-radius:8px;border:1.5px solid #e2e8f0;font-size:14px;font-weight:600;background:white;color:#1e293b;cursor:pointer}
 .grid-toolbar label{display:flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer;user-select:none}
@@ -61,15 +83,12 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .g-legend{display:flex;gap:12px;align-items:center;font-size:12px;color:#64748b}
 .g-dot{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:3px;vertical-align:middle}
 .grid-wrap{background:white;border-radius:12px;overflow:auto;max-height:calc(100dvh - 145px);box-shadow:0 1px 4px rgba(0,0,0,.07)}
-/* Grid table */
 .g-tbl{border-collapse:collapse;min-width:1100px;font-size:13px;width:100%}
 .g-tbl thead th{position:sticky;top:0;z-index:6;background:#1e293b;color:white;padding:9px 10px;text-align:right;font-size:11px;font-weight:600;letter-spacing:.3px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.08)}
 .g-tbl thead th.th-lbl{text-align:left;position:sticky;left:0;z-index:10;min-width:200px;background:#0f172a;border-right:2px solid rgba(255,255,255,.2)}
 .g-tbl thead th.th-tot{background:#1e3a5f;border-left:2px solid rgba(255,255,255,.2)}
-/* Label column (sticky) */
 .g-lbl{position:sticky;left:0;z-index:4;background:white;min-width:200px;padding:0;border-right:2px solid #f1f5f9 !important}
 .g-lbl-in{display:flex;align-items:center;gap:7px;height:42px;padding:0 12px;font-size:13px;font-weight:600;color:#374151}
-/* Data cells */
 .gc{height:42px;cursor:pointer;text-align:right;padding:0 10px;transition:background .1s;white-space:nowrap;vertical-align:middle;border-right:1px solid #f4f6f8;border-bottom:1px solid #f4f6f8;position:relative}
 .gc:hover{background:#e0f2fe !important}
 .gc .v{font-size:13px;font-weight:500;color:#374151;display:block}
@@ -79,21 +98,17 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .gc.fut .v{color:#93a8d4;font-style:italic}
 .gc .ei{position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:9px;color:#93c5fd;opacity:0;pointer-events:none;transition:opacity .1s}
 .gc:hover .ei{opacity:1}
-/* Section headers */
 .g-sec td{background:#f8fafc !important;padding:8px 12px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#64748b;border-bottom:1px solid #e2e8f0 !important;border-right:none !important}
 .g-sec .g-lbl{background:#f0f4f8 !important}
-/* Subtotal rows */
 .g-sub td{background:#eff6ff;border-top:2px solid #bfdbfe !important;border-bottom:2px solid #bfdbfe !important;border-right:1px solid #dbeafe !important}
 .g-sub .g-lbl{background:#eff6ff}
 .g-sub .sv{font-size:13px;font-weight:800;color:#1d4ed8;text-align:right;padding:0 10px;height:42px;vertical-align:middle;white-space:nowrap}
 .g-sub.chg td{background:#fff7ed;border-color:#fed7aa !important}
 .g-sub.chg .g-lbl{background:#fff7ed}
 .g-sub.chg .sv{color:#c2410c}
-/* Totals column */
 .tc{background:#f0f9ff !important;border-left:2px solid #bfdbfe !important}
 .g-sub .tc{background:#dbeafe !important}
 .g-sub.chg .tc{background:#fde8d2 !important}
-/* Solde row */
 .g-sol td{background:#0f172a}
 .g-sol .g-lbl{background:#0f172a}
 .g-sol .g-lbl-in{color:#f0f9ff}
@@ -101,7 +116,6 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .g-sol .gc{background:#0f172a !important;cursor:default;border-color:#1e293b !important}
 .g-sol .gc .v{font-size:13px;font-weight:800}
 .g-sol .tc{background:#111827 !important;border-color:#374151 !important}
-/* N-1 sub-rows */
 .g-n1 td{background:#f8fafc;border-bottom:2px solid #e2e8f0 !important}
 .g-n1 .g-lbl{background:#f8fafc}
 .g-n1 .g-lbl-in{font-size:11px;color:#94a3b8;font-weight:500}
@@ -109,7 +123,10 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .nc .nv{color:#94a3b8}
 .nc .nd{font-size:10px;font-weight:700;margin-left:3px}
 .nd.up2{color:#059669}.nd.dn2{color:#dc2626}.nd.eq{color:#94a3b8}
-/* DRAWER */
+
+/* ===============================================================
+   DRAWER
+   =============================================================== */
 #d-ov{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:100;display:none;backdrop-filter:blur(2px)}
 #drw{position:fixed;top:0;right:-440px;width:440px;height:100dvh;background:white;z-index:101;display:flex;flex-direction:column;box-shadow:-10px 0 50px rgba(0,0,0,.25);transition:right .28s cubic-bezier(.4,0,.2,1)}
 #drw.open{right:0}
@@ -118,13 +135,12 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 #ds{font-size:12px;color:#94a3b8;margin-top:2px}
 #dc2{width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0;transition:background .15s}
 #dc2:hover{background:rgba(255,255,255,.18)}
-#db{flex:1;overflow-y:auto;padding:14px 18px}
+#db{flex:1;overflow-y:auto;padding:14px 18px;-webkit-overflow-scrolling:touch}
 #df{padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;background:#f8fafc;flex-shrink:0}
 #dtot{font-size:13px;color:#64748b}
 #dtot strong{font-size:20px;font-weight:800;color:#0f172a;display:block}
-/* Drawer groups */
 .dg{margin-bottom:12px;border:1px solid #f1f5f9;border-radius:10px;overflow:hidden}
-.dg-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer;background:#f8fafc;user-select:none;transition:background .15s}
+.dg-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer;background:#f8fafc;user-select:none;transition:background .15s;min-height:44px}
 .dg-hd:hover{background:#f0f4f8}
 .dg-hd .dg-ttl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#475569;display:flex;align-items:center;gap:6px}
 .dg-hd .dg-arr{font-size:10px;color:#94a3b8;transition:transform .2s}
@@ -135,37 +151,41 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .dg.col .dg-bd{display:none}
 .m1{font-size:11px;color:#94a3b8;background:#f1f5f9;padding:2px 7px;border-radius:4px;white-space:nowrap;flex-shrink:0}
 .m1-hd{font-size:11px;color:#94a3b8;font-weight:500;background:#e2e8f0;padding:2px 7px;border-radius:4px;white-space:nowrap}
-/* Drawer items */
 .di{display:flex;align-items:center;gap:8px;margin-bottom:7px}
 .di label{flex:1;font-size:12.5px;color:#374151;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.di input[type=number]{border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 9px;font-size:13px;width:115px;text-align:right;outline:none;transition:border-color .15s;flex-shrink:0}
+.di input[type=number]{border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 9px;font-size:13px;width:115px;text-align:right;outline:none;transition:border-color .15s;flex-shrink:0;min-height:40px}
 .di input[type=number]:focus{border-color:#3b82f6;background:#f0f9ff}
-/* Dynamic table in drawer */
 .dt-tbl{width:100%;border-collapse:collapse;margin-bottom:6px}
 .dt-tbl th{font-size:10.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.3px;padding:5px 7px;border-bottom:1px solid #f1f5f9;text-align:left}
 .dt-tbl td{padding:4px 5px;border-bottom:1px solid #f8fafc;vertical-align:middle}
-.dt-tbl input{border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 7px;font-size:12.5px;width:100%;outline:none;background:white}
+.dt-tbl input{border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 7px;font-size:12.5px;width:100%;outline:none;background:white;min-height:40px}
 .dt-tbl input[type=number]{text-align:right}
 .dt-tbl input:focus{border-color:#3b82f6}
 .dt-tbl .dc{width:26px;text-align:center}
-.ddel{background:none;border:none;cursor:pointer;color:#dc2626;font-size:15px;padding:2px 4px;border-radius:4px;line-height:1}
+.ddel{background:none;border:none;cursor:pointer;color:#dc2626;font-size:15px;padding:2px 4px;border-radius:4px;line-height:1;min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center}
 .ddel:hover{background:#fef2f2}
-.drep{background:none;border:none;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px;opacity:.35;transition:all .15s;flex-shrink:0;line-height:1;color:#6366f1;margin-left:2px}
+.drep{background:none;border:none;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px;opacity:.35;transition:all .15s;flex-shrink:0;line-height:1;color:#6366f1;margin-left:2px;min-width:30px;min-height:30px;display:inline-flex;align-items:center;justify-content:center}
 .drep:hover{opacity:1;background:#eff6ff}
-.dadd{font-size:12px;color:#2563eb;background:none;border:1.5px dashed #bfdbfe;border-radius:8px;padding:5px 10px;cursor:pointer;width:100%;text-align:center;margin-top:4px;transition:all .15s}
+.dadd{font-size:12px;color:#2563eb;background:none;border:1.5px dashed #bfdbfe;border-radius:8px;padding:5px 10px;cursor:pointer;width:100%;text-align:center;margin-top:4px;transition:all .15s;min-height:40px}
 .dadd:hover{background:#eff6ff;border-style:solid}
-/* Btns */
-.btn{padding:9px 18px;border-radius:9px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s}
+
+/* ===============================================================
+   BUTTONS
+   =============================================================== */
+.btn{padding:9px 18px;border-radius:9px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;min-height:40px;touch-action:manipulation}
 .btn-p{background:#1d4ed8;color:white}.btn-p:hover{background:#1e40af}
 .btn-g{background:#f1f5f9;color:#475569}.btn-g:hover{background:#e2e8f0}
-/* Treso */
-.sbar{display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
-.sbar select{padding:7px 11px;border-radius:8px;border:1.5px solid #e2e8f0;font-size:13px;background:white;font-weight:500}
-.months-nav{display:flex;gap:5px;flex-wrap:wrap}
-.mnav-btn{padding:6px 11px;border-radius:20px;border:1.5px solid #e2e8f0;background:white;cursor:pointer;font-size:12px;font-weight:600;color:#64748b;transition:all .15s}
+
+/* ===============================================================
+   TRESO / SBAR
+   =============================================================== */
+.sbar{display:flex;gap:10px;margin-bottom:14px;align-items:flex-start;flex-wrap:wrap}
+.sbar select{padding:8px 12px;border-radius:8px;border:1.5px solid #e2e8f0;font-size:13px;background:white;font-weight:500;min-height:40px;flex-shrink:0}
+.months-nav{display:flex;gap:5px;flex-wrap:wrap;flex:1}
+.mnav-btn{padding:8px 11px;border-radius:20px;border:1.5px solid #e2e8f0;background:white;cursor:pointer;font-size:12px;font-weight:600;color:#64748b;transition:all .15s;min-height:36px;touch-action:manipulation}
 .mnav-btn:hover:not(.active){border-color:#1d4ed8;color:#1d4ed8}
 .mnav-btn.active{background:#1d4ed8;color:white;border-color:#1d4ed8}
-.mchip{padding:6px 11px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid #e2e8f0;background:white;color:#64748b;transition:all .15s}
+.mchip{padding:6px 11px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid #e2e8f0;background:white;color:#64748b;transition:all .15s;min-height:36px}
 .mchip.active{background:#1d4ed8;color:white;border-color:#1d4ed8}
 .mchip.has-data{border-color:#10b981;color:#065f46;background:#f0fdf4}
 .mchip.has-data.active{background:#059669;border-color:#059669;color:white}
@@ -174,7 +194,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .treso-kc .tlbl{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
 .treso-kc .tval{font-size:20px;font-weight:800;color:#1e293b}
 .fcard{background:white;border-radius:12px;margin-bottom:8px}
-.fcard-hd{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;transition:background .15s;background:white;border-radius:12px}
+.fcard-hd{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;transition:background .15s;background:white;border-radius:12px;min-height:56px;touch-action:manipulation}
 .fcard.open .fcard-hd{border-radius:12px 12px 0 0;border-bottom:1px solid #f1f5f9;box-shadow:0 2px 6px rgba(0,0,0,.06)}
 .fcard-hd:hover{background:#fafafa}
 .fcard-hd .title{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px}
@@ -185,9 +205,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .fcard.open .arr{color:#64748b}
 .fcard-bd{display:none;padding:4px 16px 16px;border-radius:0 0 12px 12px}
 .fcard.open .fcard-bd{display:block}
-/* Header de la section Charges */
 .exploit-chg-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;margin:14px 0 8px;font-size:13px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.5px}
-/* Cartes de catégorie de charges — visuellement claires + cliquables */
 #exploit-chg-cards .fcard{border-left:4px solid var(--cat-color,#cbd5e1);transition:transform .12s,box-shadow .15s}
 #exploit-chg-cards .fcard:not(.open):hover{transform:translateX(2px);box-shadow:0 3px 10px rgba(0,0,0,.06)}
 #exploit-chg-cards .fcard-hd{position:sticky;top:0;z-index:4;padding:14px 16px}
@@ -198,14 +216,13 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .exploit-cat-m1{font-size:10.5px;color:#94a3b8}
 .exploit-cat-delta{font-size:10.5px;font-weight:700;margin-left:3px}
 .exploit-cat-delta.up{color:#dc2626}.exploit-cat-delta.dn{color:#059669}
-/* Récapitulatif multi-mois */
 .recap-wrap{background:white;border-radius:12px;overflow:hidden;margin-bottom:14px;border:1px solid #e2e8f0}
-.recap-hd{padding:10px 16px;background:#1e293b;color:white;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.recap-hd{padding:10px 16px;background:#1e293b;color:white;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;min-height:44px;touch-action:manipulation}
 .recap-hd-title{font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#cbd5e1}
-.recap-body{overflow-x:auto}
+.recap-body{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .recap-tbl{width:100%;border-collapse:collapse;font-size:12.5px;min-width:400px}
 .recap-tbl th{background:#f8fafc;padding:7px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#64748b;border-bottom:1px solid #e2e8f0;text-align:right;white-space:nowrap}
-.recap-tbl th:first-child{text-align:left;min-width:155px;position:sticky;left:0;z-index:2;background:#f8fafc}
+.recap-tbl th:first-child{text-align:left;min-width:120px;position:sticky;left:0;z-index:2;background:#f8fafc}
 .recap-tbl th.rcur{background:#eff6ff;color:#1d4ed8}
 .recap-tbl td{padding:6px 10px;border-bottom:1px solid #f8fafc;text-align:right;color:#374151;font-weight:500;white-space:nowrap}
 .recap-tbl td:first-child{text-align:left;font-size:12px;position:sticky;left:0;z-index:1;background:white}
@@ -225,16 +242,19 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .dyn-table{width:100%;border-collapse:collapse;font-size:13px}
 .dyn-table th{background:#f8fafc;padding:7px 10px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b}
 .dyn-table td{padding:6px 8px;border-bottom:1px solid #f8fafc;vertical-align:middle}
-.dyn-table input,.dyn-table select{border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:12.5px;width:100%;outline:none;background:white}
+.dyn-table input,.dyn-table select{border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:12.5px;width:100%;outline:none;background:white;min-height:40px}
 .dyn-table input.amt{text-align:right}
 .dyn-table input:focus,.dyn-table select:focus{border-color:#3b82f6}
 .del-cell{width:30px;text-align:center}
-.dyn-del{background:none;border:none;cursor:pointer;color:#dc2626;font-size:15px;padding:2px 4px;border-radius:4px;line-height:1}
+.dyn-del{background:none;border:none;cursor:pointer;color:#dc2626;font-size:15px;padding:2px 4px;border-radius:4px;line-height:1;min-width:36px;min-height:36px;display:inline-flex;align-items:center;justify-content:center}
 .dyn-del:hover{background:#fef2f2}
-.btn-add-row{font-size:12.5px;color:#2563eb;background:none;border:1.5px dashed #bfdbfe;border-radius:8px;padding:6px 12px;cursor:pointer;margin-top:6px;transition:all .15s}
+.btn-add-row{font-size:12.5px;color:#2563eb;background:none;border:1.5px dashed #bfdbfe;border-radius:8px;padding:8px 12px;cursor:pointer;margin-top:6px;transition:all .15s;min-height:42px;width:100%;touch-action:manipulation}
 .btn-add-row:hover{background:#eff6ff;border-style:solid}
-/* Analyse */
-.tbl-wrap{overflow-x:auto;background:white;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+
+/* ===============================================================
+   ANALYSE
+   =============================================================== */
+.tbl-wrap{overflow-x:auto;background:white;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);-webkit-overflow-scrolling:touch}
 .tbl-wrap table{width:100%;border-collapse:collapse;font-size:13px}
 .tbl-wrap th{background:#0f172a;color:white;padding:9px 10px;text-align:right;font-size:11px;white-space:nowrap;position:sticky;top:0;z-index:5}
 .tbl-wrap th:first-child{text-align:left;min-width:190px}
@@ -254,29 +274,242 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .pbf{height:100%;border-radius:10px;transition:width .6s}
 .pbv{width:80px;font-size:12px;font-weight:600;text-align:right;flex-shrink:0}
 .pbp{width:55px;font-size:11px;color:#94a3b8;text-align:right;flex-shrink:0}
-/* Notif */
-#notif{position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:10px;background:#059669;color:white;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.2);display:none;z-index:200;font-size:14px}
-/* Mobile nav */
-#mob-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:#0f172a;z-index:50;padding-bottom:env(safe-area-inset-bottom)}
+
+/* ===============================================================
+   NOTIFICATION
+   =============================================================== */
+#notif{position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:10px;background:#059669;color:white;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.2);display:none;z-index:200;font-size:14px;max-width:calc(100vw - 40px)}
+
+/* ===============================================================
+   MOBILE NAV
+   =============================================================== */
+#mob-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:#0f172a;z-index:50;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -2px 20px rgba(0,0,0,.35)}
 #mob-nav .mnav{display:flex}
-#mob-nav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;color:rgba(255,255,255,.45);font-size:10px;cursor:pointer;text-decoration:none;transition:color .15s;user-select:none}
-#mob-nav a .mi{font-size:20px;line-height:1}
+#mob-nav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;color:rgba(255,255,255,.45);font-size:9px;cursor:pointer;text-decoration:none;transition:all .15s;user-select:none;touch-action:manipulation;min-height:52px;justify-content:center;position:relative}
+#mob-nav a .mi{font-size:22px;line-height:1;transition:transform .15s}
 #mob-nav a.active{color:#60a5fa}
+#mob-nav a.active .mi{transform:scale(1.1)}
+#mob-nav a::before{content:'';position:absolute;top:0;left:10%;right:10%;height:2px;background:#60a5fa;border-radius:0 0 4px 4px;opacity:0;transition:opacity .15s}
+#mob-nav a.active::before{opacity:1}
+
+/* ===============================================================
+   MOBILE HEADER (compact)
+   =============================================================== */
+#mob-header{display:none;background:#0f172a;padding:10px 14px;align-items:center;justify-content:space-between;flex-shrink:0}
+#mob-header .mob-title{font-size:14px;font-weight:700;color:white}
+#mob-header .mob-sub{font-size:11px;color:#94a3b8;background:rgba(255,255,255,.08);padding:3px 8px;border-radius:12px}
+#mob-sync-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7);padding:6px 10px;border-radius:8px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;touch-action:manipulation}
+
+/* ===============================================================
+   DESKTOP BREAKPOINTS
+   =============================================================== */
 @media(max-width:900px){
   #sb{display:none}
+  #bar{display:none}
   #mob-nav{display:block}
-  #ct{padding:12px;padding-bottom:80px}
-  #bar{padding:10px 14px}
+  #mob-header{display:flex}
+  #ct{padding:12px;padding-bottom:calc(68px + env(safe-area-inset-bottom))}
   .krow{grid-template-columns:1fr 1fr}
   .krow5{grid-template-columns:1fr 1fr}
   .crow,.crow.half{grid-template-columns:1fr}
   .treso-summary{grid-template-columns:1fr 1fr}
   #drw{width:100vw;right:-100vw}
+  /* Charts moins hauts sur mobile */
+  .ch canvas{max-height:200px !important}
+}
+
+/* ===============================================================
+   SMALL MOBILE (≤480px) — le cœur des optimisations
+   =============================================================== */
+@media(max-width:480px){
+
+  /* Layout général */
+  #ct{padding:10px;padding-bottom:calc(68px + env(safe-area-inset-bottom))}
+
+  /* KPI grilles */
+  .krow,.krow5{grid-template-columns:1fr 1fr}
+  .treso-summary{grid-template-columns:1fr 1fr}
+  .kc{padding:12px 14px}
+  .kc .val{font-size:17px}
+  .kc .lbl{font-size:10px}
+
+  /* Charts encore moins hauts */
+  .ch canvas{max-height:170px !important}
+  .ch{padding:12px 14px}
+
+  /* Year tabs */
+  .ytabs{gap:5px}
+  .ytab{padding:5px 10px;font-size:12px}
+
+  /* Tableaux de saisie — contraindre la largeur des inputs */
+  .dyn-table{font-size:12px}
+  .dyn-table th{padding:5px 6px;font-size:10px}
+  .dyn-table td{padding:4px 6px}
+  .dyn-table input,.dyn-table select{font-size:12px;padding:6px 8px}
+  /* Cacher la col date sur mobile pour gagner de l'espace */
+  .dyn-table .col-date{display:none}
+
+  /* Inputs de type sorties — full width stack */
+  .fcard-bd [style*="grid-template-columns:1fr 1fr"]{
+    display:flex;flex-direction:column;gap:8px
+  }
+
+  /* Boutons d'action — full width sur mobile */
+  .btn-row-mobile{display:flex;flex-direction:column;gap:8px}
+  .btn{width:100%;justify-content:center}
+
+  /* Barre de saisie (sbar) — colonne sur mobile */
+  .sbar{flex-direction:column;align-items:stretch;gap:8px}
+  .sbar select{width:100%}
+  .months-nav{gap:4px}
+  .mnav-btn{padding:7px 9px;font-size:11px}
+
+  /* Recap tables — col sticky plus étroite */
+  .recap-tbl th:first-child{min-width:90px;font-size:10px}
+  .recap-tbl td:first-child{font-size:11px;max-width:90px;overflow:hidden;text-overflow:ellipsis}
+  .recap-tbl th,.recap-tbl td{padding:5px 6px;font-size:11px}
+
+  /* Drawer — plein écran, header plus compact */
+  #drw{border-radius:0}
+  #dh{padding:12px 14px}
+  #dt{font-size:14px}
+  #db{padding:12px 14px}
+  #df{padding:10px 14px}
+  .di input[type=number]{width:100px;font-size:12px}
+  .di label{font-size:12px}
+
+  /* Analyse — masquer les colonnes de %N-1 et delta en mode trop étroit */
+  .tbl-wrap table{font-size:11.5px}
+  .tbl-wrap th{padding:7px 6px;font-size:10px}
+  .tbl-wrap td{padding:7px 6px}
+
+  /* Progress bars — réduire label */
+  .pbr{gap:5px}
+  .pbl{width:100px;font-size:11px}
+  .pbv{width:65px;font-size:11px}
+  .pbp{width:45px;font-size:10px}
+
+  /* fcard header : plus compact */
+  .fcard-hd{min-height:50px;padding:10px 12px}
+  .fcard-hd .title{font-size:13px;gap:6px}
+  .ftot{font-size:14px}
+
+  /* Exploitation - masquer hint sur mobile pour alléger */
+  .exploit-cat-hint{display:none}
+  .exploit-cat-tot{font-size:14px}
+
+  /* KSU / Mandat / Exploit cards */
+  .kc[style*="grid-template-columns:repeat(3"]{grid-template-columns:1fr 1fr !important}
+  .kc[style*="grid-template-columns:repeat(4"]{grid-template-columns:1fr 1fr !important}
+
+  /* Notif */
+  #notif{bottom:calc(68px + env(safe-area-inset-bottom) + 10px);font-size:13px;padding:10px 16px}
+
+  /* Summary poids charges */
+  #dPctBars .pbr{flex-wrap:wrap}
+  #dPctBars .pbb{order:3;width:100%;margin-top:2px}
+
+  /* Grille de saisie — message conseil mobile */
+  .grid-mobile-hint{display:block !important}
+}
+
+/* Astuce : forcer grid-cols inline override sur ≤480 */
+@media(max-width:480px){
+  [style*="grid-template-columns:repeat(3,1fr)"]{grid-template-columns:1fr 1fr !important}
+  [style*="grid-template-columns:repeat(4,1fr)"]{grid-template-columns:1fr 1fr !important}
+}
+
+/* ===============================================================
+   HINT GRILLE MOBILE
+   =============================================================== */
+.grid-mobile-hint{
+  display:none;
+  background:#fffbeb;
+  border:1.5px solid #fde68a;
+  border-radius:10px;
+  padding:12px 16px;
+  margin-bottom:12px;
+  font-size:13px;
+  color:#92400e;
+}
+.grid-mobile-hint strong{display:block;margin-bottom:4px}
+
+/* ===============================================================
+   SCROLL SMOOTH
+   =============================================================== */
+.months-nav{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;scrollbar-width:none}
+.months-nav::-webkit-scrollbar{display:none}
+
+/* ===============================================================
+   MODAL SYNC — amélioration mobile
+   =============================================================== */
+#sync-modal > div{
+  max-height:90dvh;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
 }
 @media(max-width:480px){
-  .krow,.krow5{grid-template-columns:1fr}
-  .treso-summary{grid-template-columns:1fr}
+  #sync-modal > div{
+    width:98%;
+    padding:18px;
+    border-radius:12px;
+  }
 }
+
+/* ===============================================================
+   ACTIVE STATE POUR TOUCH
+   =============================================================== */
+.btn:active,.mnav-btn:active,.fcard-hd:active,.dadd:active,.btn-add-row:active{
+  opacity:.75;
+  transform:scale(.98)
+}
+#mob-nav a:active .mi{transform:scale(.9)}
+
+/* ============================================================
+   PATCH MOBILE — ajouté sans toucher au reste du code
+   ============================================================ */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+#ct{overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.months-nav{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none}
+.months-nav::-webkit-scrollbar{display:none}
+.recap-body{-webkit-overflow-scrolling:touch}
+/* Touch targets 44px minimum */
+.mnav-btn{min-height:40px;touch-action:manipulation}
+.btn{min-height:40px;touch-action:manipulation}
+.btn-add-row{min-height:40px;touch-action:manipulation}
+.fcard-hd{min-height:52px;touch-action:manipulation}
+.dg-hd{min-height:44px;touch-action:manipulation}
+.dadd{min-height:40px}
+.di input[type=number]{min-height:40px}
+.dyn-table input,.dyn-table select{min-height:40px}
+/* Nav mobile améliorée */
+#mob-nav{box-shadow:0 -2px 16px rgba(0,0,0,.3)}
+#mob-nav a{min-height:52px;justify-content:center;touch-action:manipulation;position:relative}
+#mob-nav a::before{content:'';position:absolute;top:0;left:15%;right:15%;height:2px;background:#60a5fa;border-radius:0 0 3px 3px;opacity:0;transition:opacity .15s}
+#mob-nav a.active::before{opacity:1}
+#mob-nav a .mi{font-size:22px}
+/* Notif au-dessus de la nav */
+@media(max-width:900px){
+  #notif{bottom:calc(64px + env(safe-area-inset-bottom) + 8px);right:12px;max-width:calc(100vw - 24px);font-size:13px}
+  #ct{padding:12px;padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+}
+/* Petits mobiles ≤480px */
+@media(max-width:480px){
+  .krow,.krow5{grid-template-columns:1fr 1fr !important}
+  .treso-summary{grid-template-columns:1fr 1fr !important}
+  .kc{padding:12px 10px}
+  .kc .val{font-size:17px}
+  .kc .lbl{font-size:10px}
+  .ch canvas{max-height:180px}
+  .sbar{flex-direction:column;align-items:stretch}
+  .sbar select{width:100%}
+  .recap-tbl th:first-child{min-width:95px;max-width:110px}
+  .recap-tbl td:first-child{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #drw{border-radius:0}
+}
+/* Feedback tactile */
+.btn:active,.mnav-btn:active,.fcard-hd:active,.dadd:active,.btn-add-row:active{opacity:.75;transform:scale(.98)}
+
 </style>
 </head>
 <body>
@@ -304,12 +537,12 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
     <p style="margin:0 0 16px;font-size:12px;color:#475569">Tes données se sauvegardent dans le cloud et se chargent sur tous tes appareils.</p>
     <div id="sync-setup" style="display:none">
       <p style="font-size:12px;color:#0f172a;margin:0 0 4px;font-weight:600">Token GitHub :</p>
-      <input id="gh-token-input" type="password" placeholder="ghp_..." style="width:100%;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-family:monospace;box-sizing:border-box;margin-bottom:10px">
+      <input id="gh-token-input" type="password" placeholder="ghp_..." style="width:100%;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-family:monospace;box-sizing:border-box;margin-bottom:10px;min-height:42px">
       <p style="font-size:12px;color:#0f172a;margin:0 0 6px;font-weight:600">1️⃣ Première fois — crée un espace de sync</p>
-      <button onclick="createSync()" id="btn-create-sync" style="width:100%;background:#1d4ed8;color:white;border:none;padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px">🆕 Créer mon espace de sync</button>
+      <button onclick="createSync()" id="btn-create-sync" style="width:100%;background:#1d4ed8;color:white;border:none;padding:12px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px;min-height:44px">🆕 Créer mon espace de sync</button>
       <p style="font-size:12px;color:#0f172a;margin:0 0 6px;font-weight:600">2️⃣ Ou entre le code reçu depuis un autre appareil</p>
-      <input id="sync-code-input" placeholder="Code de sync..." style="width:100%;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-family:monospace;box-sizing:border-box;margin-bottom:8px">
-      <button onclick="enterSyncCode()" style="width:100%;background:#059669;color:white;border:none;padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">✅ Activer ce code</button>
+      <input id="sync-code-input" placeholder="Code de sync..." style="width:100%;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-family:monospace;box-sizing:border-box;margin-bottom:8px;min-height:42px">
+      <button onclick="enterSyncCode()" style="width:100%;background:#059669;color:white;border:none;padding:12px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;min-height:44px">✅ Activer ce code</button>
     </div>
     <div id="sync-active" style="display:none">
       <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px;margin-bottom:12px">
@@ -318,19 +551,31 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
       </div>
       <p style="font-size:12px;color:#475569;margin:0 0 6px">Code à entrer sur tes autres appareils :</p>
       <div style="display:flex;gap:8px;align-items:center">
-        <input id="sync-code-display" readonly style="flex:1;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;font-family:monospace;background:#f8fafc;box-sizing:border-box">
-        <button onclick="copySyncCode()" id="btn-copy-code" style="background:#1d4ed8;color:white;border:none;padding:9px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📋 Copier</button>
+        <input id="sync-code-display" readonly style="flex:1;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;font-family:monospace;background:#f8fafc;box-sizing:border-box;min-height:40px">
+        <button onclick="copySyncCode()" id="btn-copy-code" style="background:#1d4ed8;color:white;border:none;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;min-height:44px">📋 Copier</button>
       </div>
-      <button onclick="forceSyncNow()" style="width:100%;margin-top:10px;background:#f1f5f9;color:#334155;border:none;padding:9px;border-radius:8px;font-size:12px;cursor:pointer">🔄 Forcer la synchronisation</button>
-      <button onclick="resetSync()" style="width:100%;margin-top:6px;background:#fff;color:#dc2626;border:1px solid #fca5a5;padding:8px;border-radius:8px;font-size:11px;cursor:pointer">🗑 Réinitialiser la sync</button>
+      <button onclick="forceSyncNow()" style="width:100%;margin-top:10px;background:#f1f5f9;color:#334155;border:none;padding:11px;border-radius:8px;font-size:12px;cursor:pointer;min-height:44px">🔄 Forcer la synchronisation</button>
+      <button onclick="resetSync()" style="width:100%;margin-top:6px;background:#fff;color:#dc2626;border:1px solid #fca5a5;padding:10px;border-radius:8px;font-size:11px;cursor:pointer;min-height:44px">🗑 Réinitialiser la sync</button>
     </div>
     <p id="sync-msg" style="margin:10px 0 0;font-size:12px;text-align:center;min-height:18px"></p>
-    <button onclick="closeSyncModal()" style="width:100%;margin-top:10px;background:#f1f5f9;color:#334155;border:none;padding:10px;border-radius:8px;font-size:13px;cursor:pointer">Fermer</button>
+    <button onclick="closeSyncModal()" style="width:100%;margin-top:10px;background:#f1f5f9;color:#334155;border:none;padding:12px;border-radius:8px;font-size:13px;cursor:pointer;min-height:44px">Fermer</button>
   </div>
 </div>
 
 <div id="main">
+  <!-- Header desktop -->
   <div id="bar"><h1 id="bartitle">Tableau de Bord</h1><span class="sub" id="barsub"></span></div>
+  <!-- Header mobile (remplace la sidebar) -->
+  <div id="mob-header">
+    <div>
+      <div class="mob-title" id="mob-bartitle">🏠 Tableau de Bord</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="mob-sub" id="mob-barsub"></span>
+      <button class="mob-sync-btn" onclick="openSyncModal()">☁️ <span id="mob-sync-icon">⚙</span></button>
+    </div>
+  </div>
+
   <div id="ct">
 
     <!-- DASHBOARD -->
@@ -338,11 +583,11 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
       <div class="ytabs" id="dy"></div>
       <div class="krow krow5" id="dkpi"></div>
       <div class="crow">
-        <div class="ch"><h3>📈 Revenus vs Charges — par mois</h3><canvas id="cMonthly" height="240"></canvas></div>
-        <div class="ch"><h3>🥧 Répartition des charges</h3><canvas id="cDonut" height="240"></canvas></div>
+        <div class="ch"><h3>📈 Revenus vs Charges — par mois</h3><canvas id="cMonthly" height="200"></canvas></div>
+        <div class="ch"><h3>🥧 Répartition des charges</h3><canvas id="cDonut" height="200"></canvas></div>
       </div>
       <div class="crow full">
-        <div class="ch"><h3>📅 Solde mensuel + cumulé vs N-1 (même période)</h3><canvas id="cSolde" height="160"></canvas></div>
+        <div class="ch"><h3>📅 Solde mensuel + cumulé vs N-1</h3><canvas id="cSolde" height="140"></canvas></div>
       </div>
       <div class="ch" style="margin-bottom:14px">
         <h3>⚖️ Poids des charges sur le CA — alertes</h3>
@@ -352,6 +597,11 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 
     <!-- GRILLE -->
     <div class="view" id="view-grille">
+      <!-- Conseil mobile -->
+      <div class="grid-mobile-hint">
+        <strong>💡 Conseil mobile</strong>
+        Fais défiler horizontalement pour voir tous les mois. Tape sur une cellule pour ouvrir le panneau de saisie.
+      </div>
       <div class="grid-toolbar">
         <select id="gYear" onchange="renderGrille()"></select>
         <label><input type="checkbox" id="gN1" onchange="renderGrille()"> Comparer N-1</label>
@@ -395,19 +645,19 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
           <button class="btn-add-row" onclick="ksuAddRow()">+ Ajouter une ligne</button>
         </div>
       </div>
-      <!-- Net calculé (info) -->
       <div style="background:#1e293b;border-radius:10px;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <span style="color:#64748b;font-size:12px;font-weight:600">📊 Net calculé KSU</span>
         <span style="color:#94a3b8;font-size:15px;font-weight:700" id="ksu-net-final">—</span>
       </div>
-      <!-- Virement manuel vers Compte Mandat -->
-      <div style="background:#0f172a;border-radius:12px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px">
-        <span style="color:#94a3b8;font-size:13px;font-weight:600;white-space:nowrap">💳 Virement vers Compte Mandat</span>
-        <input type="number" step="0.01" id="ksu-vir-input" placeholder="0,00" style="width:150px;text-align:right;font-size:20px;font-weight:800;color:#6ee7b7;border:1.5px solid #334155;border-radius:8px;padding:5px 10px;background:#1e293b">
+      <div style="background:#0f172a;border-radius:12px;padding:14px 16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <span style="color:#94a3b8;font-size:13px;font-weight:600">💳 Virement vers Compte Mandat</span>
+          <input type="number" step="0.01" id="ksu-vir-input" placeholder="0,00" style="width:150px;text-align:right;font-size:20px;font-weight:800;color:#6ee7b7;border:1.5px solid #334155;border-radius:8px;padding:5px 10px;background:#1e293b;min-height:44px">
+        </div>
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-p" onclick="saveKsu()">💾 Enregistrer</button>
-        <button class="btn btn-g" onclick="initKsu()">↺ Annuler</button>
+      <div style="display:flex;gap:8px;flex-direction:row;flex-wrap:wrap">
+        <button class="btn btn-p" style="flex:1;min-width:120px" onclick="saveKsu()">💾 Enregistrer</button>
+        <button class="btn btn-g" style="flex:1;min-width:100px" onclick="initKsu()">↺ Annuler</button>
       </div>
     </div>
 
@@ -418,10 +668,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
         <div id="mandatMonths" class="months-nav"></div>
       </div>
       <div class="krow" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px" id="mandatKpi"></div>
-
-      <!-- Récapitulatif cumulé -->
       <div id="mandat-recap" style="margin-bottom:14px"></div>
-
       <!-- Entrées -->
       <div class="fcard open" style="margin-bottom:10px">
         <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
@@ -439,13 +686,12 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
           </div>
           <p style="font-size:12px;color:#64748b;margin:0 0 8px;font-weight:600">Détail encaissements :</p>
           <table class="dyn-table">
-            <thead><tr><th style="width:22%">Mode</th><th style="width:80px">Date</th><th>Client / Description</th><th>Montant</th><th class="del-cell"></th></tr></thead>
+            <thead><tr><th style="width:22%">Mode</th><th class="col-date" style="width:80px">Date</th><th>Client / Description</th><th>Montant</th><th class="del-cell"></th></tr></thead>
             <tbody id="mandat-enc-body"></tbody>
           </table>
           <button class="btn-add-row" onclick="mandatAddEnc()">+ Ajouter encaissement</button>
         </div>
       </div>
-
       <!-- Sorties -->
       <div class="fcard open" style="margin-bottom:10px">
         <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
@@ -456,31 +702,29 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
             <div>
               <label style="font-size:12px;color:#374151;font-weight:600;display:block;margin-bottom:4px">📤 Remontée fonds Allianz <span style="font-weight:400;color:#94a3b8">(tableur Allianz)</span></label>
-              <input type="number" id="mandat-remontee" step="0.01" placeholder="0,00" style="width:100%;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:700;text-align:right" oninput="updateMandatTotals()">
+              <input type="number" id="mandat-remontee" step="0.01" placeholder="0,00" style="width:100%;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:700;text-align:right;min-height:44px" oninput="updateMandatTotals()">
             </div>
             <div>
               <label style="font-size:12px;color:#374151;font-weight:600;display:block;margin-bottom:4px">🏢 Virement Compte Exploitation</label>
-              <input type="number" id="mandat-virement" step="0.01" placeholder="0,00" style="width:100%;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:700;text-align:right" oninput="updateMandatTotals()">
+              <input type="number" id="mandat-virement" step="0.01" placeholder="0,00" style="width:100%;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:700;text-align:right;min-height:44px" oninput="updateMandatTotals()">
             </div>
           </div>
         </div>
       </div>
-
       <!-- Solde -->
       <div style="background:#0f172a;border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <span style="color:#94a3b8;font-size:13px;font-weight:600">Solde Compte Mandat</span>
         <span style="font-size:22px;font-weight:800" id="mandat-solde">—</span>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-        <button class="btn btn-p" onclick="saveMandat()">💾 Enregistrer</button>
-        <button class="btn btn-g" onclick="initMandat()">↺ Annuler</button>
-        <button class="btn" style="background:#1d4ed8;color:#fff" onclick="syncAllMandatToFirebase()">🔄 Sync tout Jan→Auj vers Perf</button>
+        <button class="btn btn-p" style="flex:1;min-width:130px" onclick="saveMandat()">💾 Enregistrer</button>
+        <button class="btn btn-g" style="flex:1;min-width:100px" onclick="initMandat()">↺ Annuler</button>
+        <button class="btn" style="background:#1d4ed8;color:#fff;flex:1;min-width:130px" onclick="syncAllMandatToFirebase()">🔄 Sync vers Perf</button>
       </div>
-
-      <!-- Tableau récapitulatif par mois -->
+      <!-- Tableau récap -->
       <div class="fcard open" id="fcard-enc-mensuels">
         <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
-          <div class="title"><span class="ic2">📊</span>Récapitulatif encaissements — tous les mois</div>
+          <div class="title"><span class="ic2">📊</span>Récapitulatif encaissements</div>
           <div class="right"><span class="arr">−</span></div>
         </div>
         <div class="fcard-bd" style="padding:8px 16px 16px">
@@ -496,10 +740,7 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
         <div id="exploitMonths" class="months-nav"></div>
       </div>
       <div class="krow" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px" id="exploitKpi"></div>
-
-      <!-- Récapitulatif mois précédents -->
       <div id="exploit-recap" style="margin-bottom:14px"></div>
-
       <!-- Entrées -->
       <div class="fcard open" style="margin-bottom:10px">
         <div class="fcard-hd" onclick="toggleCard(this.closest('.fcard'))">
@@ -507,7 +748,6 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
           <div class="right"><span class="ftot" id="exploit-in-tot">—</span><span class="arr">−</span></div>
         </div>
         <div class="fcard-bd">
-          <!-- Commissions Mandat remontées (info) -->
           <div style="background:#f0fdf4;border-radius:8px;padding:8px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:12px;color:#166534;font-weight:600">🏥 Commissions IARD (Mandat)</span>
             <span style="font-size:14px;font-weight:700;color:#15803d" id="exploit-iard-info">—</span>
@@ -516,10 +756,11 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
             <span style="font-size:12px;color:#166534;font-weight:600">🌿 Commissions VIE (Mandat)</span>
             <span style="font-size:14px;font-weight:700;color:#15803d" id="exploit-vie-info">—</span>
           </div>
-          <!-- Virement manuel Mandat → Exploitation -->
-          <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px">
-            <span style="font-size:13px;color:#1e40af;font-weight:600;white-space:nowrap">💳 Virement Mandat → Exploitation</span>
-            <input type="number" step="0.01" id="exploit-vir-input" placeholder="0,00" style="width:120px;text-align:right;font-size:15px;font-weight:700;color:#1d4ed8;border:1.5px solid #bfdbfe;border-radius:6px;padding:4px 8px;background:#fff" oninput="updateExploitTotals()">
+          <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+              <span style="font-size:13px;color:#1e40af;font-weight:600">💳 Virement Mandat → Exploitation</span>
+              <input type="number" step="0.01" id="exploit-vir-input" placeholder="0,00" style="width:120px;text-align:right;font-size:15px;font-weight:700;color:#1d4ed8;border:1.5px solid #bfdbfe;border-radius:6px;padding:4px 8px;background:#fff;min-height:44px" oninput="updateExploitTotals()">
+            </div>
           </div>
           <p style="font-size:12px;color:#64748b;margin:0 0 8px;font-weight:600">🤝 Courtage (hors Allianz) :</p>
           <table class="dyn-table">
@@ -529,28 +770,24 @@ nav a .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
           <button class="btn-add-row" onclick="exploitAddCourtage()">+ Ajouter courtage</button>
         </div>
       </div>
-
-      <!-- Charges — chaque catégorie est une carte cliquable -->
+      <!-- Charges -->
       <div class="exploit-chg-header">
         <span style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">📤</span>Charges du mois</span>
-        <span style="display:flex;align-items:center;gap:10px"><span style="font-size:11px;color:#94a3b8;font-weight:500">▼ Cliquer une catégorie pour saisir</span><span style="font-size:15px;font-weight:800;color:#dc2626" id="exploit-chg-tot">—</span></span>
+        <span style="display:flex;align-items:center;gap:10px"><span style="font-size:11px;color:#94a3b8;font-weight:500;display:none" class="d-none-mobile">▼ Cliquer une catégorie pour saisir</span><span style="font-size:15px;font-weight:800;color:#dc2626" id="exploit-chg-tot">—</span></span>
       </div>
       <div id="exploit-chg-cards"></div>
-
       <!-- Solde -->
-      <div style="background:#0f172a;border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <span style="color:#94a3b8;font-size:13px;font-weight:600">⚖️ Solde Exploitation (Virement + Courtage - Charges)</span>
+      <div style="background:#0f172a;border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <span style="color:#94a3b8;font-size:12px;font-weight:600">⚖️ Solde Exploitation</span>
         <span style="font-size:22px;font-weight:800" id="exploit-solde">—</span>
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-p" onclick="saveExploit()">💾 Enregistrer courtage</button>
-        <button class="btn btn-g" onclick="initExploit()">↺ Rafraîchir</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-p" style="flex:1;min-width:130px" onclick="saveExploit()">💾 Enregistrer courtage</button>
+        <button class="btn btn-g" style="flex:1;min-width:100px" onclick="initExploit()">↺ Rafraîchir</button>
       </div>
     </div>
 
-    <!-- TRÉSORERIE (conservé pour compatibilité) -->
-    <div class="view" id="view-tresorerie" style="display:none">
-    </div>
+    <div class="view" id="view-tresorerie" style="display:none"></div>
   </div>
 </div>
 
@@ -586,7 +823,7 @@ const MO=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Se
 const YRS=[2023,2024,2025,2026];
 const _NOW=new Date();
 const CURRENT_YEAR=_NOW.getFullYear();
-const CURRENT_MONTH=_NOW.getMonth()+1; // 1-12, dynamique selon date du jour
+const CURRENT_MONTH=_NOW.getMonth()+1;
 const COMPLETED_MONTHS={2023:12,2024:12,2025:12,2026:12};
 
 const CATS={
@@ -614,8 +851,6 @@ const FIXES_SUBS={
   abonnements:{label:'Abonnements',   items:["Mil'Nr3 SMS","Clic'issimo",'ApiBots','CockPit','Ringover','IA Google','IA Claude','Agea']}
 };
 const FIXES_DYN=['Déjeuners','Voyages','Achats'];
-
-// Seuils % du CA pour alertes
 const SEUILS={fixes:20,salariale:35,taxes:8,prelevements:20,emprunts:15};
 
 // ================================================================
@@ -664,9 +899,6 @@ const BASE={
   }
 };
 
-// ================================================================
-// DÉTAIL 2026 — lignes par poste (Jan/Fév/Mars)
-// ================================================================
 const DETAIL_2026={
   1:{
     iard:{'Commission principale':29314.29,'Complément 1':322.11,'Complément 2':0,'Retraite / Divers':0},
@@ -734,7 +966,7 @@ const REV_DETAIL_2026={
 };
 
 // ================================================================
-// FIREBASE — lecture compta depuis la même base que l'application
+// FIREBASE
 // ================================================================
 const FB_CONFIG={
   apiKey:"AIzaSyDW7KjKtg5ahFkj-mO8VJETxFBFfpVSJd4",
@@ -742,23 +974,19 @@ const FB_CONFIG={
   databaseURL:"https://allianz-perf-default-rtdb.europe-west1.firebasedatabase.app",
   projectId:"allianz-perf"
 };
-let _fbApp=null, _fbDb=null, _comptaSyncData={}; // { yr: { mo: [{type,desc,amount}] } }
+let _fbApp=null, _fbDb=null, _comptaSyncData={};
 
 function initFirebaseCompta(){
   try{
+    if(typeof firebase==='undefined') throw new Error('firebase SDK not loaded yet');
     if(!firebase.apps.length) _fbApp=firebase.initializeApp(FB_CONFIG);
     else _fbApp=firebase.apps[0];
     _fbDb=firebase.database(_fbApp);
-    // Listener temps réel sur les écritures compta
     _fbDb.ref('allianz_db_v4/compta/ecritures').on('value',function(snap){
       const ecritures=snap.val()||[];
       const list=Array.isArray(ecritures)?ecritures:Object.values(ecritures);
       _buildComptaSync(list);
-      // Rafraîchir la vue trésorerie si elle est active
-      if(document.getElementById('view-tresorerie')?.classList.contains('active')) buildTresoForm();
-      // Rafraîchir la vue Compte Mandat si elle est active
       if(document.getElementById('view-mandat')?.classList.contains('active')) renderMandat();
-      // Rafraîchir le tableau encaissements Mandat si visible
       if(document.getElementById('view-mandat')?.classList.contains('active')) renderEncaissementsMensuels(mandat_yr);
     });
   }catch(e){ console.warn('Firebase compta init error',e); }
@@ -767,7 +995,6 @@ function initFirebaseCompta(){
 function _buildComptaSync(ecritures){
   const typeLabel={cheque:'Chèque',especes:'Espèces',virement:'Virement'};
   const sync={};
-  // Exclure les chèques différés ET les entrées créées depuis ce dashboard (évite la boucle)
   (ecritures||[]).filter(e=>e&&e.statut!=='differe'&&e.date&&e._source!=='dashboard'&&e._source!=='mandat').forEach(function(e){
     const yr=e.date.slice(0,4);
     const mo=+e.date.slice(5,7);
@@ -788,13 +1015,12 @@ function _buildComptaSync(ecritures){
 // MÉMOIRE UTILISATEUR
 // ================================================================
 let USER={}, USER_FD={}, USER_RD={}, TRESO={};
-// Nouvelles structures
-let KSU_DATA={};   // {yr:{mo:[{label,amount}]}}
-let MANDAT_DATA={}; // {yr:{mo:{enc:[{type,desc,amount}],remontee:0,virement:0}}}
-let EXPLOIT_DATA={}; // {yr:{mo:{courtage:[{label,amount}],virement_recu:0}}}
+let KSU_DATA={};
+let MANDAT_DATA={};
+let EXPLOIT_DATA={};
 
 // ================================================================
-// PERSISTANCE LOCALE (localStorage)
+// PERSISTANCE LOCALE
 // ================================================================
 const LS_KEY='cab_v1';
 function saveLocal(){
@@ -815,7 +1041,6 @@ function loadLocal(){
     if(d.KSU_DATA)    KSU_DATA=d.KSU_DATA;
     if(d.MANDAT_DATA) MANDAT_DATA=d.MANDAT_DATA;
     if(d.EXPLOIT_DATA)EXPLOIT_DATA=d.EXPLOIT_DATA;
-    // Re-synchronise BASE avec les données USER (pour cohérence des graphiques)
     YRS.forEach(yr=>{
       Object.keys(BASE[yr]||{}).forEach(cat=>{
         for(let mo=0;mo<12;mo++){
@@ -826,11 +1051,9 @@ function loadLocal(){
     });
   }catch(e){}
 }
-// Calcule le total à partir de USER seulement (sans fallback BASE) — pour synchro au chargement
 function catTotalFromUser(yr,cat,mo){
   const mo1=mo+1;
   if(cat==='iard'||cat==='vie'){
-    // Priorité KSU_DATA
     const ksu=ksuCatTotal(yr,mo1,cat);
     if(ksu>0) return ksu;
     const rd=USER_RD[yr]?.[mo1];
@@ -850,7 +1073,6 @@ function getFixesDetail(yr,mo){if(USER_FD[yr]?.[mo]) return USER_FD[yr][mo]; if(
 function getRevDetail(yr,mo){if(USER_RD[yr]?.[mo]) return USER_RD[yr][mo]; if(yr===2026&&mo>=1&&mo<=3) return REV_DETAIL_2026[mo]||null; return null;}
 
 function ksuCatTotal(yr,mo1,cat){
-  // Lit directement les lignes KSU dont le libellé contient 'iard' ou 'vie'
   const d=KSU_DATA[yr]?.[mo1];
   if(!d) return 0;
   const lines=Array.isArray(d)?d:(d.lines||[]);
@@ -859,12 +1081,10 @@ function ksuCatTotal(yr,mo1,cat){
               .reduce((s,l)=>s+(+l.amount||0),0);
 }
 
-function catTotal(yr,cat,mo){ // mo = 0-based
+function catTotal(yr,cat,mo){
   if(cat==='iard'||cat==='vie'){
-    // Priorité 1 : KSU_DATA (source de vérité)
     const ksu=ksuCatTotal(yr,mo+1,cat);
     if(ksu>0) return ksu;
-    // Priorité 2 : USER_RD (saisie manuelle hors KSU)
     const rd=getRevDetail(yr,mo+1);
     if(rd&&rd[cat]&&rd[cat].length) return rd[cat].reduce((s,r)=>s+(+r.amount||0),0);
   }
@@ -877,20 +1097,12 @@ function monthChg(yr,mo){return CHG_CATS.reduce((s,c)=>s+catTotal(yr,c,mo),0);}
 function monthSolde(yr,mo){return monthComm(yr,mo)-monthChg(yr,mo);}
 
 function completedIdx(yr){
-  // Pour les graphiques/analyses : uniquement les mois ≤ mois courant (date du jour)
-  // Les mois saisis en avance (prévision) ne faussent pas les totaux affichés
-  if(yr===CURRENT_YEAR){
-    const idxs=[];
-    for(let i=0;i<CURRENT_MONTH;i++){ // CURRENT_MONTH=4 → i = 0(Jan),1(Fév),2(Mar),3(Avr)
-      if(monthComm(yr,i)>0||monthChg(yr,i)>0) idxs.push(i);
-    }
-    return idxs.length?idxs:[0];
-  }
+  // Toujours 12 mois pour l'année courante
+  if(yr===CURRENT_YEAR) return Array.from({length:12},(_,i)=>i);
   return Array.from({length:COMPLETED_MONTHS[yr]||0},(_,i)=>i);
 }
 
-function isFuture(yr,mo){return yr===CURRENT_YEAR&&mo>=CURRENT_MONTH;} // mo 0-based
-
+function isFuture(yr,mo){return yr===CURRENT_YEAR&&mo>=CURRENT_MONTH;}
 function sum(arr){return arr.reduce((s,v)=>s+(v||0),0);}
 function fmt(v,dec=0){if(v===undefined||v===null||isNaN(v)) return '—'; return new Intl.NumberFormat('fr-FR',{minimumFractionDigits:dec,maximumFractionDigits:dec}).format(v)+' €';}
 function fmtN(v,dec=0){if(v===undefined||v===null||isNaN(v)) return '—'; return new Intl.NumberFormat('fr-FR',{minimumFractionDigits:dec,maximumFractionDigits:dec}).format(v);}
@@ -899,7 +1111,7 @@ function pctStr(p){if(p===null) return ''; return (p>=0?'▲ ':'▼ ')+Math.abs(
 function pctCls(p,inv=false){if(p===null) return 'nu'; if(inv) return p>=0?'dn':'up'; return p>=0?'up':'dn';}
 
 // ================================================================
-// NAVIGATION
+// NAVIGATION — avec mise à jour du header mobile
 // ================================================================
 let charts={}, dash_yr=2026, an_yr=2026, g_yr=2026;
 
@@ -908,13 +1120,19 @@ function go(v){
   document.querySelectorAll('nav a,#mob-nav a').forEach(e=>e.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
   document.querySelectorAll(`[onclick="go('${v}')"]`).forEach(e=>e.classList.add('active'));
-  const titles={dashboard:'Tableau de Bord',ksu:'KSU / Allianz',mandat:'Compte Mandat',exploitation:'Compte Exploitation',analyse:'Analyse Détaillée'};
-  document.getElementById('bartitle').textContent=titles[v]||v;
+  const titles={dashboard:'🏠 Tableau de Bord',ksu:'🏦 KSU / Allianz',mandat:'💳 Compte Mandat',exploitation:'🏢 Exploitation',analyse:'📋 Analyse'};
+  const titlesDesktop={dashboard:'Tableau de Bord',ksu:'KSU / Allianz',mandat:'Compte Mandat',exploitation:'Compte Exploitation',analyse:'Analyse Détaillée'};
+  document.getElementById('bartitle').textContent=titlesDesktop[v]||v;
+  // Header mobile
+  const mobTitle=document.getElementById('mob-bartitle');
+  if(mobTitle) mobTitle.textContent=titles[v]||v;
   if(v==='dashboard')   renderDash();
   if(v==='ksu')         initKsu();
   if(v==='mandat')      initMandat();
   if(v==='exploitation')initExploit();
   if(v==='analyse')     renderAnalyse();
+  // Scroll to top
+  document.getElementById('ct').scrollTop=0;
 }
 function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 
@@ -927,7 +1145,7 @@ function renderDash(){
   YRS.forEach(yr=>{
     const b=document.createElement('button');
     b.className='ytab'+(yr===dash_yr?' active':'');
-    b.textContent=yr+(yr===CURRENT_YEAR?' (en cours)':'');
+    b.textContent=yr+(yr===CURRENT_YEAR?' ★':'');
     b.onclick=()=>{dash_yr=yr;renderDash();};
     c.appendChild(b);
   });
@@ -944,20 +1162,21 @@ function renderDash(){
   const moPeriod=n>0?`${MO[0].substring(0,4)}–${MO[n-1].substring(0,4)}`:' ';
   const sub=yr===CURRENT_YEAR?`${n} mois en cours`:`Exercice ${yr}`;
   document.getElementById('barsub').textContent=sub;
+  const mobSub=document.getElementById('mob-barsub');
+  if(mobSub) mobSub.textContent=sub;
   const prevLabel=prevIdxs.length?` vs ${moPeriod} ${prev}`:'';
 
-  // Projection (current year only)
   let projHTML='';
   if(yr===CURRENT_YEAR&&n>0&&n<12){
-    const avgRev=tc/n, avgChg=tch/n;
-    const projRev=Math.round(avgRev*12), projChg=Math.round(avgChg*12), projSol=projRev-projChg;
-    projHTML=`<div class="kc k5"><div class="lbl">📈 Projection Revenus (12 mois)</div><div class="val">${fmt(projRev)}</div><div class="delta nu">base ${n} mois × 12</div></div>`;
+    const avgRev=tc/n;
+    const projRev=Math.round(avgRev*12);
+    projHTML=`<div class="kc k5"><div class="lbl">📈 Projection (12 mois)</div><div class="val">${fmt(projRev)}</div><div class="delta nu">base ${n} mois</div></div>`;
   }
   document.getElementById('dkpi').innerHTML=`
     <div class="kc k1"><div class="lbl">💰 Revenus ${moPeriod}</div><div class="val">${fmt(tc)}</div><div class="delta"><span class="${pctCls(p1)}">${pctStr(p1)}</span><span class="nu">${prevLabel}</span></div></div>
-    <div class="kc k2"><div class="lbl">📤 Charges ${moPeriod}</div><div class="val">${fmt(tch)}</div><div class="delta"><span class="${pctCls(p2,true)}">${pctStr(p2)}</span><span class="nu">${prevLabel}</span></div></div>
-    <div class="kc k3"><div class="lbl">📊 Solde net</div><div class="val" style="color:${ts>=0?'#059669':'#dc2626'}">${fmt(ts)}</div><div class="delta"><span class="${pctCls(p3)}">${pctStr(p3)}</span><span class="nu">${prevLabel}</span></div></div>
-    <div class="kc k4"><div class="lbl">⚖️ Taux charges/CA</div><div class="val">${tauxChg.toFixed(1)}%</div><div class="delta"><span class="nu">objectif &lt;85%</span></div></div>
+    <div class="kc k2"><div class="lbl">📤 Charges</div><div class="val">${fmt(tch)}</div><div class="delta"><span class="${pctCls(p2,true)}">${pctStr(p2)}</span></div></div>
+    <div class="kc k3"><div class="lbl">📊 Solde net</div><div class="val" style="color:${ts>=0?'#059669':'#dc2626'}">${fmt(ts)}</div><div class="delta"><span class="${pctCls(p3)}">${pctStr(p3)}</span></div></div>
+    <div class="kc k4"><div class="lbl">⚖️ Taux charges</div><div class="val">${tauxChg.toFixed(1)}%</div><div class="delta"><span class="nu">objectif &lt;85%</span></div></div>
     ${projHTML}`;
 
   dc('cMonthly');
@@ -984,12 +1203,11 @@ function renderDash(){
     {label:'Solde mensuel',data:slds,type:'bar',backgroundColor:slds.map(v=>v>=0?'rgba(5,150,105,.6)':'rgba(220,38,38,.55)'),borderRadius:3,order:2},
     {label:'Cumulé',data:cumul,type:'line',borderColor:'#1d4ed8',backgroundColor:'transparent',pointRadius:3,tension:.4,borderWidth:2,order:1}
   ];
-  if(prevIdxs.length) ds3.push({label:`Solde ${prev} (même période)`,data:prevIdxs.map(i=>monthSolde(prev,i)),type:'line',borderColor:'#cbd5e1',backgroundColor:'transparent',borderDash:[4,4],pointRadius:2,tension:.4,borderWidth:1.5,order:1});
+  if(prevIdxs.length) ds3.push({label:`Solde ${prev}`,data:prevIdxs.map(i=>monthSolde(prev,i)),type:'line',borderColor:'#cbd5e1',backgroundColor:'transparent',borderDash:[4,4],pointRadius:2,tension:.4,borderWidth:1.5,order:1});
   charts['cSolde']=new Chart(document.getElementById('cSolde'),{type:'bar',data:{labels:idxs.map(i=>MO[i].substring(0,3)),datasets:ds3},
     options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'top',labels:{font:{size:11}}},datalabels:{display:false}},scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k€':v+'€'},grid:{color:'#f1f5f9'}}}}
   });
 
-  // % CA bars with alerts
   const barsEl=document.getElementById('dPctBars');
   if(tc>0){
     barsEl.innerHTML=CHG_CATS.map(cat=>{
@@ -1002,22 +1220,21 @@ function renderDash(){
       const prevPct=prevCa>0?prevTot/prevCa*100:null;
       const diff=prevPct!==null?pctV-prevPct:null;
       const alert=pctV>seuil?'🔴':pctV>seuil*.85?'🟠':'🟢';
-      const diffTxt=diff!==null?`<span style="font-size:10.5px;color:${diff>0?'#dc2626':'#059669'};margin-left:4px">(${diff>0?'+':''}${diff.toFixed(1)}% vs N-1)</span>`:'';
+      const diffTxt=diff!==null?`<span style="font-size:10.5px;color:${diff>0?'#dc2626':'#059669'};margin-left:4px">(${diff>0?'+':''}${diff.toFixed(1)}%)</span>`:'';
       return `<div class="pbr"><div class="pbl">${alert} ${def.label.replace('Charges ','').replace('Masse ','')}</div><div class="pbb"><div class="pbf" style="width:${Math.min(pctV,100).toFixed(1)}%;background:${def.color}"></div></div><div class="pbv">${fmt(tot)}</div><div class="pbp">${pctV.toFixed(1)}%${diffTxt}</div></div>`;
-    }).join('')+`<div style="font-size:11px;color:#94a3b8;margin-top:8px">🔴 &gt; seuil · 🟠 proche du seuil · 🟢 OK — Seuils : Fixes ${SEUILS.fixes}% · Salaires ${SEUILS.salariale}% · Prélvts ${SEUILS.prelevements}%</div>`;
+    }).join('')+`<div style="font-size:11px;color:#94a3b8;margin-top:8px">🔴 &gt; seuil · 🟠 proche · 🟢 OK</div>`;
   } else {
-    barsEl.innerHTML='<div style="color:#94a3b8;font-size:13px;padding:8px">Aucune donnée de revenus pour cette période.</div>';
+    barsEl.innerHTML='<div style="color:#94a3b8;font-size:13px;padding:8px">Aucune donnée de revenus.</div>';
   }
-
 }
 
 // ================================================================
-// ENCAISSEMENTS MENSUELS (Dashboard)
+// ENCAISSEMENTS MENSUELS
 // ================================================================
 function renderEncaissementsMensuels(yr){
-  const el=document.getElementById('mandatEncMensuels')||document.getElementById('dEncMensuels');
+  const el=document.getElementById('mandatEncMensuels');
   if(!el) return;
-  const limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  const limit=12;
   let grandTotal=0;
   const rows=[];
   for(let mo=1;mo<=limit;mo++){
@@ -1029,41 +1246,34 @@ function renderEncaissementsMensuels(yr){
     grandTotal+=total;
     rows.push({mo,label:MO[mo-1],autoTotal,manualTotal,total});
   }
-  if(rows.length===0){el.innerHTML='<div style="color:#94a3b8;font-size:13px;padding:8px">Aucune donnée d\'encaissement pour cette période.</div>';return;}
+  if(rows.length===0){el.innerHTML='<div style="color:#94a3b8;font-size:13px;padding:8px">Aucune donnée.</div>';return;}
   const maxVal=Math.max(...rows.map(r=>r.total),1);
   el.innerHTML=`
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:320px;">
         <thead>
           <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Mois</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:700;color:#10b981;text-transform:uppercase;">📱 App terrain</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:700;color:#6366f1;text-transform:uppercase;">✏️ Manuel Mandat</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">Total</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;">Répartition</th>
+            <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Mois</th>
+            <th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;color:#10b981;text-transform:uppercase;">📱 App</th>
+            <th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;color:#6366f1;text-transform:uppercase;">✏️ Manuel</th>
+            <th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">Total</th>
           </tr>
         </thead>
         <tbody>
           ${rows.map(r=>`
           <tr style="border-bottom:1px solid #f1f5f9;${r.total===0?'opacity:.45':''}">
-            <td style="padding:9px 12px;font-weight:700;color:#1e293b;">${r.label}</td>
-            <td style="padding:9px 12px;text-align:right;color:#059669;font-weight:600;">${r.autoTotal>0?fmt(r.autoTotal,2):'—'}</td>
-            <td style="padding:9px 12px;text-align:right;color:#6366f1;font-weight:600;">${r.manualTotal>0?fmt(r.manualTotal,2):'—'}</td>
-            <td style="padding:9px 12px;text-align:right;font-weight:800;color:${r.total>0?'#1d4ed8':'#94a3b8'};font-size:14px;">${r.total>0?fmt(r.total,2):'—'}</td>
-            <td style="padding:9px 12px;min-width:120px;">
-              <div style="background:#f1f5f9;border-radius:4px;height:8px;overflow:hidden;">
-                <div style="height:8px;border-radius:4px;background:linear-gradient(90deg,#10b981,#1d4ed8);width:${(r.total/maxVal*100).toFixed(1)}%"></div>
-              </div>
-            </td>
+            <td style="padding:9px 10px;font-weight:700;color:#1e293b;">${r.label.substring(0,4)}</td>
+            <td style="padding:9px 10px;text-align:right;color:#059669;font-weight:600;">${r.autoTotal>0?fmt(r.autoTotal,2):'—'}</td>
+            <td style="padding:9px 10px;text-align:right;color:#6366f1;font-weight:600;">${r.manualTotal>0?fmt(r.manualTotal,2):'—'}</td>
+            <td style="padding:9px 10px;text-align:right;font-weight:800;color:${r.total>0?'#1d4ed8':'#94a3b8'};font-size:13px;">${r.total>0?fmt(r.total,2):'—'}</td>
           </tr>`).join('')}
         </tbody>
         <tfoot>
           <tr style="background:#f8fafc;border-top:2px solid #e2e8f0;">
-            <td style="padding:10px 12px;font-weight:800;color:#1e293b;">TOTAL ${yr}</td>
-            <td style="padding:10px 12px;text-align:right;font-weight:700;color:#059669;">${fmt(rows.reduce((s,r)=>s+r.autoTotal,0),2)}</td>
-            <td style="padding:10px 12px;text-align:right;font-weight:700;color:#6366f1;">${fmt(rows.reduce((s,r)=>s+r.manualTotal,0),2)}</td>
-            <td style="padding:10px 12px;text-align:right;font-weight:800;color:#1d4ed8;font-size:15px;">${fmt(grandTotal,2)}</td>
-            <td></td>
+            <td style="padding:10px;font-weight:800;color:#1e293b;">TOTAL</td>
+            <td style="padding:10px;text-align:right;font-weight:700;color:#059669;">${fmt(rows.reduce((s,r)=>s+r.autoTotal,0),2)}</td>
+            <td style="padding:10px;text-align:right;font-weight:700;color:#6366f1;">${fmt(rows.reduce((s,r)=>s+r.manualTotal,0),2)}</td>
+            <td style="padding:10px;text-align:right;font-weight:800;color:#1d4ed8;font-size:14px;">${fmt(grandTotal,2)}</td>
           </tr>
         </tfoot>
       </table>
@@ -1088,7 +1298,6 @@ function renderGrille(){
   const tbl=document.getElementById('gTbl');
   if(!tbl) return;
 
-  // Build header — distinguer mois réels vs prévision
   let html=`<thead><tr>
     <th class="th-lbl">Catégorie / Poste</th>
     ${MO.map((m,i)=>{
@@ -1098,23 +1307,14 @@ function renderGrille(){
     <th class="th-tot">Total</th>
   </tr></thead><tbody>`;
 
-  // REVENUS section
   html+=`<tr class="g-sec"><td class="g-lbl"><div class="g-lbl-in" style="color:#1d4ed8;font-size:11px">▸ REVENUS</div></td>${Array(13).fill('<td></td>').join('')}</tr>`;
-  REV_CATS.forEach(cat=>{
-    html+=gRow(cat,yr,showN1,prev);
-  });
+  REV_CATS.forEach(cat=>{ html+=gRow(cat,yr,showN1,prev); });
   html+=gSubRow('rev',yr,'TOTAL REVENUS',i=>monthComm(yr,i),'#1d4ed8');
 
-  // CHARGES section
   html+=`<tr class="g-sec"><td class="g-lbl"><div class="g-lbl-in" style="color:#c2410c;font-size:11px">▸ CHARGES</div></td>${Array(13).fill('<td></td>').join('')}</tr>`;
-  CHG_CATS.forEach(cat=>{
-    html+=gRow(cat,yr,showN1,prev);
-  });
+  CHG_CATS.forEach(cat=>{ html+=gRow(cat,yr,showN1,prev); });
   html+=gSubRow('chg',yr,'TOTAL CHARGES',i=>monthChg(yr,i),'#c2410c');
-
-  // SOLDE
   html+=gSoldeRow(yr);
-
   html+='</tbody>';
   tbl.innerHTML=html;
 }
@@ -1135,7 +1335,6 @@ function gRow(cat,yr,showN1,prev){
   }
   row+=`<td class="tc" style="text-align:right;padding:0 10px;font-size:13px;font-weight:800;color:${isRev?'#1d4ed8':'#c2410c'};vertical-align:middle">${total>0?fmtN(Math.round(total)):'—'}</td></tr>`;
 
-  // N-1 row
   if(showN1&&YRS.includes(prev)){
     row+=`<tr class="g-n1"><td class="g-lbl"><div class="g-lbl-in">↳ ${prev}</div></td>`;
     let prevTot=0;
@@ -1193,12 +1392,13 @@ function openDrawer(cat,yr,mo){
   updateDTotal();
   document.getElementById('d-ov').style.display='block';
   document.getElementById('drw').classList.add('open');
+  // Scroll haut du drawer
+  setTimeout(()=>document.getElementById('db').scrollTop=0,50);
 }
 
 function closeDrawer(){
   document.getElementById('drw').classList.remove('open');
   document.getElementById('d-ov').style.display='none';
-  // Rafraîchir la vue active
   const activeView=document.querySelector('.view.active')?.id;
   if(activeView==='view-exploitation') renderExploit();
   else if(activeView==='view-grille') renderGrille();
@@ -1213,7 +1413,6 @@ function buildDrawerContent(cat,yr,mo){
   return buildSimpleDrawer(cat,yr,mo1);
 }
 
-// IARD / VIE
 function buildDynRevDrawer(cat,yr,mo1){
   const rd=getRevDetail(yr,mo1);
   const rows=rd?.[cat]||[{desc:'',amount:0}];
@@ -1230,33 +1429,28 @@ function buildDynRevDrawer(cat,yr,mo1){
     <button class="dadd" onclick="dAddRow('d-dyn-${cat}',true)">+ Ajouter une ligne</button></div></div>`;
 }
 
-// COURTAGE
 function buildCourtageDrawer(yr,mo1){
   const d=getDetail(yr,mo1);
   const vals=d?.courtage||{};
   const items=CATS.courtage.items;
-  const rows=items.map(it=>`<div class="di"><label>${it}</label><input type="number" data-key="${it}" step="0.01" value="${(vals[it]||0)>0?(vals[it]).toFixed(2):''}" placeholder="0,00" oninput="dUpdate()"><button class="drep" data-rtype="courtage" data-rkey="${it}" onclick="replicateLine(this)" tabindex="-1" title="Répliquer ce poste sur 12 mois">🔁</button></div>`).join('');
+  const rows=items.map(it=>`<div class="di"><label>${it}</label><input type="number" data-key="${it}" step="0.01" value="${(vals[it]||0)>0?(vals[it]).toFixed(2):''}" placeholder="0,00" oninput="dUpdate()"><button class="drep" data-rtype="courtage" data-rkey="${it}" onclick="replicateLine(this)" tabindex="-1" title="Répliquer">🔁</button></div>`).join('');
   return `<div class="dg"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">Par courtier</span><span class="dg-arr">▾</span></div><div class="dg-bd">${rows}</div></div>`;
 }
 
-// FIXES (complex)
 function buildFixesDrawer(yr,mo1){
   const d=getDetail(yr,mo1)?.fixes||{};
   const fd=getFixesDetail(yr,mo1)||{};
   let html='';
 
-  // Postes simples
-  const simpleRows=FIXES_SIMPLE.map(it=>`<div class="di"><label>${it}</label><input type="number" data-fixes-item="${it}" step="0.01" value="${(d[it]||0)>0?(d[it]).toFixed(2):''}" placeholder="0,00" oninput="dUpdate()"><button class="drep" data-rtype="fixes-simple" data-rkey="${it}" onclick="replicateLine(this)" tabindex="-1" title="Répliquer sur 12 mois">🔁</button></div>`).join('');
+  const simpleRows=FIXES_SIMPLE.map(it=>`<div class="di"><label>${it}</label><input type="number" data-fixes-item="${it}" step="0.01" value="${(d[it]||0)>0?(d[it]).toFixed(2):''}" placeholder="0,00" oninput="dUpdate()"><button class="drep" data-rtype="fixes-simple" data-rkey="${it}" onclick="replicateLine(this)" tabindex="-1" title="Répliquer">🔁</button></div>`).join('');
   html+=`<div class="dg"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">🏢 Postes récurrents</span><span class="dg-arr">▾</span></div><div class="dg-bd">${simpleRows}</div></div>`;
 
-  // Named subs
   Object.entries(FIXES_SUBS).forEach(([key,def])=>{
     const sub=fd[key]||{};
-    const rows=def.items.map(it=>`<div class="di"><label>${it}</label><input type="number" data-fixes-sub="${key}" data-key="${it}" step="0.01" value="${(sub[it]||0)>0?(sub[it]).toFixed(2):''}" placeholder="0,00" oninput="dUpdate()"><button class="drep" data-rtype="fixes-sub" data-rkey="${key}" data-rsubkey="${it}" onclick="replicateLine(this)" tabindex="-1" title="Répliquer sur 12 mois">🔁</button></div>`).join('');
+    const rows=def.items.map(it=>`<div class="di"><label>${it}</label><input type="number" data-fixes-sub="${key}" data-key="${it}" step="0.01" value="${(sub[it]||0)>0?(sub[it]).toFixed(2):''}" placeholder="0,00" oninput="dUpdate()"><button class="drep" data-rtype="fixes-sub" data-rkey="${key}" data-rsubkey="${it}" onclick="replicateLine(this)" tabindex="-1" title="Répliquer">🔁</button></div>`).join('');
     html+=`<div class="dg"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">${def.label}</span><span class="dg-arr">▾</span></div><div class="dg-bd">${rows}</div></div>`;
   });
 
-  // Déjeuners (dynamic amounts)
   const dej=fd.dejeuners||[];
   const dejRows=dej.map(v=>`<tr><td><input type="number" data-da step="0.01" value="${v>0?v.toFixed(2):''}" placeholder="0,00" oninput="dUpdate()"></td><td class="dc"><button class="ddel" onclick="dDelRow(this)">×</button></td></tr>`).join('');
   html+=`<div class="dg"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">🍽 Déjeuners</span><span class="dg-arr">▾</span></div>
@@ -1264,9 +1458,8 @@ function buildFixesDrawer(yr,mo1){
       <thead><tr><th>Montant</th><th></th></tr></thead>
       <tbody>${dejRows||'<tr><td><input type="number" data-da step="0.01" placeholder="0,00" oninput="dUpdate()"></td><td class="dc"><button class="ddel" onclick="dDelRow(this)">×</button></td></tr>'}</tbody>
     </table>
-    <button class="dadd" onclick="dAddRow('d-dyn-dejeuners',false)">+ Ajouter un déjeuner</button></div></div>`;
+    <button class="dadd" onclick="dAddRow(\'d-dyn-dejeuners\',false)">+ Ajouter un déjeuner</button></div></div>`;
 
-  // Voyages + Achats (dynamic desc+amount)
   ['voyages','achats'].forEach(key=>{
     const arr=fd[key]||[];
     const icon=key==='voyages'?'✈':'🛒';
@@ -1281,24 +1474,21 @@ function buildFixesDrawer(yr,mo1){
         <thead><tr><th>Description</th><th>Montant</th><th></th></tr></thead>
         <tbody>${rows2||`<tr><td><input type="text" data-dd placeholder="Description" oninput="dUpdate()"></td><td><input type="number" data-da step="0.01" placeholder="0,00" oninput="dUpdate()"></td><td class="dc"><button class="ddel" onclick="dDelRow(this)">×</button></td></tr>`}</tbody>
       </table>
-      <button class="dadd" onclick="dAddRow('d-dyn-${key}',true)">+ Ajouter</button></div></div>`;
+      <button class="dadd" onclick="dAddRow(\'d-dyn-${key}\',true)">+ Ajouter</button></div></div>`;
   });
   return html;
 }
 
-// Simple categories (salariale, taxes, prelevements, emprunts)
 function buildSimpleDrawer(cat,yr,mo1){
   const d=getDetail(yr,mo1);
   const vals=d?.[cat]||{};
   const def=CATS[cat];
-  // YF logic for salariale
   let items=def.items||[];
   if(cat==='salariale'&&(yr>2026||(yr===2026&&mo1>=3))) items=items.filter(it=>it!=='Salaire YF');
-  const rows=items.map(it=>`<div class="di"><label>${it}</label><input type="number" data-key="${it}" step="0.01" value="${(vals[it]||0)>0?(vals[it]).toFixed(2):''}" placeholder="0,00" oninput="dUpdate()"><button class="drep" data-rtype="simple" data-rkey="${it}" onclick="replicateLine(this)" tabindex="-1" title="Répliquer sur 12 mois">🔁</button></div>`).join('');
+  const rows=items.map(it=>`<div class="di"><label>${it}</label><input type="number" data-key="${it}" step="0.01" value="${(vals[it]||0)>0?(vals[it]).toFixed(2):''}" placeholder="0,00" oninput="dUpdate()"><button class="drep" data-rtype="simple" data-rkey="${it}" onclick="replicateLine(this)" tabindex="-1" title="Répliquer">🔁</button></div>`).join('');
   return `<div class="dg"><div class="dg-hd" onclick="dToggleGrp(this)"><span class="dg-ttl">Détail ${def.label}</span><span class="dg-arr">▾</span></div><div class="dg-bd">${rows}</div></div>`;
 }
 
-// Drawer helpers
 function dToggleGrp(hd){hd.closest('.dg').classList.toggle('col');}
 
 function dAddRow(tableId,hasDesc){
@@ -1390,16 +1580,12 @@ function updateDTotal(){
   document.getElementById('dtot-val').textContent=fmt(val,2);
 }
 
-// Réplication d'une ligne précise vers les 12 mois
 function replicateLine(btn){
   if(!d_cat||d_yr===null||d_mo===null) return;
-  dUpdate(); // sauvegarder l'état courant d'abord
-
+  dUpdate();
   const type=btn.dataset.rtype;
   const key=btn.dataset.rkey;
   const subKey=btn.dataset.rsubkey||null;
-
-  // Lire la valeur depuis le champ adjacent
   let value=0, itemLabel=key;
   if(type==='fixes-simple'){
     value=+document.querySelector(`#db [data-fixes-item="${CSS.escape(key)}"]`)?.value||0;
@@ -1409,59 +1595,47 @@ function replicateLine(btn){
   } else if(type==='simple'||type==='courtage'){
     value=+document.querySelector(`#db [data-key="${CSS.escape(key)}"]`)?.value||0;
   } else return;
-
   if(!confirm(`Répliquer "${itemLabel}" = ${fmt(value)} sur les 12 mois de ${d_yr} ?`)) return;
-
   if(!USER[d_yr]) USER[d_yr]={};
   if(!USER_FD[d_yr]) USER_FD[d_yr]={};
-
   for(let m=1;m<=12;m++){
-    // Initialiser le mois depuis les données statiques si pas encore dans USER
     if(!USER[d_yr][m]){
       USER[d_yr][m]={};
       const src=(d_yr===2026&&m>=1&&m<=3)?DETAIL_2026[m]:null;
       if(src) Object.keys(src).forEach(c=>{USER[d_yr][m][c]={...src[c]};});
     }
-
     if(type==='fixes-simple'){
       if(!USER[d_yr][m].fixes) USER[d_yr][m].fixes={};
       USER[d_yr][m].fixes[key]=value;
-      // Recalculer le total Fixes pour ce mois
       const tot=Object.values(USER[d_yr][m].fixes).reduce((s,v)=>s+(+v||0),0);
       if(BASE[d_yr]?.fixes) BASE[d_yr].fixes[m-1]=tot;
-    }
-    else if(type==='fixes-sub'){
-      // Initialiser FD si besoin
+    } else if(type==='fixes-sub'){
       if(!USER_FD[d_yr][m]){
         const srcFD=(d_yr===2026&&m>=1&&m<=3)?FIXES_DETAIL_2026[m]:null;
         USER_FD[d_yr][m]=srcFD?JSON.parse(JSON.stringify(srcFD)):{assurances:{},telephonie:{},abonnements:{},dejeuners:[],voyages:[],achats:[]};
       }
       if(!USER_FD[d_yr][m][key]) USER_FD[d_yr][m][key]={};
       USER_FD[d_yr][m][key][subKey]=value;
-      // Recalculer le sous-total de la section et le total fixes
       const def=FIXES_SUBS[key];
       const subTot=def.items.reduce((s,it)=>s+(+USER_FD[d_yr][m][key][it]||0),0);
       if(!USER[d_yr][m].fixes) USER[d_yr][m].fixes={};
       USER[d_yr][m].fixes[def.label]=subTot;
       const tot=Object.values(USER[d_yr][m].fixes).reduce((s,v)=>s+(+v||0),0);
       if(BASE[d_yr]?.fixes) BASE[d_yr].fixes[m-1]=tot;
-    }
-    else if(type==='courtage'){
+    } else if(type==='courtage'){
       if(!USER[d_yr][m].courtage) USER[d_yr][m].courtage={};
       USER[d_yr][m].courtage[key]=value;
       const tot=Object.values(USER[d_yr][m].courtage).reduce((s,v)=>s+(+v||0),0);
       if(BASE[d_yr]?.courtage) BASE[d_yr].courtage[m-1]=tot;
-    }
-    else if(type==='simple'){
+    } else if(type==='simple'){
       if(!USER[d_yr][m][d_cat]) USER[d_yr][m][d_cat]={};
       USER[d_yr][m][d_cat][key]=value;
       const tot=Object.values(USER[d_yr][m][d_cat]).reduce((s,v)=>s+(+v||0),0);
       if(BASE[d_yr]?.[d_cat]) BASE[d_yr][d_cat][m-1]=tot;
     }
   }
-
   saveLocal();
-  showNotif(`✅ "${itemLabel}" = ${fmt(value)} → 12 mois`);
+  showNotif(`✅ "${itemLabel}" → 12 mois`);
   renderGrille();
 }
 
@@ -1481,7 +1655,7 @@ function renderAnalyse(){
   YRS.forEach(yr=>{
     const b=document.createElement('button');
     b.className='ytab'+(yr===an_yr?' active':'');
-    b.textContent=yr+(yr===CURRENT_YEAR?' (en cours)':'');
+    b.textContent=yr+(yr===CURRENT_YEAR?' ★':'');
     b.onclick=()=>{an_yr=yr;renderAnalyse();};
     c.appendChild(b);
   });
@@ -1492,6 +1666,8 @@ function renderAnalyse(){
   const prev_total_ca=sum(prevIdxs.map(i=>monthComm(prev,i)));
   const sub=yr===CURRENT_YEAR?`${idxs.length} mois saisis`:`Exercice complet`;
   document.getElementById('barsub').textContent=sub;
+  const mobSub=document.getElementById('mob-barsub');
+  if(mobSub) mobSub.textContent=sub;
 
   function pca(tot,ca){if(!ca) return '<td>—</td>'; return `<td>${(tot/ca*100).toFixed(1)}%</td>`;}
   function dca(tot,ca,pt,pca2,isChg){
@@ -1502,7 +1678,7 @@ function renderAnalyse(){
     return `<td class="${good?'pct-up':'pct-dn'}">${d>0?'+':''}${d.toFixed(1)}%</td>`;
   }
 
-  let html=`<table><thead><tr><th>Poste</th>${idxs.map(i=>`<th>${MO[i].substring(0,3)}</th>`).join('')}<th>Total</th><th>% CA</th><th style="color:#a5f3fc">N-1 %</th><th style="color:#a5f3fc">Δ</th></tr></thead><tbody>`;
+  let html=`<table><thead><tr><th>Poste</th>${idxs.map(i=>`<th>${MO[i].substring(0,3)}</th>`).join('')}<th>Total</th><th>% CA</th><th style="color:#a5f3fc">N-1%</th><th style="color:#a5f3fc">Δ</th></tr></thead><tbody>`;
   html+=`<tr class="tr-sep"><td colspan="${idxs.length+5}">REVENUS</td></tr>`;
   REV_CATS.forEach(cat=>{
     const def=CATS[cat];
@@ -1512,7 +1688,6 @@ function renderAnalyse(){
     const prevTot=sum(prevVals);
     html+=`<tr class="tr-cat" id="grp_${cat}" onclick="toggleAnalyseGroup('grp_${cat}')"><td><span class="g-arr" style="display:inline-block;margin-right:6px;transition:transform .2s">▾</span>${def.icon} ${def.label}</td>${vals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td><strong>${fmtN(tot)}</strong></td>${pca(tot,total_ca)}${pca(prevTot,prev_total_ca)}${dca(tot,total_ca,prevTot,prev_total_ca,false)}</tr>`;
     if(cat==='iard'||cat==='vie'){
-      // Lire les lignes directement depuis KSU_DATA
       const ksuPerMo=idxs.map(i=>{
         const d=KSU_DATA[yr]?.[i+1];
         const lines=Array.isArray(d)?d:(d?.lines||[]);
@@ -1525,31 +1700,10 @@ function renderAnalyse(){
           const rv=idxs.map((_,idx)=>ksuPerMo[idx].filter(l=>l.label===label).reduce((s,l)=>s+(+l.amount||0),0));
           if(sum(rv)>0) html+=`<tr class="tr-item hr" data-group="grp_${cat}"><td>${label}</td>${rv.map(v=>`<td>${v>0?fmtN(v,2):'—'}</td>`).join('')}<td>${fmtN(sum(rv),2)}</td><td colspan="3"></td></tr>`;
         });
-      } else {
-        // Fallback USER_RD / REV_DETAIL_2026
-        const rd0=getRevDetail(yr,idxs[0]+1);
-        if(rd0&&rd0[cat]){
-          const maxR=Math.max(...idxs.map(i=>{const rd=getRevDetail(yr,i+1);return(rd&&rd[cat])?rd[cat].length:0;}));
-          for(let ri=0;ri<maxR;ri++){
-            const rd0r=rd0[cat][ri];const lbl=(rd0r&&rd0r.desc)?rd0r.desc:`Ligne ${ri+1}`;
-            const rv=idxs.map(i=>{const rd=getRevDetail(yr,i+1);return(rd&&rd[cat]&&rd[cat][ri])?(+rd[cat][ri].amount||0):0;});
-            if(sum(rv)>0) html+=`<tr class="tr-item hr" data-group="grp_${cat}"><td>${lbl}</td>${rv.map(v=>`<td>${v>0?fmtN(v,2):'—'}</td>`).join('')}<td>${fmtN(sum(rv),2)}</td><td colspan="3"></td></tr>`;
-          }
-        }
-      }
-    } else {
-      const d=getDetail(yr,idxs[0]+1);
-      if(d&&d[cat]){
-        const items=CATS[cat].items||Object.keys(d[cat]);
-        items.forEach(item=>{
-          const iv=idxs.map(i=>{const dd=getDetail(yr,i+1);return(dd&&dd[cat]&&dd[cat][item])||0;});
-          if(sum(iv)>0) html+=`<tr class="tr-item hr" data-group="grp_${cat}"><td>${item}</td>${iv.map(v=>`<td>${v>0?fmtN(v,2):'—'}</td>`).join('')}<td>${fmtN(sum(iv),2)}</td><td colspan="3"></td></tr>`;
-        });
       }
     }
   });
   const revVals=idxs.map(i=>monthComm(yr,i));const totalRev=sum(revVals);
-  const prevRevVals=prevIdxs.map(i=>monthComm(prev,i));const totalPrevRev=sum(prevRevVals);
   html+=`<tr class="tr-total" style="background:#1e3a5f;font-size:13px"><td>💰 TOTAL COMMISSIONS</td>${revVals.map(v=>`<td style="color:#6ee7b7;font-weight:700">${fmtN(v)}</td>`).join('')}<td style="color:#6ee7b7;font-weight:800;font-size:14px">${fmtN(totalRev)}</td><td>100%</td><td>100%</td><td>—</td></tr>`;
 
   html+=`<tr class="tr-sep"><td colspan="${idxs.length+5}">CHARGES</td></tr>`;
@@ -1570,8 +1724,7 @@ function renderAnalyse(){
     }
   });
   const chgVals=idxs.map(i=>monthChg(yr,i));const totalChg=sum(chgVals);
-  const prevChgVals=prevIdxs.map(i=>monthChg(prev,i));const totalPrevChg=sum(prevChgVals);
-  html+=`<tr class="tr-charges"><td>TOTAL CHARGES</td>${chgVals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td>${fmtN(totalChg)}</td>${pca(totalChg,total_ca)}${pca(totalPrevChg,prev_total_ca)}${dca(totalChg,total_ca,totalPrevChg,prev_total_ca,true)}</tr>`;
+  html+=`<tr class="tr-charges"><td>TOTAL CHARGES</td>${chgVals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td>${fmtN(totalChg)}</td>${pca(totalChg,total_ca)}${pca(sum(prevIdxs.map(i=>monthChg(prev,i))),prev_total_ca)}${dca(totalChg,total_ca,sum(prevIdxs.map(i=>monthChg(prev,i))),prev_total_ca,true)}</tr>`;
   const soldeVals=idxs.map(i=>monthSolde(yr,i));const totalSolde=sum(soldeVals);
   html+=`<tr class="tr-solde"><td>SOLDE NET</td>${soldeVals.map(v=>`<td style="color:${v>=0?'#6ee7b7':'#fca5a5'}">${fmtN(v)}</td>`).join('')}<td>${fmtN(totalSolde)}</td><td colspan="3"></td></tr>`;
   html+='</tbody></table>';
@@ -1583,267 +1736,16 @@ function renderAnalyse(){
       const def=CATS[cat];const tot=sum(idxs.map(i=>catTotal(yr,cat,i)));const pv=tot/total_ca*100;
       const ptot=sum(prevIdxs.map(i=>catTotal(prev,cat,i)));const pp=prev_total_ca>0?ptot/prev_total_ca*100:null;
       const diff=pp!==null?pv-pp:null;
-      const dt=diff!==null?`<span style="font-size:10.5px;color:${diff>0?'#dc2626':'#059669'};margin-left:4px">(${diff>0?'+':''}${diff.toFixed(1)}% vs N-1)</span>`:'';
+      const dt=diff!==null?`<span style="font-size:10.5px;color:${diff>0?'#dc2626':'#059669'};margin-left:4px">(${diff>0?'+':''}${diff.toFixed(1)}%)</span>`:'';
       return `<div class="pbr"><div class="pbl">${def.icon} ${def.label.replace('Charges ','').replace('Masse ','')}</div><div class="pbb"><div class="pbf" style="width:${Math.min(pv,100).toFixed(1)}%;background:${def.color}"></div></div><div class="pbv">${fmt(tot)}</div><div class="pbp">${pv.toFixed(1)}%${dt}</div></div>`;
     }).join('');
   }
 }
 
 // ================================================================
-// TRÉSORERIE
-// ================================================================
-let t_yr=2026, t_mo=CURRENT_MONTH;
-
-function initTreso(){
-  const sel=document.getElementById('tYear');
-  if(!sel.children.length){YRS.forEach(yr=>{const o=document.createElement('option');o.value=yr;o.textContent=yr;sel.appendChild(o);});sel.value=2026;}
-  t_yr=parseInt(sel.value);
-  buildTresoMonthNav();
-}
-function buildTresoMonthNav(){
-  const c=document.getElementById('tMonths');c.innerHTML='';
-  for(let m=1;m<=12;m++){
-    const chip=document.createElement('div');
-    chip.className='mchip'+(m===t_mo?' active':'');
-    chip.textContent=MO[m-1].substring(0,3);
-    if(TRESO[t_yr]?.[m]!=null) chip.classList.add('has-data');
-    chip.onclick=()=>{document.querySelectorAll('#tMonths .mchip').forEach(x=>x.classList.remove('active'));chip.classList.add('active');t_mo=m;buildTresoForm();};
-    c.appendChild(chip);
-  }
-  buildTresoForm();
-}
-function getTresoData(yr,mo){return TRESO[yr]?.[mo]||{encaissements:[],paiements:[]};}
-
-// ── Données compta temps réel depuis Firebase ──────────────────
-function getComptaSync(yr,mo){
-  return(_comptaSyncData[yr]&&_comptaSyncData[yr][mo])||[];
-}
-function tresoEncRowAuto(r){
-  const colors={'Chèque':'#1e3a5f','Espèces':'#065f46','Virement':'#1d4ed8'};
-  const bgs={'Chèque':'#eff6ff','Espèces':'#f0fdf4','Virement':'#dbeafe'};
-  const col=colors[r.type]||'#374151'; const bg=bgs[r.type]||'#f0fdf4';
-  return `<tr data-auto="1" style="background:#f0fdf4;">
-    <td><span style="padding:2px 8px;background:${bg};color:${col};border-radius:4px;font-size:11px;font-weight:700;">${r.type}</span></td>
-    <td style="font-size:12px;color:#374151;">${r.desc||''}&nbsp;<span style="font-size:10px;color:#10b981;font-weight:700;">📱</span></td>
-    <td style="text-align:right;font-weight:700;color:#065f46;">${fmt(r.amount||0)}<input type="number" value="${r.amount||0}" style="display:none" readonly></td>
-    <td class="del-cell"><span style="font-size:10px;color:#9ca3af;">auto</span></td>
-  </tr>`;
-}
-
-function buildTresoForm(){
-  const data=getTresoData(t_yr,t_mo);
-  const autoEnc=getComptaSync(t_yr,t_mo);
-  const manualEnc=(data.encaissements||[]).filter(r=>!r._auto);
-
-  let autoR='';
-  if(autoEnc.length){
-    autoR=`<tr style="background:#dcfce7;"><td colspan="4" style="padding:5px 10px;font-size:10px;font-weight:800;color:#065f46;letter-spacing:.5px;text-transform:uppercase;">📱 Synchronisé depuis l'application (${autoEnc.length} ligne${autoEnc.length>1?'s':''})</td></tr>`
-      +autoEnc.map(r=>tresoEncRowAuto(r)).join('');
-    if(manualEnc.length){
-      autoR+=`<tr style="background:#f1f5f9;"><td colspan="4" style="padding:5px 10px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-transform:uppercase;">✏️ Saisies manuelles</td></tr>`;
-    }
-  }
-  let manualR=manualEnc.map(r=>tresoEncRow(r)).join('');
-  if(!manualR&&!autoEnc.length) manualR=`<tr><td><select onchange="onTI()"><option>Chèque</option><option>Virement</option><option>Espèces</option></select></td><td><input type="text" placeholder="Description" oninput="onTI()"></td><td><input type="number" step="0.01" class="amt" placeholder="0,00" oninput="onTI()"></td><td class="del-cell"><button class="dyn-del" onclick="delTR(this,'enc')">×</button></td></tr>`;
-  const encR=autoR+manualR;
-
-  let paiR=data.paiements.map((r,i)=>tresoPaiRow(r,i)).join('');
-  if(!paiR) paiR=`<tr><td><input type="text" placeholder="Organisme" oninput="onTI()"></td><td><input type="number" step="0.01" class="amt" placeholder="0,00" oninput="onTI()"></td><td class="del-cell"><button class="dyn-del" onclick="delTR(this,'pai')">×</button></td></tr>`;
-
-  const autoTotal=autoEnc.reduce((s,r)=>s+(r.amount||0),0);
-  const manTotal=manualEnc.reduce((s,r)=>s+(r.amount||0),0);
-
-  document.getElementById('tresoForm').innerHTML=`
-    <div class="fcard" id="fc-enc" style="margin-bottom:10px">
-      <div class="fcard-hd" onclick="toggleCard('fc-enc')"><div class="title"><span class="ic2">💰</span>Encaissements clients</div><div class="right"><span class="ftot" id="tot-enc">${fmt(autoTotal+manTotal)}</span><span class="arr">−</span></div></div>
-      <div class="fcard-bd"><table class="dyn-table"><thead><tr><th>Type</th><th>Description / Client</th><th>Montant</th><th class="del-cell"></th></tr></thead><tbody id="tenc-body">${encR}</tbody></table><button class="btn-add-row" onclick="addTR('enc')">+ Ajouter une ligne manuelle</button></div>
-    </div>
-    <div class="fcard" id="fc-pai">
-      <div class="fcard-hd" onclick="toggleCard('fc-pai')"><div class="title"><span class="ic2">🏦</span>Paiements directs Allianz</div><div class="right"><span class="ftot" id="tot-pai">${fmt(sum(data.paiements.map(r=>r.amount||0)))}</span><span class="arr">−</span></div></div>
-      <div class="fcard-bd"><table class="dyn-table"><thead><tr><th>Organisme</th><th>Montant</th><th class="del-cell"></th></tr></thead><tbody id="tpai-body">${paiR}</tbody></table><button class="btn-add-row" onclick="addTR('pai')">+ Ajouter</button></div>
-    </div>`;
-  updateTresoKpi();
-  document.getElementById('fc-enc').classList.add('open');
-  document.getElementById('fc-pai').classList.add('open');
-}
-function tresoEncRow(r){return `<tr><td><select onchange="onTI()"><option${r.type==='Chèque'?' selected':''}>Chèque</option><option${r.type==='Virement'?' selected':''}>Virement</option><option${r.type==='Espèces'?' selected':''}>Espèces</option></select></td><td><input type="text" value="${r.desc||''}" placeholder="Description" oninput="onTI()"></td><td><input type="number" step="0.01" class="amt" value="${r.amount>0?r.amount.toFixed(2):''}" placeholder="0,00" oninput="onTI()"></td><td class="del-cell"><button class="dyn-del" onclick="delTR(this,'enc')">×</button></td></tr>`;}
-function tresoPaiRow(r){return `<tr><td><input type="text" value="${r.desc||''}" placeholder="Organisme" oninput="onTI()"></td><td><input type="number" step="0.01" class="amt" value="${r.amount>0?r.amount.toFixed(2):''}" placeholder="0,00" oninput="onTI()"></td><td class="del-cell"><button class="dyn-del" onclick="delTR(this,'pai')">×</button></td></tr>`;}
-function addTR(type){
-  const tb=document.getElementById(type==='enc'?'tenc-body':'tpai-body');
-  const tr=document.createElement('tr');
-  tr.innerHTML=type==='enc'
-    ?`<td><select onchange="onTI()"><option>Chèque</option><option>Virement</option><option>Espèces</option></select></td><td><input type="text" placeholder="Description" oninput="onTI()"></td><td><input type="number" step="0.01" class="amt" placeholder="0,00" oninput="onTI()"></td><td class="del-cell"><button class="dyn-del" onclick="delTR(this,'enc')">×</button></td>`
-    :`<td><input type="text" placeholder="Organisme" oninput="onTI()"></td><td><input type="number" step="0.01" class="amt" placeholder="0,00" oninput="onTI()"></td><td class="del-cell"><button class="dyn-del" onclick="delTR(this,'pai')">×</button></td>`;
-  tb.appendChild(tr);onTI();
-}
-function delTR(btn,type){btn.closest('tr').remove();onTI();}
-function onTI(){
-  let et=0,pt=0;
-  document.querySelectorAll('#tenc-body tr input[type="number"]').forEach(el=>et+=(+el.value||0));
-  document.querySelectorAll('#tpai-body tr input[type="number"]').forEach(el=>pt+=(+el.value||0));
-  const e=document.getElementById('tot-enc');const p=document.getElementById('tot-pai');
-  if(e) e.textContent=fmt(et);if(p) p.textContent=fmt(pt);
-  updateTresoKpi(et,pt);
-}
-function updateTresoKpi(et,pt){
-  if(et===undefined){
-    const d=getTresoData(t_yr,t_mo);
-    const autoEnc=getComptaSync(t_yr,t_mo);
-    const manualTotal=sum(d.encaissements.filter(r=>!r._auto).map(r=>r.amount||0));
-    const autoTotal=sum(autoEnc.map(r=>r.amount||0));
-    et=manualTotal+autoTotal;
-    pt=sum(d.paiements.map(r=>r.amount||0));
-  }
-  const stored=TRESO[t_yr]?.[t_mo]?.remonter||0;
-  const existing=document.getElementById('treso-remonter');
-  const rv=existing?(+existing.value||0):stored;
-  document.getElementById('tresoKpi').innerHTML=`
-    <div class="treso-kc"><div class="tlbl">💰 Total encaissé</div><div class="tval" style="color:#2563eb">${fmt(et)}</div></div>
-    <div class="treso-kc"><div class="tlbl">🏦 Paiements directs</div><div class="tval" style="color:#6366f1">${fmt(pt)}</div></div>
-    <div class="treso-kc" style="text-align:left"><div class="tlbl" style="text-align:left">📤 Montant à remonter</div>
-      <input id="treso-remonter" type="number" step="0.01" min="0" value="${rv>0?rv.toFixed(2):''}" placeholder="Saisir le montant…"
-        style="width:100%;margin-top:4px;padding:7px 9px;border:1.5px solid #bae6fd;border-radius:8px;font-size:16px;font-weight:700;color:#1e293b;text-align:right;background:white"
-        oninput="saveTresoRemonter()"></div>`;
-}
-function saveTresoRemonter(){if(!TRESO[t_yr]) TRESO[t_yr]={};if(!TRESO[t_yr][t_mo]) TRESO[t_yr][t_mo]={encaissements:[],paiements:[]};const el=document.getElementById('treso-remonter');if(el) TRESO[t_yr][t_mo].remonter=+el.value||0;}
-function collectTresoData(){
-  const enc=[],pai=[];
-  // Exclure les lignes auto (synchronisées depuis l'application)
-  document.querySelectorAll('#tenc-body tr:not([data-auto])').forEach(row=>{const sel=row.querySelector('select');const inputs=[...row.querySelectorAll('input:not([readonly])')];const type=sel?sel.value:'Chèque';const desc=inputs[0]?.value||'';const amount=+(inputs[1]?.value||0);if(amount>0||desc) enc.push({type,desc,amount});});
-  document.querySelectorAll('#tpai-body tr').forEach(row=>{const inputs=[...row.querySelectorAll('input')];const desc=inputs[0]?.value||'';const amount=+(inputs[1]?.value||0);if(amount>0||desc) pai.push({desc,amount});});
-  return{encaissements:enc,paiements:pai};
-}
-// ── Sync Cabinet Dashboard → Firebase (perf app) ──────────────
-function syncDashboardToFirebase(yr, mo, manualRows){
-  if(!_fbDb) return;
-  const typeMap={'Chèque':'cheque','Virement':'virement','Espèces':'especes'};
-  const datePfx=String(yr)+'-'+String(mo).padStart(2,'0');
-  const ref=_fbDb.ref('allianz_db_v4/compta/ecritures');
-  ref.once('value',function(snap){
-    const raw=snap.val()||[];
-    // Reconstruire la liste en supprimant les anciennes entrées dashboard de ce mois
-    const list=(Array.isArray(raw)?raw:Object.values(raw)).filter(e=>
-      !(e&&e._source==='dashboard'&&e.date&&e.date.startsWith(datePfx))
-    );
-    // Ajouter les nouvelles lignes manuelles
-    const now=Date.now();
-    (manualRows||[]).forEach(function(r,i){
-      if(!r.amount&&!r.desc) return;
-      list.push({
-        id:'dash-'+datePfx+'-'+i+'-'+now,
-        date:datePfx+'-01',
-        type:typeMap[r.type]||'cheque',
-        montant:r.amount||0,
-        client:r.desc||'',
-        produit:'', contrat:'',
-        collaborateur:'Dashboard Cabinet',
-        note:'Saisi depuis Cabinet Dashboard',
-        statut:'en_attente',
-        _source:'dashboard',
-        createdAt:now
-      });
-    });
-    ref.set(list).catch(function(e){console.warn('Sync dashboard→Firebase error',e);});
-  });
-}
-
-// ── Sync Compte Mandat → Firebase (perf app) ──────────────────
-function syncMandatToFirebase(yr, mo){
-  if(!_fbDb) return;
-  const typeMap={'Chèque':'cheque','Virement':'virement','Espèces':'especes'};
-  const datePfx=String(yr)+'-'+String(mo).padStart(2,'0');
-  const ref=_fbDb.ref('allianz_db_v4/compta/ecritures');
-  ref.once('value',function(snap){
-    const raw=snap.val()||[];
-    const list=(Array.isArray(raw)?raw:Object.values(raw)).filter(e=>
-      !(e&&e._source==='mandat'&&e.date&&e.date.startsWith(datePfx))
-    );
-    const enc=(MANDAT_DATA[yr]&&MANDAT_DATA[yr][mo]&&MANDAT_DATA[yr][mo].enc)||[];
-    const now=Date.now();
-    enc.forEach(function(r,i){
-      if(!r.amount&&!r.desc) return;
-      list.push({
-        id:'mandat-'+datePfx+'-'+i+'-'+now+'-'+Math.random().toString(36).slice(2,5),
-        date:r.date||datePfx+'-01',
-        type:typeMap[r.type]||'cheque',
-        montant:r.amount||0,
-        client:r.desc||'',
-        produit:'',contrat:'',
-        collaborateur:'Compte Mandat',
-        note:'Saisi depuis Compte Mandat',
-        statut:'remis',
-        _source:'mandat',
-        createdAt:now
-      });
-    });
-    ref.set(list).catch(function(e){console.warn('Sync mandat→Firebase error',e);});
-  });
-}
-
-function syncAllMandatToFirebase(){
-  if(!_fbDb){showNotif('❌ Firebase non connecté');return;}
-  const yr=CURRENT_YEAR;
-  const typeMap={'Chèque':'cheque','Virement':'virement','Espèces':'especes'};
-  const ref=_fbDb.ref('allianz_db_v4/compta/ecritures');
-  ref.once('value',function(snap){
-    const raw=snap.val()||[];
-    // Supprimer toutes les entrées mandat de l'année en cours
-    const list=(Array.isArray(raw)?raw:Object.values(raw)).filter(e=>
-      !(e&&e._source==='mandat'&&e.date&&e.date.startsWith(String(yr)))
-    );
-    let count=0;
-    const now=Date.now();
-    for(let mo=1;mo<=CURRENT_MONTH;mo++){
-      const datePfx=String(yr)+'-'+String(mo).padStart(2,'0');
-      const enc=(MANDAT_DATA[yr]&&MANDAT_DATA[yr][mo]&&MANDAT_DATA[yr][mo].enc)||[];
-      enc.forEach(function(r,i){
-        if(!r.amount&&!r.desc) return;
-        list.push({
-          id:'mandat-'+datePfx+'-'+i+'-'+now+'-'+Math.random().toString(36).slice(2,5),
-          date:r.date||datePfx+'-01',
-          type:typeMap[r.type]||'cheque',
-          montant:r.amount||0,
-          client:r.desc||'',
-          produit:'',contrat:'',
-          collaborateur:'Compte Mandat',
-          note:'Saisi depuis Compte Mandat',
-          statut:'remis',
-          _source:'mandat',
-          createdAt:now
-        });
-        count++;
-      });
-    }
-    ref.set(list).then(function(){
-      showNotif('✅ '+count+' écriture(s) Mandat synchronisée(s) vers Perf (jan → '+MO[CURRENT_MONTH-1]+')');
-      if(document.getElementById('view-mandat')?.classList.contains('active')) renderMandat();
-    }).catch(function(e){console.warn('Sync mandat→Firebase error',e);showNotif('❌ Erreur de synchronisation');});
-  });
-}
-
-function saveTreso(){
-  const data=collectTresoData();
-  const el=document.getElementById('treso-remonter');if(el) data.remonter=+el.value||0;
-  if(!TRESO[t_yr]) TRESO[t_yr]={};
-  TRESO[t_yr][t_mo]=data;
-  saveLocal();
-  // Remonter les saisies manuelles vers Firebase (perf app)
-  syncDashboardToFirebase(t_yr, t_mo, data.encaissements);
-  showNotif('💾 Trésorerie enregistrée et synchronisée !');
-  buildTresoMonthNav();
-}
-function toggleCard(el){
-  if(typeof el==='string') el=document.getElementById(el);
-  if(!el) return;
-  el.classList.toggle('open');
-  const arr=el.querySelector('.arr');
-  if(arr) arr.textContent=el.classList.contains('open')?'−':'+';
-}
-
-// ================================================================
 // KSU / ALLIANZ
 // ================================================================
-let ksu_yr=CURRENT_YEAR, ksu_mo=CURRENT_MONTH-1; // mo 0-based
+let ksu_yr=CURRENT_YEAR, ksu_mo=CURRENT_MONTH-1;
 
 function initKsu(){
   const sel=document.getElementById('ksuYear');
@@ -1855,7 +1757,7 @@ function initKsu(){
 
 function buildKsuMonthNav(){
   const c=document.getElementById('ksuMonths'); c.innerHTML='';
-  const limit=ksu_yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  const limit=12; // Tous les mois affichés
   for(let i=0;i<limit;i++){
     const b=document.createElement('button');
     b.className='mnav-btn'+(i===ksu_mo?' active':'');
@@ -1875,26 +1777,23 @@ function renderKsu(){
   const lines=ksuGetLines();
   const body=document.getElementById('ksu-body');
   body.innerHTML='';
-  // Lignes existantes ou lignes par défaut
   const defaultLines=lines.length?lines:[
     {label:'Commissions IARD',amount:''},
     {label:'Commissions VIE',amount:''},
     {label:'',amount:''}
   ];
   defaultLines.forEach(l=>body.appendChild(ksuMakeRow(l.label||'',l.amount||'')));
-  // Virement sauvegardé
   const savedVir=KSU_DATA[ksu_yr]?.[ksu_mo+1]?.virement||0;
   const virInp=document.getElementById('ksu-vir-input');
   if(virInp) virInp.value=savedVir>0?savedVir.toFixed(2):'';
   updateKsuTotal();
-  // KPIs annuels
   renderKsuKpi();
 }
 
 function ksuMakeRow(label='',amount=''){
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td><input type="text" value="${label.replace(/"/g,'&quot;')}" placeholder="ex: Commissions IARD, Reprises, Bonus…" oninput="updateKsuTotal()"></td>
-    <td><input type="number" step="0.01" class="amt" value="${amount!==''&&amount!==0?amount:''}" placeholder="0,00 (négatif si prélèvement)" oninput="updateKsuTotal()"></td>
+  tr.innerHTML=`<td><input type="text" value="${label.replace(/"/g,'&quot;')}" placeholder="ex: Commissions IARD…" oninput="updateKsuTotal()"></td>
+    <td><input type="number" step="0.01" class="amt" value="${amount!==''&&amount!==0?amount:''}" placeholder="0,00" oninput="updateKsuTotal()"></td>
     <td class="del-cell"><button class="dyn-del" onclick="this.closest('tr').remove();updateKsuTotal()">×</button></td>`;
   return tr;
 }
@@ -1927,7 +1826,6 @@ function saveKsu(){
   if(!KSU_DATA[ksu_yr]) KSU_DATA[ksu_yr]={};
   const virManuel=+(document.getElementById('ksu-vir-input')?.value)||0;
   KSU_DATA[ksu_yr][ksu_mo+1]={lines,virement:virManuel};
-  // Sync vers USER_RD pour cohérence Grille/Analyse
   const iardLine=lines.find(l=>l.label.toLowerCase().includes('iard'));
   const vieLine=lines.find(l=>l.label.toLowerCase().includes('vie'));
   if(iardLine||vieLine){
@@ -1942,7 +1840,6 @@ function saveKsu(){
 }
 
 function getKsuNet(yr,mo1){
-  // Retourne le virement manuel si saisi, sinon le net calculé des lignes
   const d=KSU_DATA[yr]?.[mo1];
   if(!d) return 0;
   if(d.virement) return d.virement;
@@ -1952,21 +1849,20 @@ function getKsuNet(yr,mo1){
 
 function renderKsuKpi(){
   const yr=ksu_yr;
-  const limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  const limit=12;
   let total=0, months=0;
   for(let m=1;m<=limit;m++){const d=KSU_DATA[yr]?.[m];if(d&&(Array.isArray(d)?d.length:d.lines?.length||d.virement)){total+=getKsuNet(yr,m);months++;}}
   const avg=months?total/months:0;
   document.getElementById('ksuKpi').innerHTML=`
-    <div class="kc k1"><div class="lbl">💰 Net KSU ${yr} (${months} mois)</div><div class="val">${fmt(total)}</div></div>
-    <div class="kc k3"><div class="lbl">📊 Moyenne mensuelle</div><div class="val">${fmt(avg)}</div></div>
-    <div class="kc k4"><div class="lbl">📅 Mois saisis</div><div class="val" style="font-size:28px">${months} / ${limit}</div></div>`;
+    <div class="kc k1"><div class="lbl">💰 Net KSU ${yr}</div><div class="val">${fmt(total)}</div></div>
+    <div class="kc k3"><div class="lbl">📊 Moy. mensuelle</div><div class="val">${fmt(avg)}</div></div>
+    <div class="kc k4"><div class="lbl">📅 Mois saisis</div><div class="val" style="font-size:26px">${months}/${limit}</div></div>`;
 }
 
 // ================================================================
 // COMPTE MANDAT
 // ================================================================
 let mandat_yr=CURRENT_YEAR, mandat_mo=CURRENT_MONTH-1;
-// Solde initial du compte Mandat au 1er janvier de chaque année
 const MANDAT_SOLDE_INIT={2025:0, 2026:2933.75};
 
 function initMandat(){
@@ -1979,7 +1875,7 @@ function initMandat(){
 
 function buildMandatMonthNav(){
   const c=document.getElementById('mandatMonths'); c.innerHTML='';
-  const limit=mandat_yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  const limit=12; // Tous les mois affichés
   for(let i=0;i<limit;i++){
     const b=document.createElement('button');
     b.className='mnav-btn'+(i===mandat_mo?' active':'');
@@ -1987,43 +1883,47 @@ function buildMandatMonthNav(){
     b.onclick=(()=>{const m=i;return()=>{mandat_mo=m;buildMandatMonthNav();renderMandat();};})();
     c.appendChild(b);
   }
+  // Auto-scroll vers le mois actif
+  setTimeout(()=>{
+    const active=c.querySelector('.active');
+    if(active) active.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+  },50);
 }
 
 function renderMandat(){
   const mo1=mandat_mo+1;
   const data=MANDAT_DATA[mandat_yr]?.[mo1]||{enc:[],remontee:0,virement:0};
-  // Net KSU auto
   const ksuNet=getKsuNet(mandat_yr,mo1);
   document.getElementById('mandat-ksu-auto').textContent=fmt(ksuNet,2);
-  // Encaissements clients
   const body=document.getElementById('mandat-enc-body');
   body.innerHTML='';
-  // ── Entrées auto depuis Firebase (app terrain) ──
   const autoEnc=getComptaSync(mandat_yr,mo1);
   if(autoEnc.length){
     const hdr=document.createElement('tr');
     hdr.setAttribute('data-auto','1');
     hdr.style.cssText='background:#dcfce7;';
-    hdr.innerHTML='<td colspan="4" style="padding:5px 10px;font-size:10px;font-weight:800;color:#065f46;letter-spacing:.5px;text-transform:uppercase;">📱 Synchronisé depuis l\'application ('+autoEnc.length+' ligne'+(autoEnc.length>1?'s':'')+')</td>';
+    hdr.innerHTML='<td colspan="5" style="padding:5px 10px;font-size:10px;font-weight:800;color:#065f46;letter-spacing:.5px;text-transform:uppercase;">📱 Synchronisé depuis l\'application ('+autoEnc.length+' ligne'+(autoEnc.length>1?'s':'')+')</td>';
     body.appendChild(hdr);
     autoEnc.forEach(r=>body.appendChild(mandatAutoRow(r)));
     if(data.enc&&data.enc.length){
       const sep=document.createElement('tr');
       sep.setAttribute('data-auto','1');
       sep.style.cssText='background:#f1f5f9;';
-      sep.innerHTML='<td colspan="4" style="padding:5px 10px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-transform:uppercase;">✏️ Saisies manuelles</td>';
+      sep.innerHTML='<td colspan="5" style="padding:5px 10px;font-size:10px;font-weight:800;color:#64748b;letter-spacing:.5px;text-transform:uppercase;">✏️ Saisies manuelles</td>';
       body.appendChild(sep);
     }
   }
-  // ── Entrées manuelles ──
   const encs=data.enc&&data.enc.length?data.enc:[{type:'Chèque',desc:'',amount:''}];
   encs.forEach(e=>body.appendChild(mandatMakeEncRow(e.type||'Chèque',e.desc||'',e.amount||'',e.date||'')));
-  // Sorties
   document.getElementById('mandat-remontee').value=data.remontee>0?data.remontee:'';
   document.getElementById('mandat-virement').value=data.virement>0?data.virement:'';
   updateMandatTotals();
   renderMandatKpi();
   renderMandatRecap();
+}
+
+function getComptaSync(yr,mo){
+  return(_comptaSyncData[yr]&&_comptaSyncData[yr][mo])||[];
 }
 
 function mandatAutoRow(r){
@@ -2034,8 +1934,8 @@ function mandatAutoRow(r){
   const tr=document.createElement('tr');
   tr.setAttribute('data-auto','1');
   tr.style.background='#f0fdf4';
-  tr.innerHTML=`<td><span style="padding:2px 8px;background:${bg};color:${col};border-radius:4px;font-size:11px;font-weight:700;">${r.type}</span></td>
-    <td style="font-size:12px;color:#64748b;font-weight:600;">${dayStr}</td>
+  tr.innerHTML=`<td><span style="padding:2px 6px;background:${bg};color:${col};border-radius:4px;font-size:11px;font-weight:700;">${r.type}</span></td>
+    <td class="col-date" style="font-size:12px;color:#64748b;font-weight:600;">${dayStr}</td>
     <td style="font-size:12px;color:#374151;">${r.desc||''}&nbsp;<span style="font-size:10px;color:#10b981;font-weight:700;">📱</span></td>
     <td style="text-align:right;font-weight:700;color:#065f46;">${fmt(r.amount||0)}<input type="number" value="${r.amount||0}" style="display:none" readonly></td>
     <td class="del-cell"><span style="font-size:10px;color:#9ca3af;">auto</span></td>`;
@@ -2044,12 +1944,12 @@ function mandatAutoRow(r){
 
 function mandatMakeEncRow(type='Chèque',desc='',amount='',date=''){
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td><select onchange="updateMandatTotals()">
+  tr.innerHTML=`<td><select onchange="updateMandatTotals()" style="min-height:38px">
     <option${type==='Chèque'?' selected':''}>Chèque</option>
     <option${type==='Virement'?' selected':''}>Virement</option>
     <option${type==='Espèces'?' selected':''}>Espèces</option>
   </select></td>
-  <td><input type="date" value="${date||''}" style="width:100%;padding:4px 5px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12px;" oninput="updateMandatTotals()"></td>
+  <td class="col-date"><input type="date" value="${date||''}" style="width:100%;padding:4px 5px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12px;min-height:38px" oninput="updateMandatTotals()"></td>
   <td><input type="text" value="${desc.replace(/"/g,'&quot;')}" placeholder="Client / description" oninput="updateMandatTotals()"></td>
   <td><input type="number" step="0.01" class="amt" value="${amount>0?amount:''}" placeholder="0,00" oninput="updateMandatTotals()"></td>
   <td class="del-cell"><button class="dyn-del" onclick="this.closest('tr').remove();updateMandatTotals()">×</button></td>`;
@@ -2066,7 +1966,6 @@ function updateMandatTotals(){
   const ksuNet=getKsuNet(mandat_yr,mo1);
   let encClients=0;
   document.querySelectorAll('#mandat-enc-body tr input[type="number"]').forEach(el=>encClients+=(+el.value||0));
-  // Bandeau total encaissements clients (auto + manuel, sans KSU)
   const encTotEl=document.getElementById('mandat-enc-total');
   if(encTotEl) encTotEl.textContent=encClients>0?fmt(encClients,2):'—';
   const totalIn=ksuNet+encClients;
@@ -2084,7 +1983,6 @@ function updateMandatTotals(){
 function saveMandat(){
   const mo1=mandat_mo+1;
   const enc=[];
-  // Exclure les lignes auto (synchronisées depuis l'application)
   document.querySelectorAll('#mandat-enc-body tr:not([data-auto])').forEach(row=>{
     const sel=row.querySelector('select');
     const inputs=row.querySelectorAll('input:not([readonly])');
@@ -2098,19 +1996,18 @@ function saveMandat(){
   const virement=+document.getElementById('mandat-virement')?.value||0;
   if(!MANDAT_DATA[mandat_yr]) MANDAT_DATA[mandat_yr]={};
   MANDAT_DATA[mandat_yr][mo1]={enc,remontee,virement};
-  // Sync virement vers EXPLOIT_DATA
   if(!EXPLOIT_DATA[mandat_yr]) EXPLOIT_DATA[mandat_yr]={};
   if(!EXPLOIT_DATA[mandat_yr][mo1]) EXPLOIT_DATA[mandat_yr][mo1]={courtage:[],virement_recu:0};
   EXPLOIT_DATA[mandat_yr][mo1].virement_recu=virement;
   saveLocal();
   syncMandatToFirebase(mandat_yr, mo1);
-  showNotif('✅ Compte Mandat enregistré et synchronisé');
+  showNotif('✅ Compte Mandat enregistré');
   renderMandatKpi();
   renderMandatRecap();
 }
 
 function renderMandatKpi(){
-  const yr=mandat_yr, limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  const yr=mandat_yr, limit=12;
   let totIn=0,totOut=0,months=0;
   for(let m=1;m<=limit;m++){
     const d=MANDAT_DATA[yr]?.[m];
@@ -2127,58 +2024,43 @@ function renderMandatKpi(){
   const solde=totIn-totOut;
   const tresoActuelle=(MANDAT_SOLDE_INIT[yr]||0)+solde;
   document.getElementById('mandatKpi').innerHTML=`
-    <div class="kc k1"><div class="lbl">📥 Total Entrées ${yr}</div><div class="val">${fmt(totIn)}</div></div>
-    <div class="kc k2"><div class="lbl">📤 Total Sorties ${yr}</div><div class="val">${fmt(totOut)}</div></div>
+    <div class="kc k1"><div class="lbl">📥 Entrées ${yr}</div><div class="val">${fmt(totIn)}</div></div>
+    <div class="kc k2"><div class="lbl">📤 Sorties</div><div class="val">${fmt(totOut)}</div></div>
     <div class="kc k3"><div class="lbl">⚖️ Solde cumulé</div><div class="val" style="color:${solde>=0?'#059669':'#dc2626'}">${fmt(solde)}</div></div>
-    <div class="kc k4"><div class="lbl">💰 Trésorerie actuelle</div><div class="val" style="color:${tresoActuelle>=0?'#2563eb':'#dc2626'};font-size:22px">${fmt(tresoActuelle)}</div></div>`;
+    <div class="kc k4"><div class="lbl">💰 Trésorerie</div><div class="val" style="color:${tresoActuelle>=0?'#2563eb':'#dc2626'};font-size:20px">${fmt(tresoActuelle)}</div></div>`;
   renderEncaissementsMensuels(yr);
 }
 
 function renderMandatRecap(){
   const yr=mandat_yr;
-  const limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  const limit=12;
   const el=document.getElementById('mandat-recap');
   if(!el) return;
-
   const cols=[];
   for(let m=0;m<limit;m++) cols.push(m);
-
   function fv(v){return v!==0?fmtN(Math.round(v)):'—';}
-  function fvColor(v){
-    if(v===0) return `<span style="color:#475569">—</span>`;
-    return `<span style="color:${v>=0?'#6ee7b7':'#f87171'};font-weight:700">${fmtN(Math.round(v))}</span>`;
-  }
-
-  // En-tête cliquable
-  let th=`<th style="min-width:140px">Poste</th>`;
+  let th=`<th style="min-width:90px">Poste</th>`;
   cols.forEach(m=>{
     const isCur=m===mandat_mo;
     const nav=` onclick="mandat_mo=${m};buildMandatMonthNav();renderMandat()" style="cursor:pointer"`;
-    th+=`<th class="${isCur?'rcur':''}"${nav}>${MO[m].substring(0,3)}${isCur?'<br><span style="font-size:9px;font-weight:500;color:#2563eb">▶</span>':''}</th>`;
+    th+=`<th class="${isCur?'rcur':''}"${nav}>${MO[m].substring(0,3)}</th>`;
   });
-  th+=`<th style="background:#1e293b;color:#e2e8f0;font-weight:700">CUMUL</th>`;
-
+  th+=`<th style="background:#1e293b;color:#e2e8f0">CUMUL</th>`;
   function dataRow(icon,label,fn){
-    let tot=0;
-    let r=`<tr><td>${icon} ${label}</td>`;
+    let tot=0;let r=`<tr><td>${icon} ${label}</td>`;
     cols.forEach(m=>{const v=fn(yr,m+1);tot+=v;r+=`<td class="${m===mandat_mo?'rcur':''}">${fv(v)}</td>`;});
-    r+=`<td style="background:#1e293b;color:#e2e8f0;font-weight:600">${fv(tot)}</td>`;
+    r+=`<td style="background:#1e293b;color:#e2e8f0">${fv(tot)}</td>`;
     return r+'</tr>';
   }
   function totRow(cls,label,fn){
-    let tot=0;
-    let r=`<tr class="${cls}"><td>${label}</td>`;
+    let tot=0;let r=`<tr class="${cls}"><td>${label}</td>`;
     cols.forEach(m=>{const v=fn(yr,m+1);tot+=v;r+=`<td class="${m===mandat_mo?'rcur':''}">${fv(v)}</td>`;});
     r+=`<td style="background:#1e293b;color:#e2e8f0;font-weight:700">${fv(tot)}</td>`;
     return r+'</tr>';
   }
-  function secRow(label){
-    return `<tr class="r-sec"><td colspan="${cols.length+2}">${label}</td></tr>`;
-  }
-
+  function secRow(label){return `<tr class="r-sec"><td colspan="${cols.length+2}">${label}</td></tr>`;}
   function getKsu(y,m1){return getKsuNet(y,m1);}
   function getEnc(y,m1){
-    // Encaissements auto (Firebase) + manuels (MANDAT_DATA)
     const autoEnc=(_comptaSyncData[y]&&_comptaSyncData[y][m1])||[];
     const autoTotal=autoEnc.reduce((s,e)=>s+(+e.amount||0),0);
     const manualEnc=(MANDAT_DATA[y]?.[m1]?.enc)||[];
@@ -2193,17 +2075,15 @@ function renderMandatRecap(){
   let rows='';
   rows+=secRow('▸ ENTRÉES');
   rows+=dataRow('🏦','KSU reçu',(y,m1)=>getKsu(y,m1));
-  rows+=dataRow('👥','Encaissements clients',(y,m1)=>getEnc(y,m1));
+  rows+=dataRow('👥','Encaissements',(y,m1)=>getEnc(y,m1));
   rows+=totRow('r-rev-tot','TOTAL ENTRÉES',(y,m1)=>getMandatIn(y,m1));
-
   rows+=secRow('▸ SORTIES');
   rows+=dataRow('📤','Remontée Allianz',(y,m1)=>getRemontee(y,m1));
-  rows+=dataRow('🏢','Virement → Exploitation',(y,m1)=>getMandatVir(y,m1));
+  rows+=dataRow('🏢','Virt → Exploit',(y,m1)=>getMandatVir(y,m1));
   rows+=totRow('r-chg-tot','TOTAL SORTIES',(y,m1)=>getMandatOut(y,m1));
 
-  // Solde mensuel + cumul courant
   let cumul=0;
-  let rSolde=`<tr class="r-solde"><td>⚖️ SOLDE MENSUEL</td>`;
+  let rSolde=`<tr class="r-solde"><td>⚖️ SOLDE</td>`;
   cols.forEach(m=>{
     const mo1=m+1;
     const inp=getMandatIn(yr,mo1);
@@ -2215,13 +2095,12 @@ function renderMandatRecap(){
     rSolde+=`<td class="${m===mandat_mo?'rcur':''}" style="color:${color};font-weight:700">${hasData?fmtN(Math.round(v)):'—'}</td>`;
   });
   const cumulColor=cumul>=0?'#6ee7b7':'#f87171';
-  rSolde+=`<td style="background:#1e293b;color:${cumulColor};font-weight:800;font-size:14px">${fmtN(Math.round(cumul))}</td></tr>`;
+  rSolde+=`<td style="background:#1e293b;color:${cumulColor};font-weight:800">${fmtN(Math.round(cumul))}</td></tr>`;
   rows+=rSolde;
 
-  // Ligne Trésorerie : solde initial + cumul des soldes mensuels
   const soldeInit=MANDAT_SOLDE_INIT[yr]||0;
   let tresoRun=soldeInit;
-  let rTreso=`<tr style="background:#1e3a5f"><td style="color:#93c5fd;font-weight:700;font-size:12px">💰 Trésorerie</td>`;
+  let rTreso=`<tr style="background:#1e3a5f"><td style="color:#93c5fd;font-weight:700;font-size:11px">💰 Tréso.</td>`;
   cols.forEach(m=>{
     const mo1=m+1;
     const inp=getMandatIn(yr,mo1);
@@ -2230,19 +2109,18 @@ function renderMandatRecap(){
     const hasData=inp>0||out>0;
     if(hasData) tresoRun+=v;
     const color=tresoRun>=0?'#93c5fd':'#fca5a5';
-    rTreso+=`<td class="${m===mandat_mo?'rcur':''}" style="color:${color};font-weight:700;font-size:12px">${hasData?fmtN(Math.round(tresoRun)):'—'}</td>`;
+    rTreso+=`<td class="${m===mandat_mo?'rcur':''}" style="color:${color};font-weight:700;font-size:11px">${hasData?fmtN(Math.round(tresoRun)):'—'}</td>`;
   });
-  const tresoFinalColor=tresoRun>=0?'#93c5fd':'#fca5a5';
-  rTreso+=`<td style="background:#1e3a5f;color:${tresoFinalColor};font-weight:800;font-size:14px">${fmtN(Math.round(tresoRun))}</td></tr>`;
+  rTreso+=`<td style="background:#1e3a5f;color:${tresoRun>=0?'#93c5fd':'#fca5a5'};font-weight:800">${fmtN(Math.round(tresoRun))}</td></tr>`;
   rows+=rTreso;
 
   const wasOpen=el.dataset.open!=='0';
   el.innerHTML=`<div class="recap-wrap">
     <div class="recap-hd" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';document.getElementById('mandat-recap').dataset.open=this.nextElementSibling.style.display==='none'?'0':'1'">
-      <span class="recap-hd-title">📊 Récapitulatif Compte Mandat ${yr} — cliquer un mois pour y aller</span>
+      <span class="recap-hd-title">📊 Récapitulatif ${yr} — taper un mois pour y aller</span>
     </div>
     <div class="recap-body" style="${wasOpen?'':'display:none'}">
-      <div style="overflow-x:auto">
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
         <table class="recap-tbl"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>
       </div>
     </div>
@@ -2264,7 +2142,7 @@ function initExploit(){
 
 function buildExploitMonthNav(){
   const c=document.getElementById('exploitMonths'); c.innerHTML='';
-  const limit=exploit_yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  const limit=12; // Tous les mois affichés
   for(let i=0;i<limit;i++){
     const b=document.createElement('button');
     b.className='mnav-btn'+(i===exploit_mo?' active':'');
@@ -2272,26 +2150,25 @@ function buildExploitMonthNav(){
     b.onclick=(()=>{const m=i;return()=>{exploit_mo=m;buildExploitMonthNav();renderExploit();};})();
     c.appendChild(b);
   }
+  setTimeout(()=>{
+    const active=c.querySelector('.active');
+    if(active) active.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+  },50);
 }
 
 function renderExploit(){
   const mo1=exploit_mo+1;
-  // Réinitialiser les accordéons (nouveau mois)
   CHG_CATS.forEach(cat=>{const b=document.getElementById(`eacc-body-${cat}`);if(b) delete b.dataset.loaded;});
   const data=EXPLOIT_DATA[exploit_yr]?.[mo1]||{courtage:[],virement_recu:0};
-  // Commissions IARD/VIE depuis BASE/USER_RD (info seulement)
   const iardComm=catTotal(exploit_yr,'iard',exploit_mo);
   const vieComm=catTotal(exploit_yr,'vie',exploit_mo);
   document.getElementById('exploit-iard-info').textContent=iardComm>0?fmt(iardComm,2):'—';
   document.getElementById('exploit-vie-info').textContent=vieComm>0?fmt(vieComm,2):'—';
-  // Virement manuel sauvegardé
   const virInput=document.getElementById('exploit-vir-input');
   if(virInput) virInput.value=data.virement_recu>0?data.virement_recu.toFixed(2):'';
-  // Courtage
   const body=document.getElementById('exploit-courtage-body');
   body.innerHTML='';
   const courtageItems=CATS.courtage.items;
-  // Utiliser USER existant pour courtage si disponible
   const existCourtage=USER[exploit_yr]?.[mo1]?.courtage||{};
   const savedCourtage=data.courtage&&data.courtage.length?data.courtage:
     courtageItems.map(k=>({label:k,amount:existCourtage[k]||0})).filter(l=>l.amount>0);
@@ -2300,7 +2177,6 @@ function renderExploit(){
   } else {
     body.appendChild(exploitMakeCourtageRow('',''));
   }
-  // Charges depuis USER/USER_FD
   renderExploitCharges();
   renderExploitRecap();
   updateExploitTotals();
@@ -2321,7 +2197,6 @@ function exploitAddCourtage(){
 }
 
 function exploitCourtageSync(){
-  // Sync en mémoire vers USER pour cohérence avec Dashboard/Analyse
   const mo1=exploit_mo+1; const yr=exploit_yr;
   const courtageObj={};
   document.querySelectorAll('#exploit-courtage-body tr').forEach(row=>{
@@ -2338,86 +2213,62 @@ function exploitCourtageSync(){
 
 function renderExploitRecap(){
   const yr=exploit_yr;
-  const limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  const limit=12;
   const el=document.getElementById('exploit-recap');
   if(!el) return;
-
-  // Colonnes = tous les mois de l'année (Jan → mois courant)
   const cols=[];
   for(let m=0;m<limit;m++) cols.push(m);
-
   function fv(v){return v!==0?fmtN(Math.round(v)):'—';}
-  function fvColor(v){
-    if(v===0) return `<span style="color:#475569">—</span>`;
-    return `<span style="color:${v>=0?'#6ee7b7':'#f87171'};font-weight:700">${fmtN(Math.round(v))}</span>`;
-  }
-
-  // En-tête
-  let th=`<th style="min-width:130px">Poste</th>`;
+  let th=`<th style="min-width:90px">Poste</th>`;
   cols.forEach(m=>{
     const isCur=m===exploit_mo;
     const nav=` onclick="exploit_mo=${m};buildExploitMonthNav();renderExploit()" style="cursor:pointer"`;
-    th+=`<th class="${isCur?'rcur':''}"${nav}>${MO[m].substring(0,3)}${isCur?'<br><span style="font-size:9px;font-weight:500;color:#2563eb">▶</span>':''}</th>`;
+    th+=`<th class="${isCur?'rcur':''}"${nav}>${MO[m].substring(0,3)}</th>`;
   });
-  th+=`<th style="background:#1e293b;color:#e2e8f0;font-weight:700">CUMUL</th>`;
-
+  th+=`<th style="background:#1e293b;color:#e2e8f0">CUMUL</th>`;
   function dataRow(icon,label,fn){
-    let tot=0;
-    let r=`<tr><td>${icon} ${label}</td>`;
+    let tot=0;let r=`<tr><td>${icon} ${label}</td>`;
     cols.forEach(m=>{const v=fn(yr,m);tot+=v;r+=`<td class="${m===exploit_mo?'rcur':''}">${fv(v)}</td>`;});
-    r+=`<td style="background:#1e293b;color:#e2e8f0;font-weight:600">${fv(tot)}</td>`;
+    r+=`<td style="background:#1e293b;color:#e2e8f0">${fv(tot)}</td>`;
     return r+'</tr>';
   }
   function totRow(cls,label,fn){
-    let tot=0;
-    let r=`<tr class="${cls}"><td>${label}</td>`;
+    let tot=0;let r=`<tr class="${cls}"><td>${label}</td>`;
     cols.forEach(m=>{const v=fn(yr,m);tot+=v;r+=`<td class="${m===exploit_mo?'rcur':''}">${fv(v)}</td>`;});
     r+=`<td style="background:#1e293b;color:#e2e8f0;font-weight:700">${fv(tot)}</td>`;
     return r+'</tr>';
   }
-  function secRow(label){
-    return `<tr class="r-sec"><td colspan="${cols.length+2}">${label}</td></tr>`;
-  }
-
-  // Entrées Exploitation = Virement reçu + Courtage (données sauvegardées)
+  function secRow(label){return `<tr class="r-sec"><td colspan="${cols.length+2}">${label}</td></tr>`;}
   function getVir(y,m){return EXPLOIT_DATA[y]?.[m+1]?.virement_recu||0;}
   function getCourt(y,m){return(EXPLOIT_DATA[y]?.[m+1]?.courtage||[]).reduce((s,l)=>s+(+l.amount||0),0);}
   function getIn(y,m){return getVir(y,m)+getCourt(y,m);}
-
   let rows='';
   rows+=secRow('▸ ENTRÉES');
-  rows+=dataRow('💳','Virement Mandat reçu',(y,m)=>getVir(y,m));
-  rows+=dataRow('🤝','Courtage direct',(y,m)=>getCourt(y,m));
+  rows+=dataRow('💳','Virt. Mandat',(y,m)=>getVir(y,m));
+  rows+=dataRow('🤝','Courtage',(y,m)=>getCourt(y,m));
   rows+=totRow('r-rev-tot','TOTAL ENTRÉES',(y,m)=>getIn(y,m));
-
   rows+=secRow('▸ CHARGES');
   CHG_CATS.forEach(cat=>rows+=dataRow(CATS[cat].icon,CATS[cat].label.replace('Charges ','').replace('Masse Salariale','Salaires'),
     (y,m)=>catTotal(y,cat,m)));
   rows+=totRow('r-chg-tot','TOTAL CHARGES',(y,m)=>monthChg(y,m));
-
-  // Solde net par mois + cumul
   let cumul=0;
-  let rSolde=`<tr class="r-solde"><td>⚖️ SOLDE NET</td>`;
+  let rSolde=`<tr class="r-solde"><td>⚖️ SOLDE</td>`;
   cols.forEach(m=>{
-    const inp=getIn(yr,m);
-    const chg=monthChg(yr,m);
-    const v=inp-chg;
+    const inp=getIn(yr,m);const chg=monthChg(yr,m);const v=inp-chg;
     const hasData=inp>0||chg>0;
     if(hasData) cumul+=v;
     const color=hasData?(v>=0?'#6ee7b7':'#f87171'):'#475569';
     rSolde+=`<td class="${m===exploit_mo?'rcur':''}" style="color:${color};font-weight:700">${hasData?fmtN(Math.round(v)):'—'}</td>`;
   });
-  const cumulColor=cumul>=0?'#6ee7b7':'#f87171';
-  rSolde+=`<td style="background:#1e293b;color:${cumulColor};font-weight:800;font-size:14px">${fmtN(Math.round(cumul))}</td></tr>`;
+  rSolde+=`<td style="background:#1e293b;color:${cumul>=0?'#6ee7b7':'#f87171'};font-weight:800">${fmtN(Math.round(cumul))}</td></tr>`;
   rows+=rSolde;
-
   const wasOpen=el.dataset.open!=='0';
   el.innerHTML=`<div class="recap-wrap">
     <div class="recap-hd" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';document.getElementById('exploit-recap').dataset.open=this.nextElementSibling.style.display==='none'?'0':'1'">
-      <span class="recap-hd-title">📊 Récapitulatif ${yr} — cliquer un mois pour y aller</span>
+      <span class="recap-hd-title">📊 Récapitulatif ${yr} — taper un mois pour y aller</span>
     </div>
     <div class="recap-body" style="${wasOpen?'':'display:none'}">
-      <div style="overflow-x:auto">
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
         <table class="recap-tbl"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>
       </div>
     </div>
@@ -2439,12 +2290,11 @@ function renderExploitCharges(){
     card.id=`eacc-${cat}`;
     card.style.setProperty('--cat-color',def.color);
     const m1Html=m1tot>0?`<span class="exploit-cat-m1">M-1 ${fmtN(Math.round(m1tot))} €${delta!==null?`<span class="exploit-cat-delta ${delta>=0?'up':'dn'}"> ${delta>=0?'+':''}${delta.toFixed(0)}%</span>`:''}</span>`:'';
-    const hint=isEmpty?'<div class="exploit-cat-hint">▼ Cliquer pour saisir le mois</div>':'';
     card.innerHTML=`
       <div class="fcard-hd" onclick="toggleExploitAcc('${cat}')">
         <div class="title">
           <span style="font-size:18px">${def.icon}</span>
-          <div><div>${def.label}</div>${hint}</div>
+          <div><div>${def.label}</div></div>
         </div>
         <div class="right" style="gap:10px">
           <div class="exploit-cat-meta">
@@ -2472,7 +2322,6 @@ function toggleExploitAcc(cat){
   }
 }
 
-// Helpers M-1
 function getM1Ctx(yr,mo1){const pm=mo1-1;return pm<=0?{yr:yr-1,mo1:12}:{yr,mo1:pm};}
 function m1CatTot(yr,mo1,cat){const p=getM1Ctx(yr,mo1);return catTotal(p.yr,cat,p.mo1-1);}
 function m1Item(yr,mo1,cat,key){const p=getM1Ctx(yr,mo1);return getDetail(p.yr,p.mo1)?.[cat]?.[key]||0;}
@@ -2509,12 +2358,10 @@ function buildExploitFixesContent(yr,mo1){
   const d=getDetail(yr,mo1)?.fixes||{};
   const fd=getFixesDetail(yr,mo1)||{};
   let html='';
-  // Postes simples
   const simpTot=FIXES_SIMPLE.reduce((s,it)=>s+(d[it]||0),0);
   const simpM1=FIXES_SIMPLE.reduce((s,it)=>s+m1FixesItem(yr,mo1,it),0);
   const simpleRows=FIXES_SIMPLE.map(it=>diRow(it,`data-fixes-item="${it}"`,d[it]||0,m1FixesItem(yr,mo1,it),'fixes')).join('');
   html+=`<div class="dg open">${dgHd('🏢 Postes récurrents',simpTot,simpM1)}<div class="dg-bd">${simpleRows}</div></div>`;
-  // Sous-rubriques (assurances, téléphonie, abonnements)
   Object.entries(FIXES_SUBS).forEach(([key,def])=>{
     const sub=fd[key]||{};
     const subTot=def.items.reduce((s,it)=>s+(sub[it]||0),0);
@@ -2522,7 +2369,6 @@ function buildExploitFixesContent(yr,mo1){
     const rows=def.items.map(it=>diRow(it,`data-fixes-sub="${key}" data-key="${it}"`,sub[it]||0,m1FixesSub(yr,mo1,key,it),'fixes')).join('');
     html+=`<div class="dg open">${dgHd(def.label,subTot,subM1)}<div class="dg-bd">${rows}</div></div>`;
   });
-  // Déjeuners
   const dej=fd.dejeuners||[];
   const dejTot=dej.reduce((s,v)=>s+v,0);
   const p1=getM1Ctx(yr,mo1);const m1dej=(getFixesDetail(p1.yr,p1.mo1)||{}).dejeuners||[];const dejM1=m1dej.reduce((s,v)=>s+v,0);
@@ -2532,7 +2378,6 @@ function buildExploitFixesContent(yr,mo1){
       <thead><tr><th>Montant</th><th></th></tr></thead>
       <tbody>${dejRows||'<tr><td><input type="number" data-da step="0.01" placeholder="0,00" oninput="exploitCatUpdate(\'fixes\')"></td><td class="dc"><button class="ddel" onclick="eDelRow(this,\'fixes\')">×</button></td></tr>'}</tbody>
     </table><button class="dadd" onclick="eAddDej()">+ Ajouter un déjeuner</button></div></div>`;
-  // Voyages + Achats
   ['voyages','achats'].forEach(key=>{
     const arr=fd[key]||[];
     const arrTot=arr.reduce((s,r)=>s+(r.amount||0),0);
@@ -2585,24 +2430,8 @@ function exploitCatUpdate(cat){
     USER[yr][mo1][cat]=obj;
     if(BASE[yr]?.[cat]) BASE[yr][cat][exploit_mo]=total;
   }
-  // Mettre à jour le total dans l'en-tête de l'accordéon (niveau 1)
   const totEl=document.getElementById(`eacc-tot-${cat}`);
   if(totEl){totEl.textContent=total>0?fmt(total,2):'—';totEl.style.color=total>0?'#dc2626':'#94a3b8';}
-  // Mettre à jour les sous-totaux (niveau 2 - dg-tot)
-  if(body&&cat==='fixes'){
-    // Recalc sub-totals live
-    const d2=USER[exploit_yr]?.[exploit_mo+1]?.fixes||{};
-    const fd2=USER_FD[exploit_yr]?.[exploit_mo+1]||{};
-    body.querySelectorAll('.dg').forEach(dg=>{
-      const totSpan=dg.querySelector('.dg-tot');
-      if(!totSpan) return;
-      let sub=0;
-      dg.querySelectorAll('[data-fixes-item]').forEach(inp=>sub+=(+inp.value||0));
-      dg.querySelectorAll('[data-key]').forEach(inp=>sub+=(+inp.value||0));
-      dg.querySelectorAll('[data-da]').forEach(inp=>sub+=(+inp.value||0));
-      if(sub>0){totSpan.textContent=fmt(sub,2);}else{totSpan.textContent='';}
-    });
-  }
   saveLocal();
   updateExploitTotals();
 }
@@ -2625,7 +2454,6 @@ function eAddRow(tableId){
 
 function updateExploitTotals(){
   const mo1=exploit_mo+1; const yr=exploit_yr;
-  // Trésorerie Exploitation = Virement reçu + Courtage direct
   const virManuel=+(document.getElementById('exploit-vir-input')?.value)||0;
   let courtageTotal=0;
   document.querySelectorAll('#exploit-courtage-body tr input[type="number"]').forEach(el=>courtageTotal+=(+el.value||0));
@@ -2652,7 +2480,6 @@ function saveExploit(){
   if(!EXPLOIT_DATA[yr]) EXPLOIT_DATA[yr]={};
   const virManuel=+(document.getElementById('exploit-vir-input')?.value)||0;
   EXPLOIT_DATA[yr][mo1]={courtage,virement_recu:virManuel};
-  // Sync vers USER pour cohérence Grille
   if(!USER[yr]) USER[yr]={};
   if(!USER[yr][mo1]) USER[yr][mo1]={};
   USER[yr][mo1].courtage=courtageObj;
@@ -2663,7 +2490,6 @@ function saveExploit(){
 }
 
 function getExploitIn(yr,mo1){
-  // Entrées réelles du compte Exploitation = virement reçu + courtage
   const d=EXPLOIT_DATA[yr]?.[mo1]||{};
   const vir=d.virement_recu||0;
   const court=(d.courtage||[]).reduce((s,l)=>s+(+l.amount||0),0);
@@ -2671,7 +2497,7 @@ function getExploitIn(yr,mo1){
 }
 
 function renderExploitKpi(){
-  const yr=exploit_yr, limit=yr===CURRENT_YEAR?CURRENT_MONTH:12;
+  const yr=exploit_yr, limit=12;
   let totIn=0,totChg=0,months=0;
   for(let m=0;m<limit;m++){
     const mo1=m+1;
@@ -2681,16 +2507,97 @@ function renderExploitKpi(){
   }
   const solde=totIn-totChg;
   document.getElementById('exploitKpi').innerHTML=`
-    <div class="kc k1"><div class="lbl">📥 Entrées ${yr} (Virt+Court)</div><div class="val">${fmt(totIn)}</div></div>
-    <div class="kc k2"><div class="lbl">📤 Total Charges ${yr}</div><div class="val">${fmt(totChg)}</div></div>
+    <div class="kc k1"><div class="lbl">📥 Entrées ${yr}</div><div class="val">${fmt(totIn)}</div></div>
+    <div class="kc k2"><div class="lbl">📤 Charges</div><div class="val">${fmt(totChg)}</div></div>
     <div class="kc k3"><div class="lbl">⚖️ Solde net</div><div class="val" style="color:${solde>=0?'#059669':'#dc2626'}">${fmt(solde)}</div></div>
-    <div class="kc k4"><div class="lbl">📅 Mois saisis</div><div class="val" style="font-size:28px">${months} / ${limit}</div></div>`;
+    <div class="kc k4"><div class="lbl">📅 Mois</div><div class="val" style="font-size:26px">${months}/${limit}</div></div>`;
 }
 
 // ================================================================
 // UTILS
 // ================================================================
-function showNotif(msg){const n=document.getElementById('notif');n.textContent=msg;n.style.display='block';setTimeout(()=>n.style.display='none',2200);}
+function showNotif(msg){
+  const n=document.getElementById('notif');
+  n.textContent=msg;n.style.display='block';
+  setTimeout(()=>n.style.display='none',2200);
+}
+function toggleCard(el){
+  if(typeof el==='string') el=document.getElementById(el);
+  if(!el) return;
+  el.classList.toggle('open');
+  const arr=el.querySelector('.arr');
+  if(arr) arr.textContent=el.classList.contains('open')?'−':'+';
+}
+
+// ================================================================
+// FIREBASE SYNC
+// ================================================================
+function syncDashboardToFirebase(yr, mo, manualRows){
+  if(!_fbDb) return;
+  const typeMap={'Chèque':'cheque','Virement':'virement','Espèces':'especes'};
+  const datePfx=String(yr)+'-'+String(mo).padStart(2,'0');
+  const ref=_fbDb.ref('allianz_db_v4/compta/ecritures');
+  ref.once('value',function(snap){
+    const raw=snap.val()||[];
+    const list=(Array.isArray(raw)?raw:Object.values(raw)).filter(e=>
+      !(e&&e._source==='dashboard'&&e.date&&e.date.startsWith(datePfx))
+    );
+    const now=Date.now();
+    (manualRows||[]).forEach(function(r,i){
+      if(!r.amount&&!r.desc) return;
+      list.push({id:'dash-'+datePfx+'-'+i+'-'+now,date:datePfx+'-01',type:typeMap[r.type]||'cheque',montant:r.amount||0,client:r.desc||'',produit:'',contrat:'',collaborateur:'Dashboard Cabinet',note:'Saisi depuis Cabinet Dashboard',statut:'en_attente',_source:'dashboard',createdAt:now});
+    });
+    ref.set(list).catch(function(e){console.warn('Sync error',e);});
+  });
+}
+
+function syncMandatToFirebase(yr, mo){
+  if(!_fbDb) return;
+  const typeMap={'Chèque':'cheque','Virement':'virement','Espèces':'especes'};
+  const datePfx=String(yr)+'-'+String(mo).padStart(2,'0');
+  const ref=_fbDb.ref('allianz_db_v4/compta/ecritures');
+  ref.once('value',function(snap){
+    const raw=snap.val()||[];
+    const list=(Array.isArray(raw)?raw:Object.values(raw)).filter(e=>
+      !(e&&e._source==='mandat'&&e.date&&e.date.startsWith(datePfx))
+    );
+    const enc=(MANDAT_DATA[yr]&&MANDAT_DATA[yr][mo]&&MANDAT_DATA[yr][mo].enc)||[];
+    const now=Date.now();
+    enc.forEach(function(r,i){
+      if(!r.amount&&!r.desc) return;
+      list.push({id:'mandat-'+datePfx+'-'+i+'-'+now+'-'+Math.random().toString(36).slice(2,5),date:r.date||datePfx+'-01',type:typeMap[r.type]||'cheque',montant:r.amount||0,client:r.desc||'',produit:'',contrat:'',collaborateur:'Compte Mandat',note:'Saisi depuis Compte Mandat',statut:'remis',_source:'mandat',createdAt:now});
+    });
+    ref.set(list).catch(function(e){console.warn('Sync error',e);});
+  });
+}
+
+function syncAllMandatToFirebase(){
+  if(!_fbDb){showNotif('❌ Firebase non connecté');return;}
+  const yr=CURRENT_YEAR;
+  const typeMap={'Chèque':'cheque','Virement':'virement','Espèces':'especes'};
+  const ref=_fbDb.ref('allianz_db_v4/compta/ecritures');
+  ref.once('value',function(snap){
+    const raw=snap.val()||[];
+    const list=(Array.isArray(raw)?raw:Object.values(raw)).filter(e=>
+      !(e&&e._source==='mandat'&&e.date&&e.date.startsWith(String(yr)))
+    );
+    let count=0;
+    const now=Date.now();
+    for(let mo=1;mo<=CURRENT_MONTH;mo++){
+      const datePfx=String(yr)+'-'+String(mo).padStart(2,'0');
+      const enc=(MANDAT_DATA[yr]&&MANDAT_DATA[yr][mo]&&MANDAT_DATA[yr][mo].enc)||[];
+      enc.forEach(function(r,i){
+        if(!r.amount&&!r.desc) return;
+        list.push({id:'mandat-'+datePfx+'-'+i+'-'+now+'-'+Math.random().toString(36).slice(2,5),date:r.date||datePfx+'-01',type:typeMap[r.type]||'cheque',montant:r.amount||0,client:r.desc||'',produit:'',contrat:'',collaborateur:'Compte Mandat',note:'Saisi depuis Compte Mandat',statut:'remis',_source:'mandat',createdAt:now});
+        count++;
+      });
+    }
+    ref.set(list).then(function(){
+      showNotif('✅ '+count+' écriture(s) synchronisée(s)');
+      if(document.getElementById('view-mandat')?.classList.contains('active')) renderMandat();
+    }).catch(function(e){console.warn('Sync error',e);showNotif('❌ Erreur de synchronisation');});
+  });
+}
 
 // ================================================================
 // PWA
@@ -2716,13 +2623,9 @@ function getSyncId(){return localStorage.getItem(SYNC_KEY);}
 
 async function cloudSave(){
   const id=getSyncId(); if(!id) return;
-  const content=JSON.stringify({USER,USER_FD,USER_RD,TRESO,_ts:Date.now()});
+  const content=JSON.stringify({USER,USER_FD,USER_RD,TRESO,KSU_DATA,MANDAT_DATA,EXPLOIT_DATA,_ts:Date.now()});
   try{
-    const r=await fetch(`https://api.github.com/gists/${id}`,{
-      method:'PATCH',
-      headers:{'Authorization':`Bearer ${GH_TOKEN()}`,'Content-Type':'application/json'},
-      body:JSON.stringify({files:{[GH_FILE]:{content}}})
-    });
+    const r=await fetch(`https://api.github.com/gists/${id}`,{method:'PATCH',headers:{'Authorization':`Bearer ${GH_TOKEN()}`,'Content-Type':'application/json'},body:JSON.stringify({files:{[GH_FILE]:{content}}})});
     if(r.ok) updateSyncStatus(true); else updateSyncStatus(false);
   }catch(e){updateSyncStatus(false);}
 }
@@ -2736,11 +2639,10 @@ async function cloudLoad(){
     const content=d.files?.[GH_FILE]?.content;
     if(!content) return false;
     const data=JSON.parse(content);
-    // Ne jamais écraser des données locales plus récentes
     const localRaw=localStorage.getItem(LS_KEY);
     const localTs=localRaw?JSON.parse(localRaw)._ts||0:0;
     const cloudTs=data._ts||0;
-    if(localTs>cloudTs){updateSyncStatus(true);return true;}// local plus récent, on garde
+    if(localTs>cloudTs){updateSyncStatus(true);return true;}
     if(data.USER)        USER=data.USER;
     if(data.USER_FD)     USER_FD=data.USER_FD;
     if(data.USER_RD)     USER_RD=data.USER_RD;
@@ -2763,11 +2665,7 @@ async function createSync(){
   btn.textContent='⏳ Création...'; btn.disabled=true;
   const content=JSON.stringify({USER,USER_FD,USER_RD,TRESO});
   try{
-    const r=await fetch('https://api.github.com/gists',{
-      method:'POST',
-      headers:{'Authorization':`Bearer ${GH_TOKEN()}`,'Content-Type':'application/json'},
-      body:JSON.stringify({description:'Cabinet AG - Données dashboard',public:false,files:{[GH_FILE]:{content}}})
-    });
+    const r=await fetch('https://api.github.com/gists',{method:'POST',headers:{'Authorization':`Bearer ${GH_TOKEN()}`,'Content-Type':'application/json'},body:JSON.stringify({description:'Cabinet AG - Données dashboard',public:false,files:{[GH_FILE]:{content}}})});
     const d=await r.json();
     if(!d.id){setSyncMsg('❌ Erreur. Vérifie ton token.');btn.textContent='🆕 Créer mon espace de sync';btn.disabled=false;return;}
     localStorage.setItem(SYNC_KEY,d.id);
@@ -2817,14 +2715,21 @@ function resetSync(){
 
 function updateSyncStatus(ok){
   const el=document.getElementById('sync-status');
+  const mobIcon=document.getElementById('mob-sync-icon');
   if(!el) return;
-  if(!getSyncId()) el.innerHTML='☁️ Sync non configuré';
-  else if(ok) el.innerHTML='<span style="color:#059669">☁️ ✅ Sync activée</span>';
-  else el.innerHTML='<span style="color:#dc2626">☁️ ⚠️ Sync (hors ligne)</span>';
+  if(!getSyncId()){
+    el.innerHTML='☁️ Sync non configuré';
+    if(mobIcon) mobIcon.textContent='⚙';
+  } else if(ok){
+    el.innerHTML='<span style="color:#059669">☁️ ✅ Sync activée</span>';
+    if(mobIcon) mobIcon.textContent='✅';
+  } else {
+    el.innerHTML='<span style="color:#dc2626">☁️ ⚠️ Sync (hors ligne)</span>';
+    if(mobIcon) mobIcon.textContent='⚠️';
+  }
 }
 
 function setSyncMsg(msg){const el=document.getElementById('sync-msg');if(el) el.textContent=msg;}
-
 function openSyncModal(){
   document.getElementById('sync-modal').style.display='flex';
   setSyncMsg('');
@@ -2834,7 +2739,6 @@ function openSyncModal(){
 }
 function closeSyncModal(){document.getElementById('sync-modal').style.display='none';}
 
-// Polling automatique toutes les 60s pour détecter les modifications d'un autre appareil
 async function pollCloud(){
   if(!getSyncId()) return;
   try{
@@ -2848,38 +2752,45 @@ async function pollCloud(){
     const localTs=localRaw?JSON.parse(localRaw)._ts||0:0;
     const cloudTs=data._ts||0;
     if(cloudTs>localTs){
-      // Nouvelles données disponibles depuis un autre appareil
-      if(data.USER)        USER=data.USER;
-      if(data.USER_FD)     USER_FD=data.USER_FD;
-      if(data.USER_RD)     USER_RD=data.USER_RD;
-      if(data.TRESO)       TRESO=data.TRESO;
-      if(data.KSU_DATA)    KSU_DATA=data.KSU_DATA;
+      if(data.USER) USER=data.USER;
+      if(data.USER_FD) USER_FD=data.USER_FD;
+      if(data.USER_RD) USER_RD=data.USER_RD;
+      if(data.TRESO) TRESO=data.TRESO;
+      if(data.KSU_DATA) KSU_DATA=data.KSU_DATA;
       if(data.MANDAT_DATA) MANDAT_DATA=data.MANDAT_DATA;
-      if(data.EXPLOIT_DATA)EXPLOIT_DATA=data.EXPLOIT_DATA;
+      if(data.EXPLOIT_DATA) EXPLOIT_DATA=data.EXPLOIT_DATA;
       localStorage.setItem(LS_KEY,JSON.stringify({USER,USER_FD,USER_RD,TRESO,KSU_DATA,MANDAT_DATA,EXPLOIT_DATA,_ts:cloudTs}));
       YRS.forEach(yr=>{Object.keys(BASE[yr]||{}).forEach(cat=>{for(let mo=0;mo<12;mo++){const v=catTotalFromUser(yr,cat,mo);if(v!==null) BASE[yr][cat][mo]=v;}});});
       updateSyncStatus(true);
-      showNotif('☁️ Données synchronisées depuis un autre appareil');
-      // Rafraîchir la vue courante
-      const cur=document.querySelector('.page[style*="block"]')?.id||'dashboard';
-      go(cur);
+      showNotif('☁️ Données synchronisées');
+      go('dashboard');
     }
   }catch(e){}
 }
 
-// Init avec chargement cloud
+function initFirebaseWhenReady(retries=0){
+  if(typeof firebase !== 'undefined'){
+    initFirebaseCompta();
+  } else if(retries < 20){
+    // Firebase pas encore chargé, réessayer dans 150ms
+    setTimeout(()=>initFirebaseWhenReady(retries+1), 150);
+  } else {
+    console.warn('Firebase non disponible après délai — mode hors-ligne');
+  }
+}
+
 async function initApp(){
-  initFirebaseCompta(); // connexion temps réel à la base compta
   loadLocal();
+  setupPWA();
+  go('dashboard');
+  // Lancer Firebase en parallèle sans bloquer l'affichage
+  initFirebaseWhenReady();
   if(getSyncId()){
     updateSyncStatus(true);
     const ok=await cloudLoad();
     if(ok) go('dashboard');
+    setInterval(pollCloud,60000);
   }
-  setupPWA();
-  go('dashboard');
-  // Démarrer le polling toutes les 60 secondes
-  if(getSyncId()) setInterval(pollCloud,60000);
 }
 initApp();
 </script>
