@@ -1695,7 +1695,7 @@ function renderAnalyse(){
   REV_CATS.forEach(cat=>{
     const def=CATS[cat];
     const vals=idxs.map(i=>catTotal(yr,cat,i));
-    const tot=sum(vals);
+    const tot=sum(elapsedIdxs.map(i=>catTotal(yr,cat,i))); // Total = mois écoulés
     const prevVals=prevIdxs.map(i=>catTotal(prev,cat,i));
     const prevTot=sum(prevVals);
     html+=`<tr class="tr-cat" id="grp_${cat}" onclick="toggleAnalyseGroup('grp_${cat}')"><td><span class="g-arr" style="display:inline-block;margin-right:6px;transition:transform .2s">▾</span>${def.icon} ${def.label}</td>${vals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td><strong>${fmtN(tot)}</strong></td>${pca(tot,total_ca)}${pca(prevTot,prev_total_ca)}${dca(tot,total_ca,prevTot,prev_total_ca,false)}</tr>`;
@@ -1715,14 +1715,14 @@ function renderAnalyse(){
       }
     }
   });
-  const revVals=idxs.map(i=>monthComm(yr,i));const totalRev=sum(revVals);
+  const revVals=idxs.map(i=>monthComm(yr,i));const totalRev=sum(elapsedIdxs.map(i=>monthComm(yr,i)));
   html+=`<tr class="tr-total" style="background:#1e3a5f;font-size:13px"><td>💰 TOTAL COMMISSIONS</td>${revVals.map(v=>`<td style="color:#6ee7b7;font-weight:700">${fmtN(v)}</td>`).join('')}<td style="color:#6ee7b7;font-weight:800;font-size:14px">${fmtN(totalRev)}</td><td>100%</td><td>100%</td><td>—</td></tr>`;
 
   html+=`<tr class="tr-sep"><td colspan="${idxs.length+5}">CHARGES</td></tr>`;
   CHG_CATS.forEach(cat=>{
     const def=CATS[cat];
     const vals=idxs.map(i=>catTotal(yr,cat,i));
-    const tot=sum(vals);
+    const tot=sum(elapsedIdxs.map(i=>catTotal(yr,cat,i))); // Total = mois écoulés
     const prevVals=prevIdxs.map(i=>catTotal(prev,cat,i));
     const prevTot=sum(prevVals);
     html+=`<tr class="tr-cat" id="grp_${cat}" onclick="toggleAnalyseGroup('grp_${cat}')"><td><span class="g-arr" style="display:inline-block;margin-right:6px;transition:transform .2s">▾</span>${def.icon} ${def.label}</td>${vals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td><strong>${fmtN(tot)}</strong></td>${pca(tot,total_ca)}${pca(prevTot,prev_total_ca)}${dca(tot,total_ca,prevTot,prev_total_ca,true)}</tr>`;
@@ -1735,9 +1735,9 @@ function renderAnalyse(){
       });
     }
   });
-  const chgVals=idxs.map(i=>monthChg(yr,i));const totalChg=sum(chgVals);
+  const chgVals=idxs.map(i=>monthChg(yr,i));const totalChg=sum(elapsedIdxs.map(i=>monthChg(yr,i)));
   html+=`<tr class="tr-charges"><td>TOTAL CHARGES</td>${chgVals.map(v=>`<td>${fmtN(v)}</td>`).join('')}<td>${fmtN(totalChg)}</td>${pca(totalChg,total_ca)}${pca(sum(prevIdxs.map(i=>monthChg(prev,i))),prev_total_ca)}${dca(totalChg,total_ca,sum(prevIdxs.map(i=>monthChg(prev,i))),prev_total_ca,true)}</tr>`;
-  const soldeVals=idxs.map(i=>monthSolde(yr,i));const totalSolde=sum(soldeVals);
+  const soldeVals=idxs.map(i=>monthSolde(yr,i));const totalSolde=sum(elapsedIdxs.map(i=>monthSolde(yr,i)));
   html+=`<tr class="tr-solde"><td>SOLDE NET</td>${soldeVals.map(v=>`<td style="color:${v>=0?'#6ee7b7':'#fca5a5'}">${fmtN(v)}</td>`).join('')}<td>${fmtN(totalSolde)}</td><td colspan="3"></td></tr>`;
   html+='</tbody></table>';
   document.getElementById('aTbl').innerHTML=html;
@@ -2095,6 +2095,7 @@ function renderMandatRecap(){
   rows+=totRow('r-chg-tot','TOTAL SORTIES',(y,m1)=>getMandatOut(y,m1));
 
   let cumul=0;
+  const elapsedM=elapsedIdx(yr);
   let rSolde=`<tr class="r-solde"><td>⚖️ SOLDE</td>`;
   cols.forEach(m=>{
     const mo1=m+1;
@@ -2102,7 +2103,7 @@ function renderMandatRecap(){
     const out=getMandatOut(yr,mo1);
     const v=inp-out;
     const hasData=inp>0||out>0;
-    if(hasData) cumul+=v;
+    if(hasData&&elapsedM.includes(m)) cumul+=v;
     const color=hasData?(v>=0?'#6ee7b7':'#f87171'):'#475569';
     rSolde+=`<td class="${m===mandat_mo?'rcur':''}" style="color:${color};font-weight:700">${hasData?fmtN(Math.round(v)):'—'}</td>`;
   });
@@ -2264,11 +2265,12 @@ function renderExploitRecap(){
     (y,m)=>catTotal(y,cat,m)));
   rows+=totRow('r-chg-tot','TOTAL CHARGES',(y,m)=>monthChg(y,m));
   let cumul=0;
+  const elapsed=elapsedIdx(yr);
   let rSolde=`<tr class="r-solde"><td>⚖️ SOLDE</td>`;
   cols.forEach(m=>{
     const inp=getIn(yr,m);const chg=monthChg(yr,m);const v=inp-chg;
     const hasData=inp>0||chg>0;
-    if(hasData) cumul+=v;
+    if(hasData&&elapsed.includes(m)) cumul+=v; // cumul = mois écoulés uniquement
     const color=hasData?(v>=0?'#6ee7b7':'#f87171'):'#475569';
     rSolde+=`<td class="${m===exploit_mo?'rcur':''}" style="color:${color};font-weight:700">${hasData?fmtN(Math.round(v)):'—'}</td>`;
   });
