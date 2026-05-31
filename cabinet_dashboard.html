@@ -1828,21 +1828,16 @@ function renderAnalyse(){
     // Surlignage sursauts par cellule
     const cellHtml=idxs.map((mo,idx2)=>{
       const v=vals[idx2];
-      if(v===0) return '<td>'+fmtN(v)+'</td>';
+      if(v===0) return '<td>—</td>';
       const vm1=mo>0?catTotal(yr,cat,mo-1):0;
       const vsM1=vm1>0?(v-vm1)/vm1:0;
-      const vn1=YRS.includes(yr-1)?catTotal(yr-1,cat,mo):0;
-      const vsN1=vn1>0?(v-vn1)/vn1:0;
-      const alertM1=vsM1>=0.15, alertN1=vsN1>=0.15;
-      if(alertM1||alertN1){
-        const bg=alertM1&&alertN1?'#fee2e2':alertM1?'#fff7ed':'#ede9fe';
-        const border=alertM1&&alertN1?'#dc2626':alertM1?'#f59e0b':'#8b5cf6';
-        const tip=(alertM1?'M-1 +'+(vsM1*100).toFixed(0)+'%':'')+(alertM1&&alertN1?' | ':'')+(alertN1?'N-1 +'+(vsN1*100).toFixed(0)+'%':'');
-        return '<td style="background:'+bg+';border-left:3px solid '+border+';font-weight:700" title="'+tip+'">'+fmtN(v)+' <span style="font-size:9px;color:'+border+'">▲</span></td>';
+      if(vsM1>=0.15){
+        const tip='vs M-1 : '+fmt(vm1)+' → '+fmt(v)+' (+'+( vsM1*100).toFixed(0)+'%)';
+        return '<td style="background:#fff7ed;border-left:3px solid #f59e0b;font-weight:700" title="'+tip+'">'+fmtN(v)+' <span style="font-size:9px;color:#f59e0b">▲</span></td>';
       }
       return '<td>'+fmtN(v)+'</td>';
     }).join('');
-    html+=`<tr class="tr-cat" id="grp_${cat}" onclick="toggleAnalyseGroup('grp_${cat}')"><td><span class="g-arr" style="display:inline-block;margin-right:6px;transition:transform .2s">▾</span>${def.icon} ${def.label}</td>${cellHtml}<td><strong>${fmtN(tot)}</strong></td>${pca(tot,total_ca)}${pca(prevTot,prev_total_ca)}<td style="color:${tot-prevTot<=0?'#059669':'#dc2626'};font-weight:700">${prevTot>0?(tot-prevTot>=0?'+':'')+fmtN(Math.round(tot-prevTot))+' €  '+(prevTot>0?'('+((tot-prevTot)/prevTot*100).toFixed(1)+'%)':''):'—'}</td></tr>`;
+    html+=`<tr class="tr-cat" id="grp_${cat}" onclick="toggleAnalyseGroup('grp_${cat}')"><td><span class="g-arr" style="display:inline-block;margin-right:6px;transition:transform .2s">▾</span>${def.icon} ${def.label}</td>${cellHtml}<td><strong>${fmtN(tot)}</strong><br><span style="font-size:10px;color:#94a3b8;font-weight:400">M-1: ${sum(elapsedIdxs.map(i=>i>0?catTotal(yr,cat,i-1):0))>0?fmtN(Math.round(sum(elapsedIdxs.map(i=>i>0?catTotal(yr,cat,i-1):0)))):'—'}</span></td>${pca(tot,total_ca)}${pca(prevTot,prev_total_ca)}<td style="color:${tot-prevTot<=0?'#059669':'#dc2626'};font-weight:700">${prevTot>0?(tot-prevTot>=0?'+':'')+fmtN(Math.round(tot-prevTot))+' €  '+(prevTot>0?'('+((tot-prevTot)/prevTot*100).toFixed(1)+'%)':''):'—'}</td></tr>`;
     const d=getDetail(yr,idxs[0]+1);
     if(d&&d[cat]){
       const items=CATS[cat].items||Object.keys(d[cat]);
@@ -1852,22 +1847,14 @@ function renderAnalyse(){
         // Surlignage sous-poste par cellule
         const itemCells=idxs.map((mo,idx2)=>{
           const v=iv[idx2];
-          if(v===0) return '<td>—</td>';
-          // vs M-1
+          if(v===0) return '<td style="color:#c9d5e0;font-size:11px">—</td>';
           const vm1=idx2>0?iv[idx2-1]:0;
           const vsM1=vm1>0?(v-vm1)/vm1:0;
-          // vs N-1
-          const ivN1=idxs.map(i=>{const dd=getDetail(yr-1,i+1);return(dd&&dd[cat]&&dd[cat][item])||0;});
-          const vn1=ivN1[idx2]||0;
-          const vsN1=vn1>0?(v-vn1)/vn1:0;
-          const alertM1=vsM1>=0.15, alertN1=vsN1>=0.15;
-          if(alertM1||alertN1){
-            const bg=alertM1&&alertN1?'#fee2e2':alertM1?'#fff7ed':'#ede9fe';
-            const border=alertM1&&alertN1?'#dc2626':alertM1?'#f59e0b':'#8b5cf6';
-            const tip=(alertM1?'M-1 +'+(vsM1*100).toFixed(0)+'%':'')+(alertM1&&alertN1?' | ':'')+(alertN1?'N-1 +'+(vsN1*100).toFixed(0)+'%':'');
-            return '<td style="background:'+bg+';border-left:3px solid '+border+';font-weight:700;font-size:11px" title="'+tip+'">'+fmtN(v,2)+' <span style="font-size:9px;color:'+border+'">▲</span></td>';
+          if(vsM1>=0.15){
+            const tip='vs M-1 : '+fmt(vm1)+' → '+fmt(v)+' (+'+( vsM1*100).toFixed(0)+'%)';
+            return '<td style="background:#fff7ed;border-left:3px solid #f59e0b;font-weight:700;font-size:11px" title="'+tip+'">'+fmtN(v,2)+' <span style="font-size:9px;color:#f59e0b">▲</span></td>';
           }
-          return '<td>'+(v>0?fmtN(v,2):'—')+'</td>';
+          return '<td style="font-size:11px">'+(v>0?fmtN(v,2):'—')+'</td>';
         }).join('');
         html+=`<tr class="tr-item hr" data-group="grp_${cat}"><td>${item}</td>${itemCells}<td>${fmtN(sum(iv),2)}</td><td colspan="3"></td></tr>`;
       });
@@ -1883,15 +1870,9 @@ function renderAnalyse(){
               if(v===0) return '<td style="color:#c9d5e0;font-size:11px">—</td>';
               const vm1=idx2>0?iv2[idx2-1]:0;
               const vsM1=vm1>0?(v-vm1)/vm1:0;
-              const iv2N1=idxs.map(i=>{const fd=getFixesDetail(yr-1,i+1);return(fd&&fd[key]&&fd[key][subItem])||0;});
-              const vn1=iv2N1[idx2]||0;
-              const vsN1=vn1>0?(v-vn1)/vn1:0;
-              const alertM1=vsM1>=0.15, alertN1=vsN1>=0.15;
-              if(alertM1||alertN1){
-                const bg=alertM1&&alertN1?'#fee2e2':alertM1?'#fff7ed':'#ede9fe';
-                const border=alertM1&&alertN1?'#dc2626':alertM1?'#f59e0b':'#8b5cf6';
-                const tip=(alertM1?'M-1 +'+(vsM1*100).toFixed(0)+'%':'')+(alertM1&&alertN1?' | ':'')+(alertN1?'N-1 +'+(vsN1*100).toFixed(0)+'%':'');
-                return '<td style="background:'+bg+';border-left:3px solid '+border+';font-weight:700;font-size:11px" title="'+tip+'">'+fmtN(v,2)+' <span style="font-size:9px;color:'+border+'">▲</span></td>';
+              if(vsM1>=0.15){
+                const tip='vs M-1 : '+fmt(vm1)+' → '+fmt(v)+' (+'+( vsM1*100).toFixed(0)+'%)';
+                return '<td style="background:#fff7ed;border-left:3px solid #f59e0b;font-weight:700;font-size:11px" title="'+tip+'">'+fmtN(v,2)+' <span style="font-size:9px;color:#f59e0b">▲</span></td>';
               }
               return '<td style="font-size:11px">'+fmtN(v,2)+'</td>';
             }).join('');
@@ -1906,15 +1887,9 @@ function renderAnalyse(){
             if(v===0) return '<td>—</td>';
             const vm1=idx2>0?dejVals[idx2-1]:0;
             const vsM1=vm1>0?(v-vm1)/vm1:0;
-            const dejN1=idxs.map(i=>{const fd=getFixesDetail(yr-1,i+1);return fd?.dejeuners?.reduce((s,v)=>s+v,0)||0;});
-            const vn1=dejN1[idx2]||0;
-            const vsN1=vn1>0?(v-vn1)/vn1:0;
-            const alertM1=vsM1>=0.15, alertN1=vsN1>=0.15;
-            if(alertM1||alertN1){
-              const bg=alertM1&&alertN1?'#fee2e2':alertM1?'#fff7ed':'#ede9fe';
-              const border=alertM1&&alertN1?'#dc2626':alertM1?'#f59e0b':'#8b5cf6';
-              const tip=(alertM1?'M-1 +'+(vsM1*100).toFixed(0)+'%':'')+(alertM1&&alertN1?' | ':'')+(alertN1?'N-1 +'+(vsN1*100).toFixed(0)+'%':'');
-              return '<td style="background:'+bg+';border-left:3px solid '+border+';font-weight:700;font-size:11px" title="'+tip+'">'+fmtN(v,2)+' <span style="font-size:9px;color:'+border+'">▲</span></td>';
+            if(vsM1>=0.15){
+              const tip='vs M-1 : '+fmt(vm1)+' → '+fmt(v)+' (+'+( vsM1*100).toFixed(0)+'%)';
+              return '<td style="background:#fff7ed;border-left:3px solid #f59e0b;font-weight:700;font-size:11px" title="'+tip+'">'+fmtN(v,2)+' <span style="font-size:9px;color:#f59e0b">▲</span></td>';
             }
             return '<td style="font-size:11px">'+fmtN(v,2)+'</td>';
           }).join('');
