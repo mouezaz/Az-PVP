@@ -1912,7 +1912,7 @@ function renderAnalyse(){
   const barsEl=document.getElementById('aBars');
   if(total_ca>0){
     barsEl.innerHTML=CHG_CATS.map(cat=>{
-      const def=CATS[cat];const tot=sum(idxs.map(i=>catTotal(yr,cat,i)));const pv=tot/total_ca*100;
+      const def=CATS[cat];const tot=sum(elapsedIdxs.map(i=>catTotal(yr,cat,i)));const pv=tot/total_ca*100;
       const ptot=sum(prevIdxs.map(i=>catTotal(prev,cat,i)));const pp=prev_total_ca>0?ptot/prev_total_ca*100:null;
       const diff=pp!==null?pv-pp:null;
       const dt=diff!==null?`<span style="font-size:10.5px;color:${diff>0?'#dc2626':'#059669'};margin-left:4px">(${diff>0?'+':''}${diff.toFixed(1)}%)</span>`:'';
