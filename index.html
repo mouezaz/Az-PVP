@@ -9185,7 +9185,38 @@ function importRingoverCSV(input, mois, annee) {
       const iDir    = headers.indexOf('Direction');
       const iType   = headers.indexOf('Type');
       const iUser   = headers.indexOf('Utilisateur');
+      const iDate   = headers.indexOf('Date') >= 0 ? headers.indexOf('Date') : headers.findIndex(h => h.toLowerCase().includes('date'));
       if (iDir<0 || iType<0 || iUser<0) { toast('Format CSV non reconnu — colonnes Direction/Type/Utilisateur attendues','error'); return; }
+
+      // ── Détecter le mois/année depuis les dates du fichier CSV ──
+      if (iDate >= 0) {
+        const dateCounts = {};
+        for (var di=1; di<lines.length; di++) {
+          const dcols = parseCSVLine(lines[di], sep);
+          const dval  = (dcols[iDate]||'').replace(/^"|"$/g,'').trim();
+          // Formats : YYYY-MM-DD ou DD/MM/YYYY ou DD/MM/YY
+          let dm, dy;
+          const m1 = dval.match(/^(\d{4})-(\d{2})-(\d{2})/);
+          const m2 = dval.match(/^(\d{2})\/(\d{2})\/(\d{2,4})/);
+          if (m1) { dy = parseInt(m1[1]); dm = parseInt(m1[2]); }
+          else if (m2) { dm = parseInt(m2[2]); dy = parseInt(m2[3]); if (dy < 100) dy += 2000; }
+          if (dm && dy) {
+            const key = dy + '-' + dm;
+            dateCounts[key] = (dateCounts[key]||0) + 1;
+          }
+        }
+        // Prendre le mois le plus fréquent
+        const bestKey = Object.keys(dateCounts).sort((a,b)=>dateCounts[b]-dateCounts[a])[0];
+        if (bestKey) {
+          const [detectedY, detectedM] = bestKey.split('-').map(Number);
+          if (detectedM !== mois || detectedY !== annee) {
+            mois  = detectedM;
+            annee = detectedY;
+            toast('📅 Mois détecté automatiquement : ' + MOIS_FULL[mois] + ' ' + annee, 'info');
+          }
+        }
+      }
+
       // Colonnes numéros Ringover
       const iNumApp  = headers.indexOf('Numéro appelant'); // qui a appelé (entrant = client)
       const iNumAppe = headers.indexOf('Numéro appelé');   // qui a été appelé (sortant = client)
