@@ -8995,6 +8995,7 @@ function renderTelPage(mois, annee) {
         📂 Importer CSV Ringover
         <input type="file" accept=".csv" style="display:none" onchange="importRingoverCSV(this,parseInt(document.getElementById('tel-filter-mois').value),parseInt(document.getElementById('tel-filter-annee').value))">
       </label>
+      <button onclick="resetTelMois(parseInt(document.getElementById('tel-filter-mois').value),parseInt(document.getElementById('tel-filter-annee').value))" style="background:#fff7ed;color:#c2410c;border:1.5px solid #fdba74;border-radius:8px;padding:8px 14px;font-size:.87rem;font-weight:600;cursor:pointer">🗑️ Supprimer ce mois</button>
       <button onclick="resetTelStats()" style="background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;border-radius:8px;padding:8px 14px;font-size:.87rem;font-weight:600;cursor:pointer">🗑️ Tout réinitialiser</button>
     </div>
 
@@ -9065,6 +9066,18 @@ function renderTelPage(mois, annee) {
 }
 
 PAGES['admin-tel'] = (mc) => { renderTelPage(nowMois(), nowAnnee()); };
+
+function resetTelMois(mois, annee) {
+  if (!confirm('Supprimer les données téléphonie de ' + MOIS_FULL[mois] + ' ' + annee + ' ?')) return;
+  if (!DB.telStats) return;
+  Object.keys(DB.telStats).forEach(function(k) {
+    var d = DB.telStats[k];
+    if (d && d.mois === mois && d.annee === annee) delete DB.telStats[k];
+  });
+  saveDB(DB);
+  toast('✅ Données ' + MOIS_FULL[mois] + ' ' + annee + ' supprimées', 'success');
+  renderTelPage(mois, annee);
+}
 
 function resetTelStats() {
   if (!confirm('Supprimer toutes les données téléphonie (tous les mois) ?')) return;
