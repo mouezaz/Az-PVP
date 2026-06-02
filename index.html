@@ -8072,7 +8072,7 @@ function renderStatsVentes() {
 
   // Mois pic
   var maxMois = 1;
-  for (var m=1; m<=12; m++) if (byMois[m].prime > byMois[maxMois].prime) maxMois = m;
+  for (var m=1; m<=12; m++) if (byMois[m].nb > byMois[maxMois].nb) maxMois = m;
 
   // Meilleur collab
   var bestCollab = Object.keys(byCollab).sort(function(a,b){ return byCollab[b].prime-byCollab[a].prime; })[0];
@@ -8093,7 +8093,7 @@ function renderStatsVentes() {
   html += _svKpi('💰 Total primes', fmtEuro(totalPrime), '#003DA5');
   html += _svKpi('📄 Nb ventes', totalNb, '#157A45');
   html += _svKpi('🏆 Top collab', bestCollab||'—', COLLAB_COLORS[bestCollab]||'#6b7280');
-  html += _svKpi('📅 Mois pic', MOIS_LABELS[maxMois], '#D4711A');
+  html += _svKpi('📅 Mois pic', MOIS_LABELS[maxMois] + ' (' + byMois[maxMois].nb + ' contrats)', '#D4711A');
   html += '</div>';
 
   // ── Évolution mensuelle ──
