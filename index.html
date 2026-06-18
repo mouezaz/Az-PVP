@@ -9096,6 +9096,37 @@ function renderTelPage(mois, annee) {
 
 PAGES['admin-tel'] = (mc) => { renderTelPage(nowMois(), nowAnnee()); };
 
+function deleteComptaMois() {
+  var sel = document.getElementById('admin-compta-mois-sel');
+  if (!sel) return;
+  var parts = sel.value.split('-');
+  var annee = parseInt(parts[0]), mois = parseInt(parts[1]);
+  if (!confirm('Supprimer toutes les écritures comptables de ' + MOIS_FULL[mois] + ' ' + annee + ' ?')) return;
+  if (!DB.compta) return;
+  var avant = (DB.compta.ecritures||[]).length;
+  DB.compta.ecritures = (DB.compta.ecritures||[]).filter(function(e) {
+    // date format: "2026-05-05"
+    if (!e.date) return true;
+    var d = new Date(e.date);
+    return !(d.getMonth()+1 === mois && d.getFullYear() === annee);
+  });
+  // Supprimer aussi les mouvements et remises du même mois
+  DB.compta.mouvements = (DB.compta.mouvements||[]).filter(function(m) {
+    if (!m.date) return true;
+    var d = new Date(m.date);
+    return !(d.getMonth()+1 === mois && d.getFullYear() === annee);
+  });
+  DB.compta.remises = (DB.compta.remises||[]).filter(function(r) {
+    if (!r.date) return true;
+    var d = new Date(r.date);
+    return !(d.getMonth()+1 === mois && d.getFullYear() === annee);
+  });
+  var apres = (DB.compta.ecritures||[]).length;
+  saveDB(DB);
+  toast('✅ ' + (avant - apres) + ' écriture(s) supprimée(s) — ' + MOIS_FULL[mois] + ' ' + annee, 'success');
+  showPage('admin-compta');
+}
+
 function resetTelMois(mois, annee) {
   if (!confirm('Supprimer les données téléphonie de ' + MOIS_FULL[mois] + ' ' + annee + ' ?')) return;
   if (!DB.telStats) return;
@@ -14976,6 +15007,7 @@ PAGES['admin-compta'] = function(mc) {
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
       <input type="month" id="admin-compta-mois-sel" value="${moisSel}" onchange="_comptaAdminMoisSel=this.value;showPage('admin-compta')"
         style="padding:7px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.85rem;">
+      <button onclick="deleteComptaMois()" style="background:#fff7ed;color:#c2410c;border:1.5px solid #fdba74;border-radius:8px;padding:7px 14px;font-size:.85rem;font-weight:600;cursor:pointer;white-space:nowrap;">🗑️ Supprimer ce mois</button>
       <div style="flex:1;min-width:200px;position:relative;">
         <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#9ca3af;">🔍</span>
         <input type="text" id="admin-compta-search" placeholder="Rechercher client, contrat, produit, collaborateur…"
