@@ -15719,10 +15719,15 @@ function saveContaModal(existingId) {
   }
   saveComptaEcriture(obj);
 
-  // Mouvement caisse automatique si rendu espèces
+  // Mouvement caisse automatique pour les espèces
   var baseEsp2 = type==='mixte' ? montantEspeces : (type==='especes'?montant:0);
+  if (baseEsp2>0 && !existingId) {
+    // Entrée espèces en caisse
+    saveComptaMouvement({ id:'mv-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), date, type:'approvisionnement', montant:baseEsp2, note:'Espèces reçues — '+client+' ('+fmtEuro(baseEsp2)+')', createdAt:Date.now() });
+  }
   if (baseEsp2>0 && renduMonnaie>0 && !existingId) {
-    saveComptaMouvement({ id:'mv-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), date, type:'retrait', montant:renduMonnaie, note:'Rendu monnaie — '+client+' ('+fmtEuro(baseEsp2)+')', createdAt:Date.now() });
+    // Sortie rendu monnaie
+    saveComptaMouvement({ id:'mv-'+(Date.now()+1)+'-'+Math.random().toString(36).slice(2,6), date, type:'retrait', montant:renduMonnaie, note:'Rendu monnaie — '+client+' ('+fmtEuro(baseEsp2)+')', createdAt:Date.now()+1 });
   }
 
   document.getElementById('conta-modal-overlay').remove();
