@@ -14831,12 +14831,33 @@ function initCompta() {
 
 function getFondCaisse() {
   initCompta();
-  return (DB.compta.mouvements||[]).reduce(function(s,m){
+  // Mouvements manuels (fond de caisse, retraits, remises banque)
+  var solde = (DB.compta.mouvements||[]).reduce(function(s,m){
     if (m.type==='approvisionnement') return s + (m.montant||0);
     if (m.type==='retrait')           return s - (m.montant||0);
     if (m.type==='remise_banque')     return s - (m.montant||0);
     return s;
   }, 0);
+  // Espèces reçues des clients (entrent physiquement dans la caisse)
+  (DB.compta.ecritures||[]).forEach(function(e){
+    if (e.type === 'especes' && e.statut === 'remis') {
+      solde += (e.montant || 0);
+    }
+    // Rendu monnaie déjà soustrait via mouvement retrait automatique
+  });
+  // Remises banque d'espèces (sorties de caisse)
+  (DB.compta.remises||[]).forEach(function(r){
+    // Les remises de chèques ne touchent pas la caisse physique
+    // On identifie les remises d'espèces via les écritures liées
+    var ids = r.ecrituresIds || [];
+    ids.forEach(function(id){
+      var ec = (DB.compta.ecritures||[]).find(function(e){ return e.id === id; });
+      if (ec && ec.type === 'especes') {
+        solde -= (r.montantTotal || 0);
+      }
+    });
+  });
+  return solde;
 }
 
 function getEcrituresMois(mois, annee) {
