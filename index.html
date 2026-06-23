@@ -1729,8 +1729,8 @@ function renderCollabVentes() {
   const hasLock     = autoBloque || mrhBloque || an28Bloque;
   // Construire les badges de conditions manquantes
   const lockBadges  = [
-    autoBloque ? `Auto ${objSt.nbAuto}/${OBJECTIFS_COLLAB.autoMin}${!objSt.nopOK?' + NOP '+objSt.nbNOP+'/'+OBJECTIFS_COLLAB.nopMin:''}` : null,
-    mrhBloque  ? `MRH ${objSt.nbMRH}/${OBJECTIFS_COLLAB.mrhMin}${!objSt.nopOK && !autoBloque?' + NOP '+objSt.nbNOP+'/'+OBJECTIFS_COLLAB.nopMin:''}` : null,
+    autoBloque ? `Auto ${objSt.nbAuto}/${OBJECTIFS_COLLAB.autoMin}${!objSt.nopOK?' + NOP+GAV '+objSt.nbNOPouGAV+'/'+OBJECTIFS_COLLAB.nopMin:''}` : null,
+    mrhBloque  ? `MRH ${objSt.nbMRH}/${OBJECTIFS_COLLAB.mrhMin}${!objSt.nopOK && !autoBloque?' + NOP+GAV '+objSt.nbNOPouGAV+'/'+OBJECTIFS_COLLAB.nopMin:''}` : null,
     an28Bloque ? `⚠ Décote -30% AN (${objSt.nbAN}/28) — Santé, GAV, PER exemptées` : null,
   ].filter(Boolean).join(' · ');
 
@@ -4417,7 +4417,7 @@ PAGES['collab-home'] = function(mc) {
         :!nopOK?'<span style="background:#fee2e2;color:#991b1b;font-size:.72rem;font-weight:700;padding:2px 10px;border-radius:20px;">⚠️ NOP insuffisant</span>'
         :'<span style="background:#fef9c3;color:#92400e;font-size:.72rem;font-weight:700;padding:2px 10px;border-radius:20px;">En cours…</span>')
       +'</div><div style="display:flex;gap:12px;flex-wrap:wrap;">'
-      +bar(objStatus.nbNOP,OBJECTIFS_COLLAB.nopMin,'NOP','🏢',true)
+      +bar(objStatus.nbNOPouGAV,OBJECTIFS_COLLAB.nopMin,'NOP+GAV','🏢',true)
       +bar(objStatus.nbAuto,OBJECTIFS_COLLAB.autoMin,'Auto','🚗',nopOK)
       +bar(objStatus.nbMRH,OBJECTIFS_COLLAB.mrhMin,'MRH','🏠',nopOK)
       +'</div></div>';
@@ -4607,12 +4607,14 @@ PAGES['collab-suivi'] = (mc) => {
   const nbSante  = myVentesM.filter(v=>v.produit==='Santé').length;
   const nbGAV    = myVentesM.filter(v=>['GAV','PER','Emprunteur'].includes(v.produit)).length;
   const nbNOP    = myVentesM.filter(v=>v.produit==='NOP').length;
+  const nbGAVseul = myVentesM.filter(v=>v.produit==='GAV').length;
   const nbAuto   = myVentesM.filter(v=>v.produit==='Auto').length;
   const nbMRH    = myVentesM.filter(v=>v.produit==='MRH').length;
 
-  // NOP unlock — Auto & MRH se déverrouillent quand NOP >= 4
-  const nopUnlocked  = nbNOP >= OBJ_NOP;
-  const nopManquants = Math.max(0, OBJ_NOP - nbNOP);
+  // NOP unlock — Auto & MRH se déverrouillent quand (NOP + GAV) >= 4
+  const nbNOPouGAV   = nbNOP + nbGAVseul;
+  const nopUnlocked  = nbNOPouGAV >= OBJ_NOP;
+  const nopManquants = Math.max(0, OBJ_NOP - nbNOPouGAV);
 
   // Leads & Devis du mois
   const myLeadsM = (DB.leads||[]).filter(l => {
@@ -4658,7 +4660,7 @@ PAGES['collab-suivi'] = (mc) => {
 
   const pctSante = Math.round(nbSante/OBJ_SANTE*100);
   const pctGAV   = Math.round(nbGAV/OBJ_GAV*100);
-  const pctNOP   = Math.round(nbNOP/OBJ_NOP*100);
+  const pctNOP   = Math.round(nbNOPouGAV/OBJ_NOP*100);
   const pctAuto  = Math.round(nbAuto/OBJ_AUTO*100);
   const pctMRH   = Math.round(nbMRH/OBJ_MRH*100);
 
@@ -4666,12 +4668,12 @@ PAGES['collab-suivi'] = (mc) => {
   const wins = [];
   if (nbSante>=OBJ_SANTE) wins.push(`${nbSante} Santé ✅`);
   if (nbGAV>=OBJ_GAV)     wins.push(`${nbGAV} GAV/PER ✅`);
-  if (nbNOP>=OBJ_NOP)     wins.push(`${nbNOP} NOP 🔓`);
+  if (nbNOPouGAV>=OBJ_NOP) wins.push(`${nbNOPouGAV} NOP+GAV 🔓`);
   if (nbAuto>=OBJ_AUTO)   wins.push(`${nbAuto} Auto ✅`);
   if (nbMRH>=OBJ_MRH)     wins.push(`${nbMRH} MRH ✅`);
   const tips = nopUnlocked
     ? ['Auto & MRH débloqués — foncez ! 🚀', 'Le multi-équipement, c\'est votre super-pouvoir ! 💪']
-    : [`Encore ${nopManquants} NOP pour débloquer Auto & MRH 🔓`, 'Le NOP est la clé de votre développement IARD !'];
+    : [`Encore ${nopManquants} NOP/GAV pour débloquer Auto & MRH 🔓`, 'Le NOP/GAV est la clé de votre développement IARD !'];
   const tip = tips[totalAN % tips.length];
   const bannerMsg = wins.length ? `🏆 Bravo : ${wins.join(' · ')}` : tip;
 
@@ -4736,15 +4738,15 @@ PAGES['collab-suivi'] = (mc) => {
         <div style="font-size:22px">⚡</div>
         <div style="font-size:20px">${nopUnlocked?'🔓':'🔒'}</div>
       </div>
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin-bottom:4px">NOP — Multi-équip.</div>
-      <div style="font-size:36px;font-weight:700;color:${nopUnlocked?'#16A34A':'#D97706'};line-height:1;letter-spacing:-2px">${nbNOP}</div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-600);margin-bottom:4px">NOP+GAV — Multi-équip.</div>
+      <div style="font-size:36px;font-weight:700;color:${nopUnlocked?'#16A34A':'#D97706'};line-height:1;letter-spacing:-2px">${nbNOPouGAV}</div>
       <div style="font-size:12px;color:var(--gray-400);margin-top:4px">obj. <strong>${OBJ_NOP}</strong> / mois</div>
       <div style="margin-top:10px;height:6px;background:rgba(0,0,0,.08);border-radius:99px">
         <div style="height:100%;width:${Math.min(pctNOP,100)}%;background:${nopUnlocked?'#16A34A':'#D97706'};border-radius:99px"></div>
       </div>
       ${nopUnlocked
         ? `<div style="font-size:11px;color:#16A34A;margin-top:6px;font-weight:600">Auto & MRH déverrouillés ! 🎉</div>`
-        : `<div style="font-size:11px;color:#D97706;margin-top:6px;font-weight:600">Encore <strong>${nopManquants}</strong> NOP → déverrouille Auto & MRH</div>`
+        : `<div style="font-size:11px;color:#D97706;margin-top:6px;font-weight:600">Encore <strong>${nopManquants}</strong> NOP/GAV → déverrouille Auto & MRH</div>`
       }
     </div>
   </div>
@@ -12540,13 +12542,15 @@ function getObjectifsStatus(collab, mois, annee) {
   var nbAuto = ventesM.filter(function(v){ return v.produit === 'Auto'; }).length;
   var nbMRH  = ventesM.filter(function(v){ return v.produit === 'MRH';  }).length;
   var nbNOP  = ventesM.filter(function(v){ return v.produit === 'NOP';  }).length;
+  var nbGAV  = ventesM.filter(function(v){ return v.produit === 'GAV';  }).length;
+  var nbNOPouGAV = nbNOP + nbGAV;
   var nbAN   = ventesM.filter(function(v){ return v.affaireNouvelle === 'Oui'; }).length;
-  var nopOK  = nbNOP  >= OBJECTIFS_COLLAB.nopMin;
+  var nopOK  = nbNOPouGAV >= OBJECTIFS_COLLAB.nopMin;
   // Règle 28 AN active à partir de mai 2026
   var regle28actif = (annee > 2026) || (annee === 2026 && mois >= 5);
   var anOK = !regle28actif || nbAN >= OBJECTIFS_COLLAB.anMin;
   return {
-    nbAuto: nbAuto, nbMRH: nbMRH, nbNOP: nbNOP, nbAN: nbAN,
+    nbAuto: nbAuto, nbMRH: nbMRH, nbNOP: nbNOP, nbGAV: nbGAV, nbNOPouGAV: nbNOPouGAV, nbAN: nbAN,
     nopOK:  nopOK,
     autoOK: nopOK && nbAuto >= OBJECTIFS_COLLAB.autoMin,
     mrhOK:  nopOK && nbMRH  >= OBJECTIFS_COLLAB.mrhMin,
