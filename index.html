@@ -3672,18 +3672,22 @@ function saveConvertLead(leadId) {
 // ── GESTION ÉQUIPE (dynamique depuis DB) ──────────────────────
 const COLLABS_DEFAULT = [
   {name:'Dorina', init:'DS', color:'#7B2D8B'},
-  {name:'Rihem',  init:'RF', color:'#003DA5'},
+  {name:'Rihem',  init:'RF', color:'#003DA5', archived:true},
   {name:'Mael',   init:'ML', color:'#0F7B7B', avatarOnly:true},
 ];
-function getCollabs() {
+function getCollabsAll() {
   var stored = DB && DB.settings && DB.settings.collabs;
   return (stored && stored.length > 0) ? stored : COLLABS_DEFAULT;
 }
-function getCollabNames() {
-  return getCollabs().map(function(c){ return c.name; });
+function getCollabs(includeArchived) {
+  var all = getCollabsAll();
+  return includeArchived ? all : all.filter(function(c){ return !c.archived; });
 }
-function getCollabColors() {
-  var r = {}; getCollabs().forEach(function(c){ r[c.name] = c.color; }); return r;
+function getCollabNames(includeArchived) {
+  return getCollabs(includeArchived).map(function(c){ return c.name; });
+}
+function getCollabColors(includeArchived) {
+  var r = {}; getCollabsAll().forEach(function(c){ r[c.name] = c.color; }); return r;
 }
 // Appel ici car COLLABS_DEFAULT et getCollabs() sont maintenant définis
 renderLoginScreen();
@@ -11141,7 +11145,7 @@ function addCollab() {
   if (getCollabNames().indexOf(name) !== -1) { toast(name + ' existe déjà dans l\'équipe', 'error'); return; }
   if (!DB.settings) DB.settings = {};
   if (!DB.settings.collabs || DB.settings.collabs.length === 0) {
-    DB.settings.collabs = COLLABS_DEFAULT.map(function(c){ return {name:c.name, init:c.init, color:c.color}; });
+    DB.settings.collabs = COLLABS_DEFAULT.map(function(c){ return {name:c.name, init:c.init, color:c.color, archived:c.archived, avatarOnly:c.avatarOnly}; });
   }
   DB.settings.collabs.push({ name: name, init: init, color: color });
   saveDB(DB);
@@ -11154,7 +11158,7 @@ function removeCollab(name) {
   if (!confirm('Retirer ' + name + ' de l\'équipe ?\n\nSes données (ventes, leads, devis…) sont conservées.')) return;
   if (!DB.settings) DB.settings = {};
   if (!DB.settings.collabs || DB.settings.collabs.length === 0) {
-    DB.settings.collabs = COLLABS_DEFAULT.map(function(c){ return {name:c.name, init:c.init, color:c.color}; });
+    DB.settings.collabs = COLLABS_DEFAULT.map(function(c){ return {name:c.name, init:c.init, color:c.color, archived:c.archived, avatarOnly:c.avatarOnly}; });
   }
   DB.settings.collabs = DB.settings.collabs.filter(function(c){ return c.name !== name; });
   saveDB(DB);
